@@ -123,6 +123,8 @@ async def run_domain_eval(
     client: AsyncLLMClient,
     domain: DomainPrompt,
     model: str,
+    *,
+    session_id: str | None = None,
     use_tool_call: bool = True,
 ) -> EvalResult:
     """Run extraction and evaluation for a single domain and model.
@@ -135,10 +137,8 @@ async def run_domain_eval(
               Input:  [system prompt, user prompt]
               Output: tool call / assistant text
 
-    ``@observe(capture_input=False, capture_output=False)`` suppresses the
-    default behaviour of serialising Python function args as the trace I/O.
-    We set trace-level I/O explicitly via ``update_current_trace`` so the
-    Langfuse UI shows meaningful natural-language content, not object dumps.
+    Pass a shared ``session_id`` (e.g. ``f"eval-{timestamp}"`` generated once
+    per batch) to group all runs in a single eval session in Langfuse.
     """
     messages = build_prompt(domain, use_tool_call=use_tool_call)
     fn_name = domain.id.replace("-", "_") + "_spec"
@@ -155,6 +155,7 @@ async def run_domain_eval(
 
     with propagate_attributes(
         trace_name=trace_name,
+        session_id=session_id,
         metadata={
             "domain_id": domain.id,
             "complexity": str(domain.complexity),
@@ -210,7 +211,6 @@ async def run_domain_eval(
                 output={
                     "success": True,
                     "health": round(score.health, 3),
-                    "obligation_coverage": round(score.obligation_ratio, 3),
                     "well_formed": score.well_formed,
                 }
             )
@@ -218,11 +218,6 @@ async def run_domain_eval(
                 name="spec_health",
                 value=score.health,
                 comment=f"errors={score.error_count} warnings={score.warning_count}",
-            )
-            langfuse.score_current_trace(
-                name="obligation_coverage",
-                value=score.obligation_ratio,
-                comment=f"{score.obligation_covered}/{score.obligation_total} pairs covered",
             )
             langfuse.score_current_trace(
                 name="well_formed",
@@ -236,9 +231,6 @@ async def run_domain_eval(
             # Log hard zeros so failed traces are visible in score-based filters.
             langfuse.score_current_trace(
                 name="spec_health", value=0.0, comment=error_msg
-            )
-            langfuse.score_current_trace(
-                name="obligation_coverage", value=0.0, comment="spec not parsed"
             )
             langfuse.score_current_trace(name="well_formed", value=0.0)
 
