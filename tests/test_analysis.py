@@ -14,16 +14,18 @@ from alspec.analysis import (
     AxiomRecord,
     ConstrainedSymbol,
     Guard,
+    audit_spec,
     decompose_axiom,
 )
 from alspec.basis import (
+    ALL_BASIS_SPECS,
     finite_map_spec,
     nat_spec,
     partial_order_spec,
     stack_spec,
 )
 from alspec.examples import bug_tracker_spec
-from alspec.helpers import app, const, eq, forall, var
+from alspec.helpers import app, const, eq, forall, iff, var
 from alspec.spec import Axiom
 from alspec.terms import (
     Biconditional,
@@ -891,3 +893,257 @@ class TestAuditFlagInScoreSpec:
         ]
         assert all(d.severity == Severity.WARNING for d in audit_diags)
         assert all(d.axiom is None for d in audit_diags)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 3: Definedness Witness — audit_spec.check == "unwitnessed_partial"
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("spec_fn", ALL_BASIS_SPECS, ids=lambda f: f.__name__)
+def test_basis_specs_no_unwitnessed_partials(spec_fn) -> None:  # type: ignore[no-untyped-def]
+    """Every partial function in the basis library must be witnessed.
+
+    Concrete witnesses:
+    - stack_spec:       pop ← pop_push (RHS = Var), top ← top_push (RHS = Var)
+    - list_spec:        hd  ← hd_cons  (RHS = Var), tl  ← tl_cons  (RHS = Var)
+    - finite_map_spec:  lookup ← lookup_update_hit (RHS = Var)
+    """
+    spec = spec_fn()
+    diagnostics = audit_spec(spec)
+    unwitnessed = [d for d in diagnostics if d.check == "unwitnessed_partial"]
+    assert unwitnessed == [], f"Unexpected unwitnessed partials in {spec.name}: {unwitnessed}"
+
+
+class TestUnwitnessedPartialDetected:
+    """A partial function whose only equations have partial RHS must be flagged."""
+
+    def test_both_partials_flagged(self) -> None:
+        """f(x) = g(x) — both partial, vacuously satisfied by both undefined."""
+        from alspec.helpers import atomic, fn
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={"S": atomic("S")},
+            functions={
+                "c": fn("c", [], "S"),
+                "f": fn("f", [("x", "S")], "S", total=False),
+                "g": fn("g", [("x", "S")], "S", total=False),
+            },
+            predicates={},
+        )
+        x = var("x", "S")
+        spec = Spec(
+            name="TestUnwitnessed",
+            signature=sig,
+            axioms=(
+                # f(x) = g(x) — RHS is partial, vacuously satisfied
+                Axiom("f_eq_g", forall([x], eq(app("f", x), app("g", x)))),
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        unwitnessed = [d for d in diagnostics if d.check == "unwitnessed_partial"]
+        names = {d.message.split("'")[1] for d in unwitnessed}
+        assert "f" in names  # f's only equation has partial RHS
+        assert "g" in names  # g is never on the LHS — unconstrained AND unwitnessed
+
+
+class TestWitnessedByTotalRHS:
+    """A partial function with a total-RHS equation must NOT be flagged."""
+
+    def test_total_constant_rhs_witnesses(self) -> None:
+        """f(c) = c — RHS is total constant, witnesses f."""
+        from alspec.helpers import atomic, fn
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={"S": atomic("S")},
+            functions={
+                "c": fn("c", [], "S"),
+                "f": fn("f", [("x", "S")], "S", total=False),
+            },
+            predicates={},
+        )
+        spec = Spec(
+            name="TestWitnessed",
+            signature=sig,
+            axioms=(
+                # f(c) = c — RHS is total constant, definitely defined
+                Axiom("f_c", eq(app("f", const("c")), const("c"))),
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        unwitnessed = [d for d in diagnostics if d.check == "unwitnessed_partial"]
+        assert unwitnessed == []
+
+    def test_var_rhs_witnesses(self) -> None:
+        """f(push(s, e)) = e — Var RHS is definitely defined, witnesses f."""
+        spec = stack_spec()
+        diagnostics = audit_spec(spec)
+        unwitnessed = [d for d in diagnostics if d.check == "unwitnessed_partial"]
+        # pop + top are both witnessed, so no unwitnessed_partial
+        assert unwitnessed == []
+
+
+class TestWitnessedByDefinedness:
+    """A partial function with only a Definedness assertion must NOT be flagged."""
+
+    def test_iff_definedness_witnesses(self) -> None:
+        """def(f(x)) ⇔ p(x) — no equation for f, but definedness is asserted."""
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+        from alspec.terms import Definedness
+
+        sig = Signature(
+            sorts={"S": atomic("S")},
+            functions={
+                "c": fn("c", [], "S"),
+                "f": fn("f", [("x", "S")], "S", total=False),
+            },
+            predicates={
+                "p": pred("p", [("x", "S")]),
+            },
+        )
+        x = var("x", "S")
+        spec = Spec(
+            name="TestDefWitnessed",
+            signature=sig,
+            axioms=(
+                # def(f(x)) ⇔ p(x) — no value equation, but definedness is asserted
+                Axiom(
+                    "f_def",
+                    forall(
+                        [x],
+                        iff(
+                            Definedness(app("f", x)),
+                            PredApp("p", (x,)),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        unwitnessed = [d for d in diagnostics if d.check == "unwitnessed_partial"]
+        assert unwitnessed == []
+
+    def test_negated_definedness_in_axiom_witnesses(self) -> None:
+        """Even ¬def(f(...)) counts as a Definedness assertion (scanner detects the node)."""
+        from alspec.helpers import atomic, fn
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+        from alspec.terms import Definedness, Negation
+
+        sig = Signature(
+            sorts={"S": atomic("S")},
+            functions={
+                "c": fn("c", [], "S"),
+                "f": fn("f", [("x", "S")], "S", total=False),
+            },
+            predicates={},
+        )
+        k = var("k", "S")
+        spec = Spec(
+            name="TestNegDefWitnessed",
+            signature=sig,
+            axioms=(
+                # ¬def(f(c)) — the finite_map pattern: explicitly undefined on empty
+                Axiom(
+                    "f_undef_c",
+                    Negation(Definedness(app("f", const("c")))),
+                ),
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        unwitnessed = [d for d in diagnostics if d.check == "unwitnessed_partial"]
+        assert unwitnessed == []
+
+
+class TestPartialRHSDoesNotWitness:
+    """An equation where the RHS is a partial function application must NOT witness."""
+
+    def test_partial_self_equation_does_not_witness(self) -> None:
+        """f(c) = f(d) — RHS is partial, does not witness."""
+        from alspec.helpers import atomic, fn
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "T": atomic("T")},
+            functions={
+                "c": fn("c", [], "S"),
+                "d": fn("d", [], "S"),
+                "f": fn("f", [("x", "S")], "T", total=False),
+            },
+            predicates={},
+        )
+        spec = Spec(
+            name="TestPartialRHS",
+            signature=sig,
+            axioms=(
+                # f(c) = f(d) — RHS is partial, does not witness
+                Axiom("f_eq", eq(app("f", const("c")), app("f", const("d")))),
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        unwitnessed = [d for d in diagnostics if d.check == "unwitnessed_partial"]
+        assert len(unwitnessed) == 1
+        assert "f" in unwitnessed[0].message
+
+    def test_finite_map_lookup_miss_does_not_witness_alone(self) -> None:
+        """Miss equation (lookup(update(M,k1,v), k2) = lookup(M, k2)) has partial RHS.
+
+        The finite_map_spec is fully witnessed because the *hit* axiom has a
+        Var RHS. This test verifies the miss axiom in isolation does not witness.
+        """
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+        from alspec.terms import Negation
+
+        k1 = var("k1", "Key")
+        k2 = var("k2", "Key")
+        v = var("v", "Val")
+        M = var("M", "Map")
+
+        sig = Signature(
+            sorts={
+                "Key": atomic("Key"),
+                "Val": atomic("Val"),
+                "Map": atomic("Map"),
+            },
+            functions={
+                "empty": fn("empty", [], "Map"),
+                "update": fn("update", [("M", "Map"), ("k", "Key"), ("v", "Val")], "Map"),
+                "lookup": fn("lookup", [("M", "Map"), ("k", "Key")], "Val", total=False),
+            },
+            predicates={
+                "eq_key": pred("eq_key", [("k1", "Key"), ("k2", "Key")]),
+            },
+        )
+        spec = Spec(
+            name="MapMissOnly",
+            signature=sig,
+            axioms=(
+                # Only the miss axiom: RHS is lookup (partial), does NOT witness
+                Axiom(
+                    "lookup_miss_only",
+                    forall(
+                        [M, k1, k2, v],
+                        Implication(
+                            Negation(PredApp("eq_key", (k1, k2))),
+                            eq(
+                                app("lookup", app("update", M, k1, v), k2),
+                                app("lookup", M, k2),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        unwitnessed = [d for d in diagnostics if d.check == "unwitnessed_partial"]
+        names = {d.message.split("'")[1] for d in unwitnessed}
+        assert "lookup" in names
+

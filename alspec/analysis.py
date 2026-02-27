@@ -19,8 +19,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
+from typing import assert_never
 
 from .check import Diagnostic, Severity
+from .signature import Signature, Totality
 from .spec import Axiom, Spec
 from .terms import (
     Biconditional,
@@ -358,6 +360,123 @@ def decompose_axiom(axiom: Axiom) -> AxiomRecord:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Phase 3 helpers — definitely-defined predicate and Definedness scanner
+# ---------------------------------------------------------------------------
+
+
+def _definitely_defined(term: Term, sig: Signature) -> bool:
+    """Conservative check: is this term definitely defined under total variable assignments?
+
+    Based on CASL's definite definedness (Astesiano et al. §3.3).
+    A term is definitely defined when its definedness follows from
+    structure alone, without reasoning about axiom interactions.
+    """
+    if isinstance(term, Var):
+        return True
+    if isinstance(term, TermLiteral):
+        return True
+    if isinstance(term, FieldAccess):
+        return _definitely_defined(term.term, sig)
+    if isinstance(term, FnApp):
+        fn_sym = sig.get_fn(term.fn_name)
+        if fn_sym is None:
+            return False  # undeclared function — can't determine
+        if fn_sym.totality != Totality.TOTAL:
+            return False  # partial function — never definitely defined
+        return all(_definitely_defined(arg, sig) for arg in term.args)
+    assert_never(term)
+
+
+def _has_definedness_assertion(formula: Formula, fn_name: str) -> bool:
+    """Does this formula contain a Definedness(FnApp(fn_name, ...)) node anywhere?"""
+    if isinstance(formula, Definedness):
+        if isinstance(formula.term, FnApp) and formula.term.fn_name == fn_name:
+            return True
+        return False
+    if isinstance(formula, Equation):
+        return False  # Equations contain Terms, not Formulas
+    if isinstance(formula, PredApp):
+        return False
+    if isinstance(formula, Negation):
+        return _has_definedness_assertion(formula.formula, fn_name)
+    if isinstance(formula, Conjunction):
+        return any(_has_definedness_assertion(f, fn_name) for f in formula.conjuncts)
+    if isinstance(formula, Disjunction):
+        return any(_has_definedness_assertion(f, fn_name) for f in formula.disjuncts)
+    if isinstance(formula, Implication):
+        return (
+            _has_definedness_assertion(formula.antecedent, fn_name)
+            or _has_definedness_assertion(formula.consequent, fn_name)
+        )
+    if isinstance(formula, Biconditional):
+        return (
+            _has_definedness_assertion(formula.lhs, fn_name)
+            or _has_definedness_assertion(formula.rhs, fn_name)
+        )
+    if isinstance(formula, UniversalQuant):
+        return _has_definedness_assertion(formula.body, fn_name)
+    if isinstance(formula, ExistentialQuant):
+        return _has_definedness_assertion(formula.body, fn_name)
+    assert_never(formula)
+
+
+def _check_unwitnessed_partials(spec: Spec, index: AxiomIndex) -> list[Diagnostic]:
+    """Detect partial functions with no definedness witness.
+
+    A partial function f is unwitnessed when:
+    1. No axiom constraining f has an equation RHS that is definitely defined, AND
+    2. No axiom in the entire spec contains Definedness(FnApp(f, ...))
+
+    Primary mechanism (1) handles the common case: f(constructor_term) = value.
+    Secondary mechanism (2) catches explicit Definedness assertions that the
+    decomposer can't attribute to f as a constrained symbol.
+    """
+    diagnostics: list[Diagnostic] = []
+
+    for fn_name, fn_sym in spec.signature.functions.items():
+        if fn_sym.totality != Totality.PARTIAL:
+            continue
+
+        witnessed = False
+
+        # Primary: check equation RHS in constrained records
+        constrained_records = index.by_constrained.get(fn_name, ())
+        for rec in constrained_records:
+            if rec.equation_rhs is not None:
+                if _definitely_defined(rec.equation_rhs, spec.signature):
+                    witnessed = True
+                    break
+
+        # Secondary: scan all axiom formulas for Definedness assertions
+        if not witnessed:
+            for axiom in spec.axioms:
+                if _has_definedness_assertion(axiom.formula, fn_name):
+                    witnessed = True
+                    break
+
+        if not witnessed:
+            diagnostics.append(
+                Diagnostic(
+                    check="unwitnessed_partial",
+                    severity=Severity.WARNING,
+                    axiom=None,
+                    message=(
+                        f"Partial function '{fn_name}' has no definedness witness: "
+                        f"no axiom forces it to be defined on any input"
+                    ),
+                    path=None,
+                )
+            )
+
+    return diagnostics
+
+
+# ---------------------------------------------------------------------------
+# Adequacy checks (Phase 2 — original)
+# ---------------------------------------------------------------------------
+
+
 def _check_unconstrained_fns(spec: Spec, index: AxiomIndex) -> list[Diagnostic]:
     """Emit a WARNING for every declared function not referenced in any axiom."""
     unconstrained = set(spec.signature.functions.keys()) - index.all_referenced_fns
@@ -422,12 +541,12 @@ def audit_spec(spec: Spec) -> tuple[Diagnostic, ...]:
     to detect structural patterns that indicate likely semantic deficiencies.
     Every check is formally grounded — no heuristics, no fuzzy matching.
 
-    Builds the AxiomIndex internally.  Phases 3 and 4 will add more checks
-    here.
+    Builds the AxiomIndex internally.  Phase 4 will add more checks here.
     """
     index = AxiomIndex.from_spec(spec)
     diagnostics: list[Diagnostic] = []
     diagnostics.extend(_check_unconstrained_fns(spec, index))
     diagnostics.extend(_check_unconstrained_preds(spec, index))
     diagnostics.extend(_check_orphan_sorts(spec))
+    diagnostics.extend(_check_unwitnessed_partials(spec, index))  # Phase 3
     return tuple(diagnostics)
