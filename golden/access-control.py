@@ -25,11 +25,13 @@
 *Design Decision 1*: Using a `none` role makes `get_role` total. This allows us to safely use strong equations (like `get_role(s,u) = admin`) in the derivation of `can_access` without strict partiality concerns.
 *Design Decision 2*: `can_access` is modeled as a derived predicate defined universally against `get_role` and `has_permission`, rather than mapped independently against all constructors. This is standard in CASL to prevent combinatorial axiom explosions for derived concepts.
 *Design Decision 3*: `grant` and `revoke` utilize a joint primary key composed of `UserId` and `ResourceId`. Therefore, hit/miss dispatch requires taking the `Conjunction` of `eq_user` and `eq_res` in the antecedent.
+*Design Decision 4*: Role constants require explicit distinctness axioms. Under loose semantics, without `admin ≠ regular` and similar, a model where all roles are equal is valid — which would make `can_access_def` grant admin access to everyone. The three distinctness axioms close this loophole.
 
 | Observer/Predicate | Constructor | Case | Axiom Label | Expected Behavior |
 |--------------------|-------------|------|-------------|-------------------|
 | `eq_user` (Basis) | — | — | `eq_user_refl/sym/trans`| Equivalence relation (3 axioms) |
 | `eq_res` (Basis) | — | — | `eq_res_refl/sym/trans` | Equivalence relation (3 axioms) |
+| Role (Distinct.) | — | — | `role_*_ne_*` | Pairwise distinctness (3 axioms) |
 | `get_role` | `init` | — | `get_role_init` | `none` |
 | `get_role` | `set_role` | hit | `get_role_set_hit` | `role` |
 | `get_role` | `set_role` | miss | `get_role_set_miss` | delegates |
@@ -44,7 +46,7 @@
 | `can_access` (derived)| — | — | `can_access_def` | `(get_role == admin) ∨ has_permission` |
 
 **Completeness Count**:
-3 (`eq_user`) + 3 (`eq_res`) + 5 (`get_role`) + 6 (`has_permission`) + 1 (`can_access`) = 18 Axioms.
+3 (`eq_user`) + 3 (`eq_res`) + 3 (Role distinctness) + 5 (`get_role`) + 6 (`has_permission`) + 1 (`can_access`) = 21 Axioms.
 """
 
 from alspec import (
@@ -120,6 +122,13 @@ def access_control_spec() -> Spec:
             Conjunction((PredApp("eq_res", (r1, r2)), PredApp("eq_res", (r2, r3)))),
             PredApp("eq_res", (r1, r3))
         ))),
+
+        # --- Role distinctness (enumeration) ---
+        # Without these, a model where regular = admin is valid,
+        # which would grant all regular users admin access.
+        Axiom("role_admin_ne_regular", Negation(eq(const("admin"), const("regular")))),
+        Axiom("role_admin_ne_none", Negation(eq(const("admin"), const("none")))),
+        Axiom("role_regular_ne_none", Negation(eq(const("regular"), const("none")))),
 
         # --- Observer: get_role ---
         Axiom("get_role_init", forall([u], eq(

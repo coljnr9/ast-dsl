@@ -46,9 +46,9 @@ Using key-dispatch (`eq_id(k, k2)`) across observers and Store constructors:
 3. **`get_status`** (partial)
    - `empty`: omitted (undefined).
    - `create_ticket`: hit (`open`), miss (delegates).
-   - `resolve_ticket`: hit (`resolved` guarded by `has_ticket`), miss (delegates).
+   - `resolve_ticket`: hit+has_ticket (`resolved`), hit+no_ticket (delegates), miss (delegates).
    - `assign_ticket`: universal preservation (assigning doesn't change status).
-   - (5 axioms total).
+   - (6 axioms total).
 4. **`get_severity`** (partial)
    - `empty`: omitted.
    - `create_ticket`: hit (`classify`), miss (delegates).
@@ -56,17 +56,17 @@ Using key-dispatch (`eq_id(k, k2)`) across observers and Store constructors:
    - (4 axioms total).
 5. **`get_assignee`** (doubly partial)
    - `empty`: omitted.
-   - `create_ticket`: hit (omitted, no assignee initially), miss (delegates).
-   - `assign_ticket`: hit (assigned user `u`, guarded by `has_ticket`), miss (delegates).
+   - `create_ticket`: hit (explicit undefinedness — no assignee initially), miss (delegates).
+   - `assign_ticket`: hit+has_ticket (assigned user `u`), hit+no_ticket (delegates), miss (delegates).
    - `resolve_ticket`: universally preserves assignee.
-   - (4 axioms total).
+   - (6 axioms total).
 6. **`is_critical`** (predicate)
    - `empty`: false.
    - `create_ticket`: hit (iff `classify = high`), miss (delegates).
    - `resolve_ticket`, `assign_ticket`: universally preserved.
    - (5 axioms total).
 
-**Completeness Count:** Expected 26 total axioms covering key dispatch scenarios and universal preservation shortcuts.
+**Completeness Count:** Expected 29 total axioms covering key dispatch scenarios and universal preservation shortcuts.
 
 ## Design Decisions & Tricky Cases
 - **Key Dispatching:** For FiniteMap-like specs, observer updates branch on key equality (`eq_id`). A match guarantees the value interacts with the current constructor. 
@@ -75,7 +75,7 @@ Using key-dispatch (`eq_id(k, k2)`) across observers and Store constructors:
 """
 
 from alspec import (
-    Axiom, Conjunction, Implication, Negation, PredApp,
+    Axiom, Conjunction, Definedness, Implication, Negation, PredApp,
     Signature, Spec,
     atomic, fn, pred, var, app, const, eq, forall, iff,
 )
@@ -209,6 +209,16 @@ def bug_tracker_spec() -> Spec:
             ))
         ),
         Axiom(
+            label="get_status_resolve_hit_noticket",
+            formula=forall([s, k, k2], Implication(
+                PredApp("eq_id", (k, k2)),
+                Implication(
+                    Negation(PredApp("has_ticket", (s, k))),
+                    eq(app("get_status", app("resolve_ticket", s, k), k2), app("get_status", s, k2))
+                )
+            ))
+        ),
+        Axiom(
             label="get_status_resolve_miss",
             formula=forall([s, k, k2], Implication(
                 Negation(PredApp("eq_id", (k, k2))),
@@ -255,6 +265,13 @@ def bug_tracker_spec() -> Spec:
 
         # get_assignee
         Axiom(
+            label="get_assignee_create_hit",
+            formula=forall([s, k, k2, t, b], Implication(
+                PredApp("eq_id", (k, k2)),
+                Negation(Definedness(app("get_assignee", app("create_ticket", s, k, t, b), k2)))
+            ))
+        ),
+        Axiom(
             label="get_assignee_create_miss",
             formula=forall([s, k, k2, t, b], Implication(
                 Negation(PredApp("eq_id", (k, k2))),
@@ -268,6 +285,16 @@ def bug_tracker_spec() -> Spec:
                 Implication(
                     PredApp("has_ticket", (s, k)),
                     eq(app("get_assignee", app("assign_ticket", s, k, u), k2), u)
+                )
+            ))
+        ),
+        Axiom(
+            label="get_assignee_assign_hit_noticket",
+            formula=forall([s, k, k2, u], Implication(
+                PredApp("eq_id", (k, k2)),
+                Implication(
+                    Negation(PredApp("has_ticket", (s, k))),
+                    eq(app("get_assignee", app("assign_ticket", s, k, u), k2), app("get_assignee", s, k2))
                 )
             ))
         ),

@@ -26,25 +26,25 @@ Dispatch: Because `lookup` searches by `Name`, and both `add` and `remove` take 
 | `eq_name` | — | — | `eq_name_refl` | reflexivity |
 | `eq_name` | — | — | `eq_name_sym` | symmetry |
 | `eq_name` | — | — | `eq_name_trans` | transitivity |
-| `lookup` | `empty` | — | *(omitted)* | Undefined (no names in empty book). |
+| `lookup` | `empty` | — | `lookup_empty` | Explicit undefinedness (no names in empty book). |
 | `lookup` | `add` | hit | `lookup_add_hit` | Returns the newly added `Number`. |
 | `lookup` | `add` | miss | `lookup_add_miss` | Delegates to `lookup(pb, ...)` |
-| `lookup` | `remove` | hit | *(omitted)* | Undefined (name just removed). |
+| `lookup` | `remove` | hit | `lookup_remove_hit`| Explicit undefinedness (name just removed). |
 | `lookup` | `remove` | miss | `lookup_remove_miss`| Delegates to `lookup(pb, ...)` |
 
 ### Step 4: Design Decisions & Tricky Cases
-- **Undefinedness representation**: By omitting the `empty` constructor case and the `remove` hit case, we correctly capture undefinedness. If we ask `lookup` for something we just removed, there's no axiom resolving it to a value, accurately reflecting the declared partiality (`total=False`).
+- **Explicit undefinedness**: Under loose semantics, omitting an axiom leaves the interpretation unconstrained rather than forcing undefinedness. The `empty` constructor case and the `remove` hit case use `Negation(Definedness(...))` to explicitly assert that `lookup` is undefined in those contexts.
 - **Update via Add**: Standard finite-map patterns handle key reassignment automatically through the `add` operator — a new `add` over an existing key will naturally short-circuit and shadow previous writes due to the structural recursive matching on the outermost term.
 - **Total vs Partial removal**: Removing a name that does not exist remains total. Since `lookup_remove_miss` maintains previous lookups for non-matching keys, removing an already absent key essentially constructs a structurally thicker but logically identical map.
 
 ### Step 5: Completeness Count
 - 3 foundational axioms for key equality (`eq_name`).
-- 3 behavioral axioms mapping the single observer (`lookup`) against its applicable constructor branches (`add_hit`, `add_miss`, `remove_miss`).
-- **Total Expected Axioms: 6**
+- 5 behavioral axioms mapping the single observer (`lookup`) against all constructor branches (`empty`, `add_hit`, `add_miss`, `remove_hit`, `remove_miss`).
+- **Total Expected Axioms: 8**
 """
 
 from alspec import (
-    Axiom, Conjunction, Implication, Negation, PredApp,
+    Axiom, Conjunction, Definedness, Implication, Negation, PredApp,
     Signature, Spec, atomic, fn, pred, var, app, const, eq, forall
 )
 
@@ -101,7 +101,13 @@ def phone_book_spec() -> Spec:
         ),
 
         # ━━ lookup: partial finite-map observer ━━
-        # empty case OMITTED — undefined (no names in an empty phone book)
+        # Empty phone book has no entries — lookup is explicitly undefined
+        Axiom(
+            label="lookup_empty",
+            formula=forall([n], Negation(Definedness(
+                app("lookup", const("empty"), n)
+            )))
+        ),
 
         # add hit: return the inserted number
         Axiom(
@@ -127,7 +133,14 @@ def phone_book_spec() -> Spec:
             ))
         ),
 
-        # remove hit OMITTED — undefined (key has been deleted)
+        # remove hit: removed key is explicitly undefined
+        Axiom(
+            label="lookup_remove_hit",
+            formula=forall([pb, n, n2], Implication(
+                PredApp("eq_name", (n, n2)),
+                Negation(Definedness(app("lookup", app("remove", pb, n), n2)))
+            ))
+        ),
 
         # remove miss: delegate to the previous phone book state
         Axiom(

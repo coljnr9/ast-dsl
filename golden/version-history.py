@@ -26,7 +26,7 @@ We need to model the domain of a version control system for a single document.
 - `has_version : Repo × VersionId` (Predicate observer, checks if version exists).
 
 ### Step 3: Axiom Obligation Table
-Total expected axioms: 25.
+Total expected axioms: 31.
 1-3. `eq_id`: reflexivity, symmetry, transitivity.
 
 **Predicate Observer `has_version`** (4 axioms)
@@ -47,24 +47,26 @@ Total expected axioms: 25.
 - × `revert` (hit): returns `v`.
 - × `revert` (miss): returns `current_version(r)`.
 
-**Observer `get_content` (Partial)** (4 axioms)
-- × `init` (hit): returns `c`. (miss omitted as undefined).
+**Observer `get_content` (Partial)** (5 axioms)
+- × `init` (hit): returns `c`.
+- × `init` (miss): explicit undefinedness (version not in fresh repo).
 - × `commit` (hit): returns `c`.
 - × `commit` (miss): delegates `get_content(r, v2)`.
 - × `revert`: Universal preservation `get_content(r, v2)`.
 
-**Observer `diff` (Doubly Partial, 2 keys)** (6 axioms)
+**Observer `diff` (Doubly Partial, 2 keys)** (11 axioms)
 Axioms must be split based on the combination of `v1` and `v2`.
-- × `init` (both hit): returns `compute_diff(c, c)`. (any miss omitted)
+- × `init` (both hit): returns `compute_diff(c, c)`.
+- × `init` (hit/miss, miss/hit, miss/miss): explicit undefinedness (version not in fresh repo).
 - × `commit` (both hit): returns `compute_diff(c, c)`.
-- × `commit` (hit for v1, miss for v2): guarded by `has_version(r, v2)`, returns `compute_diff(c, get_content(r, v2))`.
-- × `commit` (miss for v1, hit for v2): guarded by `has_version(r, v1)`, returns `compute_diff(get_content(r, v1), c)`.
+- × `commit` (hit for v1, miss for v2): guarded by `has_version(r, v2)`, returns `compute_diff(c, get_content(r, v2))`. No-version: explicit undefinedness.
+- × `commit` (miss for v1, hit for v2): guarded by `has_version(r, v1)`, returns `compute_diff(get_content(r, v1), c)`. No-version: explicit undefinedness.
 - × `commit` (both miss): delegates `diff(r, v1, v2)`.
 - × `revert`: Universal preservation `diff(r, v1, v2)`.
 """
 
 from alspec import (
-    Axiom, Conjunction, Disjunction, Implication, Negation, PredApp,
+    Axiom, Conjunction, Definedness, Disjunction, Implication, Negation, PredApp,
     Signature, Spec, atomic, fn, pred, var, app, const, eq, forall, iff
 )
 
@@ -175,6 +177,11 @@ def version_history_spec() -> Spec:
             PredApp("eq_id", (v, v2)),
             eq(app("get_content", app("init", c, v), v2), c)
         ))),
+        # Version not in freshly initialized repo — explicitly undefined
+        Axiom("get_content_init_miss", forall([c, v, v2], Implication(
+            Negation(PredApp("eq_id", (v, v2))),
+            Negation(Definedness(app("get_content", app("init", c, v), v2)))
+        ))),
         Axiom("get_content_commit_hit", forall([r, c, v, v2], Implication(
             PredApp("eq_id", (v, v2)),
             eq(app("get_content", app("commit", r, c, v), v2), c)
@@ -196,6 +203,19 @@ def version_history_spec() -> Spec:
             Conjunction((PredApp("eq_id", (v, v1)), PredApp("eq_id", (v, v2)))),
             eq(app("diff", app("init", c, v), v1, v2), app("compute_diff", c, c))
         ))),
+        # init with one or both versions missing — undefined
+        Axiom("diff_init_hit_miss", forall([c, v, v1, v2], Implication(
+            Conjunction((PredApp("eq_id", (v, v1)), Negation(PredApp("eq_id", (v, v2))))),
+            Negation(Definedness(app("diff", app("init", c, v), v1, v2)))
+        ))),
+        Axiom("diff_init_miss_hit", forall([c, v, v1, v2], Implication(
+            Conjunction((Negation(PredApp("eq_id", (v, v1))), PredApp("eq_id", (v, v2)))),
+            Negation(Definedness(app("diff", app("init", c, v), v1, v2)))
+        ))),
+        Axiom("diff_init_miss_miss", forall([c, v, v1, v2], Implication(
+            Conjunction((Negation(PredApp("eq_id", (v, v1))), Negation(PredApp("eq_id", (v, v2))))),
+            Negation(Definedness(app("diff", app("init", c, v), v1, v2)))
+        ))),
         Axiom("diff_commit_hit_hit", forall([r, c, v, v1, v2], Implication(
             Conjunction((PredApp("eq_id", (v, v1)), PredApp("eq_id", (v, v2)))),
             eq(app("diff", app("commit", r, c, v), v1, v2), app("compute_diff", c, c))
@@ -210,6 +230,14 @@ def version_history_spec() -> Spec:
                 )
             )
         ))),
+        # v2 not in previous repo — diff undefined
+        Axiom("diff_commit_hit_miss_noversion", forall([r, c, v, v1, v2], Implication(
+            Conjunction((PredApp("eq_id", (v, v1)), Negation(PredApp("eq_id", (v, v2))))),
+            Implication(
+                Negation(PredApp("has_version", (r, v2))),
+                Negation(Definedness(app("diff", app("commit", r, c, v), v1, v2)))
+            )
+        ))),
         Axiom("diff_commit_miss_hit", forall([r, c, v, v1, v2], Implication(
             Conjunction((Negation(PredApp("eq_id", (v, v1))), PredApp("eq_id", (v, v2)))),
             Implication(
@@ -218,6 +246,14 @@ def version_history_spec() -> Spec:
                     app("diff", app("commit", r, c, v), v1, v2),
                     app("compute_diff", app("get_content", r, v1), c)
                 )
+            )
+        ))),
+        # v1 not in previous repo — diff undefined
+        Axiom("diff_commit_miss_hit_noversion", forall([r, c, v, v1, v2], Implication(
+            Conjunction((Negation(PredApp("eq_id", (v, v1))), PredApp("eq_id", (v, v2)))),
+            Implication(
+                Negation(PredApp("has_version", (r, v1))),
+                Negation(Definedness(app("diff", app("commit", r, c, v), v1, v2)))
             )
         ))),
         Axiom("diff_commit_miss_miss", forall([r, c, v, v1, v2], Implication(

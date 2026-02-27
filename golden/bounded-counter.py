@@ -21,28 +21,26 @@ Because `inc` is a partial constructor (undefined when `is_at_max(c)` holds), AN
 
 | Observer | Constructor | Case | Definition Strategy |
 |----------|------------|------|---------------------|
+| `def` | `inc` | - | `def(inc(c)) ⇔ ¬is_at_max(c)` |
 | `val` | `new` | - | `val(new(m)) = zero` |
-| `val` | `inc` | `is_at_max` | *(omitted)* (undefined transition) |
 | `val` | `inc` | `not is_at_max` | `val(inc(c)) = suc(val(c))` |
 | `max_val` | `new` | - | `max_val(new(m)) = m` |
-| `max_val` | `inc` | `is_at_max` | *(omitted)* |
 | `max_val` | `inc` | `not is_at_max` | preserved `max_val(inc(c)) = max_val(c)` |
 | `is_at_max` | `new` | - | `<=> eq(zero, m)` (at max iff max is zero) |
-| `is_at_max` | `inc` | `is_at_max` | *(omitted)* |
 | `is_at_max` | `inc` | `not is_at_max` | `<=> eq(suc(val(c)), max_val(c))` (at max iff new val is max) |
 
 **Step 4: Design Decisions & Tricky Cases**
-- **Implicit Undefinedness**: Following the reference, we omit any `Definedness` explicit axiom. By simply leaving instances when `is_at_max(c)` is true out of the equations, we correctly model that `inc` fails (is undefined) at max.
+- **Explicit Definedness Boundary**: Under loose semantics, omitting axioms for the `is_at_max` case does not force `inc` to be undefined — it leaves the interpretation unconstrained. The `inc_def` axiom explicitly states `def(inc(c)) ⇔ ¬is_at_max(c)`, establishing that `inc` is defined exactly when not at max. Observer axioms over `inc` then only need the `¬is_at_max` branch; the `is_at_max` case is determined by strict error propagation (undefined constructor → undefined observation).
 - **`max_val` Observer**: Without `max_val` (or a global constant limit), it would be impossible to derive whether `inc(c)` becomes at max just based on `suc(val(c))`. 
 
 **Step 5: Completeness Check**
 - 3 Observers × 2 Constructors = 6 obligations.
 - `inc` triggers logical splitting per observer (1 guarded axiom per observer). 
-Expected Total Axioms: 6.
+Expected Total Axioms: 7 (1 definedness boundary + 6 observer obligations).
 """
 
 from alspec import (
-    Axiom, Implication, Negation, PredApp,
+    Axiom, Definedness, Implication, Negation, PredApp,
     Signature, Spec, atomic, fn, pred, var, app, const, eq, forall, iff
 )
 
@@ -77,6 +75,17 @@ def bounded_counter_spec() -> Spec:
     
     # Axioms definition
     axioms = (
+        # -- inc definedness boundary
+        Axiom(
+            label="inc_def",
+            formula=forall([c],
+                iff(
+                    Definedness(app("inc", c)),
+                    Negation(PredApp("is_at_max", (c,)))
+                )
+            )
+        ),
+        
         # -- val observer obligations
         Axiom(
             label="val_new",

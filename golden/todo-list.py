@@ -44,26 +44,27 @@ We owe axioms for every (Observer × Constructor) pair. For constructors that ta
 | `get_title` | `add_item` | hit | `get_title_add_hit` | returns `t` |
 | `get_title` | `add_item` | miss | `get_title_add_miss` | delegates |
 | `get_title` | `complete_item` | any | `get_title_complete` | universal preservation |
-| `get_title` | `remove_item` | hit | *(omitted)* | undefined |
+| `get_title` | `remove_item` | hit | `get_title_remove_hit`| explicit undefinedness |
 | `get_title` | `remove_item` | miss | `get_title_remove_miss`| delegates |
 | `get_status`| `empty` | — | *(omitted)* | undefined |
 | `get_status`| `add_item` | hit | `get_status_add_hit` | returns `pending` |
 | `get_status`| `add_item` | miss | `get_status_add_miss` | delegates |
 | `get_status`| `complete_item`| hit | `get_status_complete_hit`| returns `done` (guarded by `has_item`) |
+| `get_status`| `complete_item`| hit | `get_status_complete_hit_noitem`| delegates (no-op on non-existent item) |
 | `get_status`| `complete_item`| miss | `get_status_complete_miss`| delegates |
-| `get_status`| `remove_item` | hit | *(omitted)* | undefined |
+| `get_status`| `remove_item` | hit | `get_status_remove_hit`| explicit undefinedness |
 | `get_status`| `remove_item` | miss | `get_status_remove_miss`| delegates |
 
-**Completeness Count:** Expected = 3 (`eq_id`) + 6 (`has_item`) + 4 (`get_title`) + 5 (`get_status`) = **18 axioms**.
+**Completeness Count:** Expected = 3 (`eq_id`) + 6 (`has_item`) + 5 (`get_title`) + 7 (`get_status`) = **21 axioms**.
 
 ## 4. Tricky Cases & Design Decisions
 1. **Universal Preservation Optimization:** For instances where a constructor fundamentally doesn't interact with an observer regardless of key, we collapse hit/miss cases. `complete_item` doesn't change `has_item` or `get_title`, netting single universal axioms for both.
 2. **Guarded Updates:** `get_status_complete_hit` must only return `done` if the item actually existed prior, so `Implication(PredApp("has_item", (l, k)), ...)` wraps the assignment. Otherwise, completing a nonexistent task would magically vivify its status.
-3. **Undefined Removal States:** When processing a `remove_item` hit against partial observers (`get_title`, `get_status`), the results are intentionally left omitted. In standard CASL formalism, the lack of an equation correctly yields undefinedness for the removed item.
+3. **Explicit Undefinedness on Removal:** When processing a `remove_item` hit against partial observers (`get_title`, `get_status`), undefinedness is asserted explicitly via `Negation(Definedness(...))`. Under loose semantics, omitting an axiom leaves the interpretation unconstrained rather than forcing undefinedness.
 """
 
 from alspec import (
-    Axiom, Conjunction, Implication, Negation, PredApp,
+    Axiom, Conjunction, Definedness, Implication, Negation, PredApp,
     Signature, Spec,
     atomic, fn, pred, var, app, const, eq, forall, iff,
 )
@@ -204,7 +205,14 @@ def todo_list_spec() -> Spec:
                 app("get_title", l, k2),
             ))
         ),
-        # remove_item_hit is correctly omitted (undefined result)
+        # Removing an item makes its title explicitly undefined
+        Axiom(
+            label="get_title_remove_hit",
+            formula=forall([l, k, k2], Implication(
+                PredApp("eq_id", (k, k2)),
+                Negation(Definedness(app("get_title", app("remove_item", l, k), k2)))
+            ))
+        ),
         Axiom(
             label="get_title_remove_miss",
             formula=forall([l, k, k2], Implication(
@@ -245,6 +253,17 @@ def todo_list_spec() -> Spec:
                 )
             ))
         ),
+        # Completing a non-existent item is a no-op: status delegates (both sides undefined)
+        Axiom(
+            label="get_status_complete_hit_noitem",
+            formula=forall([l, k, k2], Implication(
+                PredApp("eq_id", (k, k2)),
+                Implication(
+                    Negation(PredApp("has_item", (l, k))),
+                    eq(app("get_status", app("complete_item", l, k), k2), app("get_status", l, k2))
+                )
+            ))
+        ),
         Axiom(
             label="get_status_complete_miss",
             formula=forall([l, k, k2], Implication(
@@ -255,7 +274,14 @@ def todo_list_spec() -> Spec:
                 ),
             ))
         ),
-        # remove_item_hit is correctly omitted (undefined result)
+        # Removing an item makes its status explicitly undefined
+        Axiom(
+            label="get_status_remove_hit",
+            formula=forall([l, k, k2], Implication(
+                PredApp("eq_id", (k, k2)),
+                Negation(Definedness(app("get_status", app("remove_item", l, k), k2)))
+            ))
+        ),
         Axiom(
             label="get_status_remove_miss",
             formula=forall([l, k, k2], Implication(
