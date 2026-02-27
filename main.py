@@ -1,8 +1,7 @@
 def main():
-    print("Welcome to many-sorted!")
-    print("Core logic has been moved to the 'many_sorted/' package.")
-    print("Run 'python3 examples/examples.py' to see it in action.")
-
+    import sys
+    from many_sorted.cli import main as cli_main
+    sys.exit(cli_main())
 
 if __name__ == "__main__":
     main()

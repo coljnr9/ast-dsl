@@ -5,12 +5,14 @@ description = "Building blocks for many-sorted algebraic specifications"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "langfuse>=3.14.5",
     "openai>=2.24.0",
     "python-dotenv>=1.2.1",
 ]
 
 [project.scripts]
 many-sorted-examples = "examples.examples:main"
+many-sorted = "many_sorted.cli:main"
 
 [tool.setuptools]
 packages = ["many_sorted", "examples"]

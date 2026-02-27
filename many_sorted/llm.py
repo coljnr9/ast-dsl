@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import TypeVar, Generic
 
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
+from langfuse.openai import AsyncOpenAI
 
 # -----------------
 # Result Types
@@ -54,6 +54,7 @@ class AsyncLLMClient:
         """Generates text from the given prompt using the specified model."""
         try:
             response = await self._client.chat.completions.create(
+                name="generate_text",
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
             )
