@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from alspec.eval.domains import DOMAINS
-from alspec.eval.harness import EvalRun, run_domain_eval
+from alspec.eval.harness import EvalResult, EvalRun, run_domain_eval
 from alspec.eval.report import (
     export_csv,
     print_detailed_diagnostics,
@@ -21,6 +21,24 @@ from alspec.llm import AsyncLLMClient
 from alspec.result import Err, Ok
 
 
+def save_specs(results: list[EvalResult], directory: str) -> None:
+    """Write each result's generated code to <directory>/<domain_id>.py."""
+    out_dir = Path(directory)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    saved = 0
+    for result in results:
+        if result.code is None:
+            continue
+        parts: list[str] = []
+        if result.analysis:
+            parts.append(f'"""\n{result.analysis}\n"""\n')
+        parts.append(result.code)
+        path = out_dir / f"{result.domain_id}.py"
+        path.write_text("\n".join(parts))
+        saved += 1
+    print(f"Saved {saved} spec(s) to {out_dir}/")
+
+
 async def run_evals(
     domain_ids: list[str] | None,
     models: list[str],
@@ -28,6 +46,7 @@ async def run_evals(
     csv_out: str | None,
     verbose: bool,
     use_tool_call: bool,
+    save_specs_dir: str | None,
 ) -> None:
     client_res = AsyncLLMClient.from_env()
     match client_res:
@@ -92,6 +111,9 @@ async def run_evals(
         export_csv(run, csv_out)
         print(f"Exported results to {csv_out}")
 
+    if save_specs_dir:
+        save_specs(list(results), save_specs_dir)
+
 
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Run alspec evaluations.")
@@ -133,6 +155,16 @@ def main(argv: Sequence[str] | None = None) -> None:
             "tool calling via OpenRouter."
         ),
     )
+    parser.add_argument(
+        "--save-specs",
+        type=str,
+        metavar="DIR",
+        help=(
+            "Save each domain's generated spec code to DIR/<domain-id>.py. "
+            "The directory is created if it does not exist. Only results with "
+            "successfully extracted code are written."
+        ),
+    )
 
     args = parser.parse_args(argv)
 
@@ -147,6 +179,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             csv_out=args.csv,
             verbose=args.verbose,
             use_tool_call=not args.no_tool_call,
+            save_specs_dir=args.save_specs,
         )
     )
 

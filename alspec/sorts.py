@@ -76,15 +76,21 @@ class ProductSort:
         return SortKind.PRODUCT
 
     def field_sort(self, field_name: str) -> SortRef | None:
-        """Look up the sort of a field by name. Returns None if not found."""
+        """Look up the sort of a field by name. Returns None if not found.
+
+        Guards against malformed entries (e.g. raw tuples from LLM-generated
+        code executed via exec that bypasses the dataclass constructor).
+        """
         for f in self.fields:
+            if not isinstance(f, ProductField):
+                continue
             if f.name == field_name:
                 return f.sort
         return None
 
     @property
     def field_names(self) -> tuple[str, ...]:
-        return tuple(f.name for f in self.fields)
+        return tuple(f.name for f in self.fields if isinstance(f, ProductField))
 
 
 @dataclass(frozen=True)

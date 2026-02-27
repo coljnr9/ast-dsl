@@ -135,20 +135,22 @@ def render() -> str:
         take a `TicketId`. So for each (observer, constructor) pair we get a **hit/miss
         split**: does the constructor's key match the observer's key?
 
-        **`eq_id` basis axioms (2 axioms):**
-        Before the obligation table, we need reflexivity and symmetry for the key
-        equality predicate. These are structural — they don't come from
-        observer×constructor pairs.
+        **`eq_id` basis axioms (3 axioms):**
+        Before the obligation table, we need reflexivity, symmetry, and transitivity
+        for the key equality predicate. These are structural — they don't come from
+        observer×constructor pairs. Transitivity also demonstrates `Conjunction` inside
+        `Implication`, an important pattern.
 
-        **`has_ticket` (predicate, total over store — 7 axioms):**
+        **`has_ticket` (predicate, total over store — 5 axioms):**
         - × `empty`: false — no tickets in an empty store.
         - × `create_ticket` hit: true — we just added a ticket at this key.
         - × `create_ticket` miss: delegates to `has_ticket(s, k2)` — creating a
           ticket at key `k` doesn't affect whether a ticket exists at a different key `k2`.
-        - × `resolve_ticket` hit: preserves — `has_ticket(resolve_ticket(s, k), k) ⟺ has_ticket(s, k)`.
-        - × `resolve_ticket` miss: delegates.
-        - × `assign_ticket` hit: preserves.
-        - × `assign_ticket` miss: delegates.
+        - × `resolve_ticket`: **Both hit and miss produce identical preservation** —
+          `has_ticket(resolve_ticket(s, k), k2) ⟺ has_ticket(s, k2)` holds
+          unconditionally. Collapse into one universal axiom (same simplification as
+          `get_severity × resolve_ticket`).
+        - × `assign_ticket`: Same — both hit and miss preserve. One universal axiom.
 
         **`get_status` (partial — undefined when ticket doesn't exist — 6 axioms):**
         - × `empty`: **omitted** — no tickets, so `get_status(empty, k)` is undefined.
@@ -179,7 +181,9 @@ def render() -> str:
           key after creation, `get_assignee` is still undefined because new tickets
           have no assignee. This is the "doubly partial" case.
         - × `create_ticket` miss: delegates.
-        - × `assign_ticket` hit: returns the new `UserId`.
+        - × `assign_ticket` hit: returns the new `UserId` (guarded by `has_ticket`) —
+          assigning to a nonexistent ticket is a no-op, so the axiom only fires when
+          the ticket actually exists.
         - × `assign_ticket` miss: delegates.
         - × `resolve_ticket`: universal preservation — resolve doesn't change assignee.
 
@@ -192,25 +196,24 @@ def render() -> str:
         - × `assign_ticket`: universal preservation.
 
         **Completeness count:**
-        - `eq_id` basis: 2 axioms (refl, sym)
-        - `has_ticket`: 7 axioms (empty + 2×create + 2×resolve + 2×assign)
+        - `eq_id` basis: 3 axioms (refl, sym, trans)
+        - `has_ticket`: 5 axioms (empty + 2×create + 1×resolve_universal + 1×assign_universal)
         - `get_status`: 6 axioms (2×create + 1×resolve_hit + 1×resolve_miss + 2×assign)
         - `get_severity`: 4 axioms (2×create + 1×resolve_universal + 1×assign_universal)
         - `get_assignee`: 4 axioms (1×create_miss + 2×assign + 1×resolve_universal)
         - `is_critical`: 5 axioms (empty + 2×create + 1×resolve + 1×assign)
-        - **Total: 28 axioms**
+        - **Total: 27 axioms**
 
         | Observer / Predicate | Constructor | Case | Axiom Label | Behavior |
         |---------------------|------------|------|-------------|----------|
         | `eq_id` (basis) | — | — | `eq_id_refl` | reflexivity |
         | `eq_id` (basis) | — | — | `eq_id_sym` | symmetry |
+        | `eq_id` (basis) | — | — | `eq_id_trans` | transitivity (Conjunction in antecedent) |
         | `has_ticket` | `empty` | — | `has_ticket_empty` | false |
         | `has_ticket` | `create_ticket` | hit | `has_ticket_create_hit` | true |
         | `has_ticket` | `create_ticket` | miss | `has_ticket_create_miss` | delegates |
-        | `has_ticket` | `resolve_ticket` | hit | `has_ticket_resolve_hit` | preserves |
-        | `has_ticket` | `resolve_ticket` | miss | `has_ticket_resolve_miss` | delegates |
-        | `has_ticket` | `assign_ticket` | hit | `has_ticket_assign_hit` | preserves |
-        | `has_ticket` | `assign_ticket` | miss | `has_ticket_assign_miss` | delegates |
+        | `has_ticket` | `resolve_ticket` | any | `has_ticket_resolve` | universal preservation |
+        | `has_ticket` | `assign_ticket` | any | `has_ticket_assign` | universal preservation |
         | `get_status` (partial) | `empty` | — | *(omitted)* | undefined |
         | `get_status` (partial) | `create_ticket` | hit | `get_status_create_hit` | `open` |
         | `get_status` (partial) | `create_ticket` | miss | `get_status_create_miss` | delegates |
@@ -226,7 +229,7 @@ def render() -> str:
         | `get_assignee` (partial) | `empty` | — | *(omitted)* | undefined |
         | `get_assignee` (partial) | `create_ticket` | hit | *(omitted)* | undefined — no assignee |
         | `get_assignee` (partial) | `create_ticket` | miss | `get_assignee_create_miss` | delegates |
-        | `get_assignee` (partial) | `assign_ticket` | hit | `get_assignee_assign_hit` | returns `u` |
+        | `get_assignee` (partial) | `assign_ticket` | hit | `get_assignee_assign_hit` | returns `u` (guarded by `has_ticket`) |
         | `get_assignee` (partial) | `assign_ticket` | miss | `get_assignee_assign_miss` | delegates |
         | `get_assignee` (partial) | `resolve_ticket` | any | `get_assignee_resolve` | universal preservation |
         | `is_critical` (pred) | `empty` | — | `is_critical_empty` | false |
@@ -241,15 +244,16 @@ def render() -> str:
 
         ```python
         from alspec import (
-            Axiom, Biconditional, Implication, Negation, PredApp,
+            Axiom, Conjunction, Implication, Negation, PredApp,
             Signature, Spec,
-            atomic, fn, pred, var, app, const, eq, forall,
+            atomic, fn, pred, var, app, const, eq, forall, iff,
         )
 
-        # Variables — note two TicketId variables for key dispatch
+        # Variables — three TicketId variables (k3 needed for eq_id transitivity)
         s = var("s", "Store")
         k = var("k", "TicketId")        # constructor's key
         k2 = var("k2", "TicketId")      # observer's key
+        k3 = var("k3", "TicketId")      # auxiliary (transitivity only)
         t = var("t", "Title")
         b = var("b", "Body")
         u = var("u", "UserId")
@@ -325,6 +329,18 @@ def render() -> str:
                 )),
             ),
 
+            # Conjunction inside Implication — transitivity: k=k2 ∧ k2=k3 ⇒ k=k3
+            Axiom(
+                label="eq_id_trans",
+                formula=forall([k, k2, k3], Implication(
+                    Conjunction((                                    # Formula ✓
+                        PredApp("eq_id", (k, k2)),                  # Formula ✓
+                        PredApp("eq_id", (k2, k3)),                 # Formula ✓
+                    )),
+                    PredApp("eq_id", (k, k3)),                      # Formula ✓
+                )),
+            ),
+
             # ━━ has_ticket: total predicate ━━
 
             # Negation(PredApp) as complete formula — no tickets in empty store
@@ -344,64 +360,39 @@ def render() -> str:
                 )),
             ),
 
-            # Implication(Negation(PredApp), Biconditional(PredApp, PredApp)) — miss
+            # Implication(Negation(PredApp), iff(PredApp, PredApp)) — miss
             Axiom(
                 label="has_ticket_create_miss",
                 formula=forall([s, k, k2, t, b], Implication(
                     Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
-                    Biconditional(
-                        lhs=PredApp("has_ticket", (app("create_ticket", s, k, t, b), k2)),  # Formula ✓
-                        rhs=PredApp("has_ticket", (s, k2)),         # Formula ✓
+                    iff(
+                        PredApp("has_ticket", (app("create_ticket", s, k, t, b), k2)),  # Formula ✓
+                        PredApp("has_ticket", (s, k2)),             # Formula ✓
                     ),
                 )),
             ),
 
-            # resolve_ticket hit: preserved
+            # Universal preservation — resolve doesn't change ticket existence for ANY key.
+            # Both hit and miss produce identical biconditionals, so collapse to one axiom.
             Axiom(
-                label="has_ticket_resolve_hit",
-                formula=forall([s, k, k2], Implication(
-                    PredApp("eq_id", (k, k2)),                      # Formula ✓
-                    Biconditional(
-                        lhs=PredApp("has_ticket", (app("resolve_ticket", s, k), k2)),  # Formula ✓
-                        rhs=PredApp("has_ticket", (s, k2)),         # Formula ✓
+                label="has_ticket_resolve",
+                formula=forall([s, k, k2],
+                    iff(
+                        PredApp("has_ticket", (app("resolve_ticket", s, k), k2)),  # Formula ✓
+                        PredApp("has_ticket", (s, k2)),             # Formula ✓
                     ),
-                )),
+                ),
             ),
 
-            # resolve_ticket miss: delegates
+            # Universal preservation — assign doesn't change ticket existence for ANY key.
             Axiom(
-                label="has_ticket_resolve_miss",
-                formula=forall([s, k, k2], Implication(
-                    Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
-                    Biconditional(
-                        lhs=PredApp("has_ticket", (app("resolve_ticket", s, k), k2)),  # Formula ✓
-                        rhs=PredApp("has_ticket", (s, k2)),         # Formula ✓
+                label="has_ticket_assign",
+                formula=forall([s, k, k2, u],
+                    iff(
+                        PredApp("has_ticket", (app("assign_ticket", s, k, u), k2)),  # Formula ✓
+                        PredApp("has_ticket", (s, k2)),             # Formula ✓
                     ),
-                )),
-            ),
-
-            # assign_ticket hit: preserved
-            Axiom(
-                label="has_ticket_assign_hit",
-                formula=forall([s, k, k2, u], Implication(
-                    PredApp("eq_id", (k, k2)),                      # Formula ✓
-                    Biconditional(
-                        lhs=PredApp("has_ticket", (app("assign_ticket", s, k, u), k2)),  # Formula ✓
-                        rhs=PredApp("has_ticket", (s, k2)),         # Formula ✓
-                    ),
-                )),
-            ),
-
-            # assign_ticket miss: delegates
-            Axiom(
-                label="has_ticket_assign_miss",
-                formula=forall([s, k, k2, u], Implication(
-                    Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
-                    Biconditional(
-                        lhs=PredApp("has_ticket", (app("assign_ticket", s, k, u), k2)),  # Formula ✓
-                        rhs=PredApp("has_ticket", (s, k2)),         # Formula ✓
-                    ),
-                )),
+                ),
             ),
 
             # ━━ get_status: partial, key-dispatch ━━
@@ -528,13 +519,17 @@ def render() -> str:
                 )),
             ),
 
-            # assign_ticket hit: returns the new UserId
+            # assign_ticket hit: returns the new UserId (guarded — assigning to a
+            # nonexistent ticket is a no-op, so get_assignee is still undefined there)
             Axiom(
                 label="get_assignee_assign_hit",
                 formula=forall([s, k, k2, u], Implication(
                     PredApp("eq_id", (k, k2)),                      # Formula ✓
-                    eq(app("get_assignee", app("assign_ticket", s, k, u), k2),
-                       u),                                           # Term ✓
+                    Implication(
+                        PredApp("has_ticket", (s, k)),              # Formula ✓ — guard
+                        eq(app("get_assignee", app("assign_ticket", s, k, u), k2),
+                           u),                                       # Term ✓
+                    ),
                 )),
             ),
 
@@ -568,14 +563,14 @@ def render() -> str:
             ),
 
             # create_ticket hit: critical iff severity is high
-            # PredApp inside Biconditional with eq
+            # PredApp inside iff with eq (Formula (Equation))
             Axiom(
                 label="is_critical_create_hit",
                 formula=forall([s, k, k2, t, b], Implication(
                     PredApp("eq_id", (k, k2)),                      # Formula ✓
-                    Biconditional(
-                        lhs=PredApp("is_critical", (app("create_ticket", s, k, t, b), k2)),  # Formula ✓
-                        rhs=eq(app("classify", t, b), const("high")),  # Formula (Equation) ✓
+                    iff(
+                        PredApp("is_critical", (app("create_ticket", s, k, t, b), k2)),  # Formula ✓
+                        eq(app("classify", t, b), const("high")),   # Formula (Equation) ✓
                     ),
                 )),
             ),
@@ -585,9 +580,9 @@ def render() -> str:
                 label="is_critical_create_miss",
                 formula=forall([s, k, k2, t, b], Implication(
                     Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
-                    Biconditional(
-                        lhs=PredApp("is_critical", (app("create_ticket", s, k, t, b), k2)),  # Formula ✓
-                        rhs=PredApp("is_critical", (s, k2)),         # Formula ✓
+                    iff(
+                        PredApp("is_critical", (app("create_ticket", s, k, t, b), k2)),  # Formula ✓
+                        PredApp("is_critical", (s, k2)),            # Formula ✓
                     ),
                 )),
             ),
@@ -595,19 +590,23 @@ def render() -> str:
             # Universal preservation — resolve doesn't change criticality.
             Axiom(
                 label="is_critical_resolve",
-                formula=forall([s, k, k2], Biconditional(
-                    lhs=PredApp("is_critical", (app("resolve_ticket", s, k), k2)),  # Formula ✓
-                    rhs=PredApp("is_critical", (s, k2)),            # Formula ✓
-                )),
+                formula=forall([s, k, k2],
+                    iff(
+                        PredApp("is_critical", (app("resolve_ticket", s, k), k2)),  # Formula ✓
+                        PredApp("is_critical", (s, k2)),            # Formula ✓
+                    ),
+                ),
             ),
 
             # Universal preservation — assign doesn't change criticality.
             Axiom(
                 label="is_critical_assign",
-                formula=forall([s, k, k2, u], Biconditional(
-                    lhs=PredApp("is_critical", (app("assign_ticket", s, k, u), k2)),  # Formula ✓
-                    rhs=PredApp("is_critical", (s, k2)),            # Formula ✓
-                )),
+                formula=forall([s, k, k2, u],
+                    iff(
+                        PredApp("is_critical", (app("assign_ticket", s, k, u), k2)),  # Formula ✓
+                        PredApp("is_critical", (s, k2)),            # Formula ✓
+                    ),
+                ),
             ),
         )
 
@@ -625,12 +624,14 @@ def render() -> str:
         | **Hit/miss key dispatch** | `Implication(PredApp("eq_id", ...), ...)` vs `Implication(Negation(PredApp("eq_id", ...)), ...)` |
         | **PredApp inside Implication** | Every hit/miss guard uses `PredApp("eq_id", ...)` as the antecedent |
         | **Negation(PredApp) as formula** | `has_ticket_empty`, `is_critical_empty` |
-        | **Biconditional(PredApp, PredApp)** | `has_ticket_create_miss`, preservation axioms |
-        | **Biconditional(PredApp, Equation)** | `is_critical_create_hit` — critical iff severity = high |
-        | **Universal preservation** | `get_severity_resolve`, `get_severity_assign`, etc. — no key dispatch needed |
+        | **iff(PredApp, PredApp)** | `has_ticket_create_miss`, `has_ticket_resolve`, `has_ticket_assign` |
+        | **iff(PredApp, Equation)** | `is_critical_create_hit` — critical iff severity = high |
+        | **Universal preservation** | `get_severity_resolve`, `has_ticket_resolve`, etc. — no key dispatch needed |
+        | **Collapsed hit/miss** | `has_ticket_resolve`, `has_ticket_assign` — identical in both branches → one axiom |
+        | **Conjunction in antecedent** | `eq_id_trans` — `Conjunction((PredApp(...), PredApp(...)))` as guard |
         | Partial observer | `get_status`, `get_severity`, `get_assignee` — undefined when ticket doesn't exist |
         | Doubly partial observer | `get_assignee` — undefined if no ticket OR no assignee |
         | Uninterpreted function | `classify` — appears in axioms but not defined by them |
-        | Nested Implication | `get_status_resolve_hit` — `has_ticket` guard inside key dispatch |
+        | Nested Implication | `get_status_resolve_hit`, `get_assignee_assign_hit` — guards inside key dispatch |
         """
     )

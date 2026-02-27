@@ -27,12 +27,15 @@ def render() -> str:
         ### Valid Compositions
 
         | Expression | Why it's correct |
-        |-----------|-----------------|
+        |-----------|------------------|
         | `eq(app(...), app(...))` | Both are Terms ✓ |
         | `eq(app(...), var(...))` | Both are Terms ✓ |
         | `Negation(eq(...))` | eq returns a Formula ✓ |
         | `Negation(PredApp(...))` | PredApp is a Formula ✓ |
         | `Implication(PredApp(...), eq(...))` | Both are Formulas ✓ |
+        | `iff(PredApp(...), PredApp(...))` | Formula ⇔ Formula ✓ |
+        | `iff(PredApp(...), eq(...))` | Formula ⇔ Formula ✓ |
+        | `Conjunction((PredApp(...), PredApp(...)))` | Tuple of Formulas ✓ |
 
         ---
         """

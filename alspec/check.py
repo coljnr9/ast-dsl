@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from .signature import Signature
-from .sorts import CoproductSort, ProductSort, SortKind, SortRef
+from .sorts import CoproductAlt, CoproductSort, ProductField, ProductSort, SortKind, SortRef
 from .spec import Spec
 from .terms import (
     Biconditional,
@@ -310,6 +310,12 @@ def check_layer_1(spec: Spec, ctx: CheckContext) -> None:
     for _name, sort_decl in spec.signature.sorts.items():
         if isinstance(sort_decl, ProductSort):
             for f in sort_decl.fields:
+                if not isinstance(f, ProductField):
+                    ctx.error(
+                        "product_sort_fields_resolved",
+                        f"ProductSort '{_name}' has a non-ProductField entry: {type(f).__name__}",
+                    )
+                    continue
                 if f.sort not in spec.signature.sorts:
                     ctx.error(
                         "product_sort_fields_resolved",
@@ -317,6 +323,12 @@ def check_layer_1(spec: Spec, ctx: CheckContext) -> None:
                     )
         elif isinstance(sort_decl, CoproductSort):
             for a in sort_decl.alts:
+                if not isinstance(a, CoproductAlt):
+                    ctx.error(
+                        "coproduct_sort_alts_resolved",
+                        f"CoproductSort '{_name}' has a non-CoproductAlt entry: {type(a).__name__}",
+                    )
+                    continue
                 if a.sort not in spec.signature.sorts:
                     ctx.error(
                         "coproduct_sort_alts_resolved",
