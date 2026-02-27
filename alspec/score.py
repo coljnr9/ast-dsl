@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .check import check_spec, compute_obligations, Diagnostic
+from .check import Diagnostic, check_spec, compute_obligations
 from .spec import Spec
+
 
 @dataclass(frozen=True)
 class SpecScore:
@@ -21,16 +22,17 @@ class SpecScore:
     axiom_count: int
     diagnostics: tuple[Diagnostic, ...]
 
+
 def score_spec(spec: Spec, *, strict: bool = True) -> SpecScore:
     """Check a spec and produce a quality score."""
     result = check_spec(spec)
-    
+
     # Calculate obligation coverage
     obligations = compute_obligations(spec)
-    
+
     obligation_total = len(obligations)
     obligation_covered = sum(1 for obs, con, has_ax, _ in obligations if has_ax)
-    
+
     if obligation_total == 0:
         obligation_ratio = 1.0
     else:
@@ -38,7 +40,7 @@ def score_spec(spec: Spec, *, strict: bool = True) -> SpecScore:
 
     error_count = len(result.errors)
     warning_count = len(result.warnings)
-    
+
     health = 1.0
     if strict:
         if error_count > 0:
@@ -50,14 +52,14 @@ def score_spec(spec: Spec, *, strict: bool = True) -> SpecScore:
         health -= error_count * 0.15
         health -= warning_count * 0.05
         health -= (1.0 - obligation_ratio) * 0.50
-        
+
     health = max(health, 0.0)
-    
+
     sort_count = len(spec.signature.sorts)
     function_count = len(spec.signature.functions)
     predicate_count = len(spec.signature.predicates)
     axiom_count = len(spec.axioms)
-    
+
     return SpecScore(
         spec_name=spec.name,
         well_formed=result.is_well_formed,
@@ -71,5 +73,5 @@ def score_spec(spec: Spec, *, strict: bool = True) -> SpecScore:
         function_count=function_count,
         predicate_count=predicate_count,
         axiom_count=axiom_count,
-        diagnostics=result.diagnostics
+        diagnostics=result.diagnostics,
     )

@@ -12,10 +12,8 @@ Terms are the building blocks of equations (axioms).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Union
 
 from .sorts import SortRef
-
 
 # ---------------------------------------------------------------------------
 # Term AST
@@ -72,7 +70,7 @@ class Literal:
 
 
 # Union of all term forms
-Term = Union[Var, FnApp, FieldAccess, Literal]
+Term = Var | FnApp | FieldAccess | Literal
 
 # Python needs this for frozen dataclass forward refs
 FnApp.__pydantic_model__ = None  # type: ignore[attr-defined]
@@ -164,6 +162,7 @@ class Biconditional:
     2. LLMs consistently need it for predicate equivalence across constructors.
     3. Without it, LLMs write one implication direction and forget the other.
     """
+
     lhs: Formula
     rhs: Formula
 
@@ -201,15 +200,15 @@ class Definedness:
 
 
 # Union of all formula forms
-Formula = Union[
-    Equation,
-    PredApp,
-    Negation,
-    Conjunction,
-    Disjunction,
-    Implication,
-    Biconditional,
-    UniversalQuant,
-    ExistentialQuant,
-    Definedness,
-]
+Formula = (
+    Equation
+    | PredApp
+    | Negation
+    | Conjunction
+    | Disjunction
+    | Implication
+    | Biconditional
+    | UniversalQuant
+    | ExistentialQuant
+    | Definedness
+)

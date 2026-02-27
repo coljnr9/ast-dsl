@@ -16,12 +16,11 @@ function profile refers to a sort in S.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Mapping
 
 from .sorts import SortDecl, SortRef
-
 
 # ---------------------------------------------------------------------------
 # Function symbols

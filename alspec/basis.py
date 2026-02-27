@@ -15,22 +15,22 @@ Every spec here follows the methodology:
   4. Write axioms: one per (operation, constructor) pair
 
 Usage:
-    from alspec.basis import bool_spec, nat_spec, list_spec, ...
+    from alspec.sorts import AtomicSort, ProductSort, SortRef
+    from alspec.terms import Term, list_spec, ...
 """
 
 from alspec import (
     Axiom,
-    Signature,
-    Spec,
-    Equation,
-    PredApp,
-    Negation,
     Conjunction,
     Disjunction,
     Implication,
+    Negation,
+    PredApp,
+    Signature,
+    Spec,
 )
-from alspec.helpers import S, atomic, fn, pred, var, app, const, eq, forall
-
+from alspec.helpers import app, atomic, const, eq, fn, forall, pred, var
+from alspec.terms import Term
 
 # =====================================================================
 # Bool
@@ -77,15 +77,23 @@ def bool_spec() -> Spec:
         Axiom("not_false", eq(app("not", const("false")), const("true"))),
         # and: primary arg has 2 constructors → 2 axioms
         Axiom("and_true", forall([b], eq(app("and", const("true"), b), b))),
-        Axiom("and_false", forall([b], eq(app("and", const("false"), b), const("false")))),
+        Axiom(
+            "and_false", forall([b], eq(app("and", const("false"), b), const("false")))
+        ),
         # or: primary arg has 2 constructors → 2 axioms
         Axiom("or_true", forall([b], eq(app("or", const("true"), b), const("true")))),
         Axiom("or_false", forall([b], eq(app("or", const("false"), b), b))),
         # implies: defined in terms of not and or
-        Axiom("implies_def", forall([a, b], eq(
-            app("implies", a, b),
-            app("or", app("not", a), b),
-        ))),
+        Axiom(
+            "implies_def",
+            forall(
+                [a, b],
+                eq(
+                    app("implies", a, b),
+                    app("or", app("not", a), b),
+                ),
+            ),
+        ),
     )
 
     return Spec(name="Bool", signature=sig, axioms=axioms)
@@ -135,28 +143,52 @@ def nat_spec() -> Spec:
     axioms = (
         # add: 2 constructors (zero, suc) on first arg → 2 axioms
         Axiom("add_zero", forall([y], eq(app("add", const("zero"), y), y))),
-        Axiom("add_suc", forall([x, y], eq(
-            app("add", app("suc", x), y),
-            app("suc", app("add", x, y)),
-        ))),
+        Axiom(
+            "add_suc",
+            forall(
+                [x, y],
+                eq(
+                    app("add", app("suc", x), y),
+                    app("suc", app("add", x, y)),
+                ),
+            ),
+        ),
         # mul: 2 constructors on first arg → 2 axioms
         Axiom("mul_zero", forall([y], eq(app("mul", const("zero"), y), const("zero")))),
-        Axiom("mul_suc", forall([x, y], eq(
-            app("mul", app("suc", x), y),
-            app("add", y, app("mul", x, y)),
-        ))),
+        Axiom(
+            "mul_suc",
+            forall(
+                [x, y],
+                eq(
+                    app("mul", app("suc", x), y),
+                    app("add", y, app("mul", x, y)),
+                ),
+            ),
+        ),
         # leq: 2 constructors on first arg → 2 axioms
         Axiom("leq_zero", forall([y], PredApp("leq", (const("zero"), y)))),
-        Axiom("leq_suc_suc", forall([x, y], Implication(
-            PredApp("leq", (app("suc", x), app("suc", y))),
-            PredApp("leq", (x, y)),
-        ))),
+        Axiom(
+            "leq_suc_suc",
+            forall(
+                [x, y],
+                Implication(
+                    PredApp("leq", (app("suc", x), app("suc", y))),
+                    PredApp("leq", (x, y)),
+                ),
+            ),
+        ),
         # lt: 2 constructors on second arg → 2 axioms
         Axiom("lt_zero", forall([y], Negation(PredApp("lt", (y, const("zero")))))),
-        Axiom("lt_suc", forall([x, y], Implication(
-            PredApp("lt", (app("suc", x), app("suc", y))),
-            PredApp("lt", (x, y)),
-        ))),
+        Axiom(
+            "lt_suc",
+            forall(
+                [x, y],
+                Implication(
+                    PredApp("lt", (app("suc", x), app("suc", y))),
+                    PredApp("lt", (x, y)),
+                ),
+            ),
+        ),
     )
 
     return Spec(name="Nat", signature=sig, axioms=axioms)
@@ -248,18 +280,38 @@ def stack_spec() -> Spec:
 
     axioms = (
         # pop: partial, skip new (undefined), push → 1 axiom
-        Axiom("pop_push", forall([s, e], eq(
-            app("pop", app("push", s, e)), s,
-        ))),
+        Axiom(
+            "pop_push",
+            forall(
+                [s, e],
+                eq(
+                    app("pop", app("push", s, e)),
+                    s,
+                ),
+            ),
+        ),
         # top: partial, skip new (undefined), push → 1 axiom
-        Axiom("top_push", forall([s, e], eq(
-            app("top", app("push", s, e)), e,
-        ))),
+        Axiom(
+            "top_push",
+            forall(
+                [s, e],
+                eq(
+                    app("top", app("push", s, e)),
+                    e,
+                ),
+            ),
+        ),
         # empty: 2 constructors → 2 axioms
         Axiom("empty_new", PredApp("empty", (const("new"),))),
-        Axiom("not_empty_push", forall([s, e], Negation(
-            PredApp("empty", (app("push", s, e),)),
-        ))),
+        Axiom(
+            "not_empty_push",
+            forall(
+                [s, e],
+                Negation(
+                    PredApp("empty", (app("push", s, e),)),
+                ),
+            ),
+        ),
     )
 
     return Spec(name="Stack", signature=sig, axioms=axioms)
@@ -326,16 +378,28 @@ def list_spec() -> Spec:
         Axiom("tl_cons", forall([x, L], eq(app("tl", app("cons", x, L)), L))),
         # append: 2 constructors (nil, cons) on first arg → 2 axioms
         Axiom("append_nil", forall([M], eq(app("append", const("nil"), M), M))),
-        Axiom("append_cons", forall([x, L, M], eq(
-            app("append", app("cons", x, L), M),
-            app("cons", x, app("append", L, M)),
-        ))),
+        Axiom(
+            "append_cons",
+            forall(
+                [x, L, M],
+                eq(
+                    app("append", app("cons", x, L), M),
+                    app("cons", x, app("append", L, M)),
+                ),
+            ),
+        ),
         # length: 2 constructors on arg → 2 axioms
         Axiom("length_nil", eq(app("length", const("nil")), const("zero"))),
-        Axiom("length_cons", forall([x, L], eq(
-            app("length", app("cons", x, L)),
-            app("suc", app("length", L)),
-        ))),
+        Axiom(
+            "length_cons",
+            forall(
+                [x, L],
+                eq(
+                    app("length", app("cons", x, L)),
+                    app("suc", app("length", L)),
+                ),
+            ),
+        ),
     )
 
     return Spec(name="List", signature=sig, axioms=axioms)
@@ -367,18 +431,31 @@ def partial_order_spec() -> Spec:
         predicates={"leq": pred("leq", [("x", "Elem"), ("y", "Elem")])},
     )
 
-    leq = lambda a, b: PredApp("leq", (a, b))
+    def leq(a: Term, b: Term) -> PredApp:
+        return PredApp("leq", (a, b))
 
     axioms = (
         Axiom("reflexivity", forall([x], leq(x, x))),
-        Axiom("antisymmetry", forall([x, y], Implication(
-            Conjunction((leq(x, y), leq(y, x))),
-            eq(x, y),
-        ))),
-        Axiom("transitivity", forall([x, y, z], Implication(
-            Conjunction((leq(x, y), leq(y, z))),
-            leq(x, z),
-        ))),
+        Axiom(
+            "antisymmetry",
+            forall(
+                [x, y],
+                Implication(
+                    Conjunction((leq(x, y), leq(y, x))),
+                    eq(x, y),
+                ),
+            ),
+        ),
+        Axiom(
+            "transitivity",
+            forall(
+                [x, y, z],
+                Implication(
+                    Conjunction((leq(x, y), leq(y, z))),
+                    leq(x, z),
+                ),
+            ),
+        ),
     )
 
     return Spec(name="PartialOrder", signature=sig, axioms=axioms)
@@ -409,18 +486,31 @@ def total_order_spec() -> Spec:
         predicates={"leq": pred("leq", [("x", "Elem"), ("y", "Elem")])},
     )
 
-    leq = lambda a, b: PredApp("leq", (a, b))
+    def leq(a: Term, b: Term) -> PredApp:
+        return PredApp("leq", (a, b))
 
     axioms = (
         Axiom("reflexivity", forall([x], leq(x, x))),
-        Axiom("antisymmetry", forall([x, y], Implication(
-            Conjunction((leq(x, y), leq(y, x))),
-            eq(x, y),
-        ))),
-        Axiom("transitivity", forall([x, y, z], Implication(
-            Conjunction((leq(x, y), leq(y, z))),
-            leq(x, z),
-        ))),
+        Axiom(
+            "antisymmetry",
+            forall(
+                [x, y],
+                Implication(
+                    Conjunction((leq(x, y), leq(y, x))),
+                    eq(x, y),
+                ),
+            ),
+        ),
+        Axiom(
+            "transitivity",
+            forall(
+                [x, y, z],
+                Implication(
+                    Conjunction((leq(x, y), leq(y, z))),
+                    leq(x, z),
+                ),
+            ),
+        ),
         Axiom("totality", forall([x, y], Disjunction((leq(x, y), leq(y, x))))),
     )
 
@@ -460,10 +550,16 @@ def monoid_spec() -> Spec:
     axioms = (
         Axiom("left_unit", forall([x], eq(app("op", const("e"), x), x))),
         Axiom("right_unit", forall([x], eq(app("op", x, const("e")), x))),
-        Axiom("associativity", forall([x, y, z], eq(
-            app("op", app("op", x, y), z),
-            app("op", x, app("op", y, z)),
-        ))),
+        Axiom(
+            "associativity",
+            forall(
+                [x, y, z],
+                eq(
+                    app("op", app("op", x, y), z),
+                    app("op", x, app("op", y, z)),
+                ),
+            ),
+        ),
     )
 
     return Spec(name="Monoid", signature=sig, axioms=axioms)
@@ -502,7 +598,8 @@ def finite_map_spec() -> Spec:
     v = var("v", "Val")
     M = var("M", "Map")
 
-    eq_key = lambda a, b: PredApp("eq_key", (a, b))
+    def eq_key(a: Term, b: Term) -> PredApp:
+        return PredApp("eq_key", (a, b))
 
     sig = Signature(
         sorts={
@@ -523,20 +620,40 @@ def finite_map_spec() -> Spec:
     axioms = (
         # lookup on empty: partial, undefined → no axiom needed (partiality)
         # lookup on update: 2 cases (same key, different key)
-        Axiom("lookup_update_hit", forall([M, k1, k2, v], Implication(
-            eq_key(k1, k2),
-            eq(app("lookup", app("update", M, k1, v), k2), v),
-        ))),
-        Axiom("lookup_update_miss", forall([M, k1, k2, v], Implication(
-            Negation(eq_key(k1, k2)),
-            eq(app("lookup", app("update", M, k1, v), k2), app("lookup", M, k2)),
-        ))),
+        Axiom(
+            "lookup_update_hit",
+            forall(
+                [M, k1, k2, v],
+                Implication(
+                    eq_key(k1, k2),
+                    eq(app("lookup", app("update", M, k1, v), k2), v),
+                ),
+            ),
+        ),
+        Axiom(
+            "lookup_update_miss",
+            forall(
+                [M, k1, k2, v],
+                Implication(
+                    Negation(eq_key(k1, k2)),
+                    eq(
+                        app("lookup", app("update", M, k1, v), k2), app("lookup", M, k2)
+                    ),
+                ),
+            ),
+        ),
         # eq_key is an equivalence (at minimum reflexive + symmetric for map correctness)
         Axiom("eq_key_refl", forall([k], eq_key(k, k))),
-        Axiom("eq_key_sym", forall([k1, k2], Implication(
-            eq_key(k1, k2),
-            eq_key(k2, k1),
-        ))),
+        Axiom(
+            "eq_key_sym",
+            forall(
+                [k1, k2],
+                Implication(
+                    eq_key(k1, k2),
+                    eq_key(k2, k1),
+                ),
+            ),
+        ),
     )
 
     return Spec(name="FiniteMap", signature=sig, axioms=axioms)
@@ -560,12 +677,12 @@ ALL_BASIS_SPECS = [
 
 
 if __name__ == "__main__":
-    from alspec import dumps
-
     for spec_fn in ALL_BASIS_SPECS:
         sp = spec_fn()
         n_sorts = len(sp.signature.sorts)
         n_fns = len(sp.signature.functions)
         n_preds = len(sp.signature.predicates)
         n_axioms = len(sp.axioms)
-        print(f"{sp.name:20s}  sorts={n_sorts}  fns={n_fns}  preds={n_preds}  axioms={n_axioms}")
+        print(
+            f"{sp.name:20s}  sorts={n_sorts}  fns={n_fns}  preds={n_preds}  axioms={n_axioms}"
+        )

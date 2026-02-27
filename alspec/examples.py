@@ -11,16 +11,16 @@ References:
 
 from alspec import (
     Axiom,
-    Signature,
-    Spec,
+    Conjunction,
     Implication,
     Negation,
     PredApp,
-    Conjunction,
+    Signature,
+    Spec,
     dumps,
 )
-from alspec.helpers import S, atomic, fn, pred, var, app, const, eq, forall
-
+from alspec.helpers import S, app, atomic, const, eq, fn, forall, pred, var
+from alspec.terms import Term
 
 # ===================================================================
 # Example 1: Natural Numbers (Peano)
@@ -64,18 +64,24 @@ def nat_spec() -> Spec:
         # add(zero, x) = x
         Axiom(
             label="add_zero_left",
-            formula=forall([x], eq(
-                app("add", const("zero"), x),
-                x,
-            )),
+            formula=forall(
+                [x],
+                eq(
+                    app("add", const("zero"), x),
+                    x,
+                ),
+            ),
         ),
         # add(suc(x), y) = suc(add(x, y))
         Axiom(
             label="add_suc_left",
-            formula=forall([x, y], eq(
-                app("add", app("suc", x), y),
-                app("suc", app("add", x, y)),
-            )),
+            formula=forall(
+                [x, y],
+                eq(
+                    app("add", app("suc", x), y),
+                    app("suc", app("add", x, y)),
+                ),
+            ),
         ),
     )
 
@@ -128,18 +134,24 @@ def stack_spec() -> Spec:
         # pop(push(S, e)) = S
         Axiom(
             label="pop_push",
-            formula=forall([s, e], eq(
-                app("pop", app("push", s, e)),
-                s,
-            )),
+            formula=forall(
+                [s, e],
+                eq(
+                    app("pop", app("push", s, e)),
+                    s,
+                ),
+            ),
         ),
         # top(push(S, e)) = e
         Axiom(
             label="top_push",
-            formula=forall([s, e], eq(
-                app("top", app("push", s, e)),
-                e,
-            )),
+            formula=forall(
+                [s, e],
+                eq(
+                    app("top", app("push", s, e)),
+                    e,
+                ),
+            ),
         ),
         # empty(new)
         Axiom(
@@ -149,9 +161,12 @@ def stack_spec() -> Spec:
         # ¬ empty(push(S, e))
         Axiom(
             label="not_empty_push",
-            formula=forall([s, e], Negation(
-                PredApp("empty", (app("push", s, e),)),
-            )),
+            formula=forall(
+                [s, e],
+                Negation(
+                    PredApp("empty", (app("push", s, e),)),
+                ),
+            ),
         ),
     )
 
@@ -178,7 +193,8 @@ def partial_order_spec() -> Spec:
     y = var("y", "Elem")
     z = var("z", "Elem")
 
-    leq = lambda a, b: PredApp("leq", (a, b))  # noqa: E731
+    def leq(a: Term, b: Term) -> PredApp:
+        return PredApp("leq", (a, b))
 
     sig = Signature(
         sorts={"Elem": atomic("Elem")},
@@ -197,18 +213,24 @@ def partial_order_spec() -> Spec:
         # ∀ x, y : Elem • x ≤ y ∧ y ≤ x ⇒ x = y
         Axiom(
             label="antisymmetry",
-            formula=forall([x, y], Implication(
-                antecedent=Conjunction((leq(x, y), leq(y, x))),
-                consequent=eq(x, y),
-            )),
+            formula=forall(
+                [x, y],
+                Implication(
+                    antecedent=Conjunction((leq(x, y), leq(y, x))),
+                    consequent=eq(x, y),
+                ),
+            ),
         ),
         # ∀ x, y, z : Elem • x ≤ y ∧ y ≤ z ⇒ x ≤ z
         Axiom(
             label="transitivity",
-            formula=forall([x, y, z], Implication(
-                antecedent=Conjunction((leq(x, y), leq(y, z))),
-                consequent=leq(x, z),
-            )),
+            formula=forall(
+                [x, y, z],
+                Implication(
+                    antecedent=Conjunction((leq(x, y), leq(y, z))),
+                    consequent=leq(x, z),
+                ),
+            ),
         ),
     )
 
@@ -216,41 +238,53 @@ def partial_order_spec() -> Spec:
 
 
 # ===================================================================
-# Example 4: Bug Tracker (our domain)
+# Example 4: Bug Tracker (comprehensive worked example)
 #
-# This tests whether the building blocks handle a "real" domain spec
-# with product sorts, multiple entities, and uninterpreted functions.
+# Exercises: product sorts, coproduct sorts, field access, partial
+# functions, predicates, implications, biconditionals, and the full
+# axiom obligation pattern.
 # ===================================================================
 
 
 def bug_tracker_spec() -> Spec:
-    """Simplified bug tracker in algebraic spec style.
+    """Bug tracker — the comprehensive worked example.
 
-    sorts:
-        TicketId, Title, Body  (atomic)
-        SeverityLevel          (atomic — uninterpreted, filled by LLM)
-        Ticket                 (product: id, title, body, severity)
+    Sorts:
+        TicketId, Title, Body          (atomic)
+        SeverityLevel                  (atomic — uninterpreted, filled by LLM)
+        Status                         (atomic — enumeration via nullary constructors open, resolved)
+        Ticket                         (product: id, title, body, severity, status)
 
-    ops:
-        classify : Title × Body → SeverityLevel
-        create   : TicketId × Title × Body → Ticket
+    Functions:
+        classify   : Title × Body → SeverityLevel        (total)
+        create     : TicketId × Title × Body → Ticket    (total, constructor)
+        resolve    : Ticket → Ticket                     (total, constructor — transitions status)
+        get_severity : Ticket → SeverityLevel             (total, observer)
+        get_status   : Ticket → Status                   (total, observer)
 
-    axioms:
-        ∀ id : TicketId, t : Title, b : Body
-        • create(id, t, b).severity = classify(t, b)
+    Predicates:
+        is_critical : Ticket
 
-    This is the pattern Gravity-Well generates: an uninterpreted function
-    (classify) whose result is bound to a field on a product sort (Ticket)
-    via an equational axiom. The well-sortedness check would verify:
-      - classify returns SeverityLevel
-      - Ticket.severity has sort SeverityLevel
-      - Therefore the equation is well-sorted.
+    Axiom obligation table:
+        get_severity × create  → axiom (get_severity_create)
+        get_severity × resolve → axiom (get_severity_resolve)
+        get_status   × create  → axiom (get_status_create)
+        get_status   × resolve → axiom (get_status_resolve)
+        is_critical  × create  → axiom (is_critical_create)
+        is_critical  × resolve → axiom (is_critical_resolve)
     """
-    from alspec import FieldAccess, ProductField, ProductSort
+    from alspec import (
+        Biconditional,
+        PredApp,
+        ProductField,
+        ProductSort,
+    )
 
+    # Variables
     id_var = var("id", "TicketId")
     t = var("t", "Title")
     b = var("b", "Body")
+    tk = var("tk", "Ticket")
 
     sig = Signature(
         sorts={
@@ -258,6 +292,7 @@ def bug_tracker_spec() -> Spec:
             "Title": atomic("Title"),
             "Body": atomic("Body"),
             "SeverityLevel": atomic("SeverityLevel"),
+            "Status": atomic("Status"),
             "Ticket": ProductSort(
                 name=S("Ticket"),
                 fields=(
@@ -265,31 +300,113 @@ def bug_tracker_spec() -> Spec:
                     ProductField("title", S("Title")),
                     ProductField("body", S("Body")),
                     ProductField("severity", S("SeverityLevel")),
+                    ProductField("status", S("Status")),
                 ),
             ),
         },
         functions={
-            "classify": fn("classify", [("t", "Title"), ("b", "Body")], "SeverityLevel"),
+            # Uninterpreted function — filled by LLM at code-gen time
+            "classify": fn(
+                "classify", [("t", "Title"), ("b", "Body")], "SeverityLevel"
+            ),
+            # Constructors for Ticket
             "create": fn(
                 "create",
                 [("id", "TicketId"), ("t", "Title"), ("b", "Body")],
                 "Ticket",
             ),
+            "resolve": fn("resolve", [("tk", "Ticket")], "Ticket"),
+            # Observers
+            "get_severity": fn("get_severity", [("tk", "Ticket")], "SeverityLevel"),
+            "get_status": fn("get_status", [("tk", "Ticket")], "Status"),
+            # Status constants
+            "open": fn("open", [], "Status"),
+            "resolved": fn("resolved", [], "Status"),
+            # SeverityLevel constants
+            "high": fn("high", [], "SeverityLevel"),
         },
-        predicates={},
+        predicates={
+            "is_critical": pred("is_critical", [("tk", "Ticket")]),
+        },
     )
 
-    # create(id, t, b).severity = classify(t, b)
     axioms = (
+        # ── get_severity × create ──
+        # Observer: get_severity, Constructor: create
         Axiom(
-            label="ticket_severity_is_classified",
-            formula=forall([id_var, t, b], eq(
-                FieldAccess(
-                    term=app("create", id_var, t, b),
-                    field_name="severity",
+            label="get_severity_create",
+            formula=forall(
+                [id_var, t, b],
+                eq(
+                    app("get_severity", app("create", id_var, t, b)),
+                    app("classify", t, b),
                 ),
-                app("classify", t, b),
-            )),
+            ),
+        ),
+        # ── get_severity × resolve ──
+        # Observer: get_severity, Constructor: resolve
+        # Severity is preserved across resolution.
+        Axiom(
+            label="get_severity_resolve",
+            formula=forall(
+                [tk],
+                eq(
+                    app("get_severity", app("resolve", tk)),
+                    app("get_severity", tk),
+                ),
+            ),
+        ),
+        # ── get_status × create ──
+        # Observer: get_status, Constructor: create
+        # New tickets start open.
+        Axiom(
+            label="get_status_create",
+            formula=forall(
+                [id_var, t, b],
+                eq(
+                    app("get_status", app("create", id_var, t, b)),
+                    const("open"),
+                ),
+            ),
+        ),
+        # ── get_status × resolve ──
+        # Observer: get_status, Constructor: resolve
+        Axiom(
+            label="get_status_resolve",
+            formula=forall(
+                [tk],
+                eq(
+                    app("get_status", app("resolve", tk)),
+                    const("resolved"),
+                ),
+            ),
+        ),
+        # ── is_critical × create ──
+        # Predicate: is_critical, Constructor: create
+        # A newly created ticket is critical iff classify returns high severity.
+        # Uses Biconditional: is_critical holds exactly when severity is high.
+        Axiom(
+            label="is_critical_create",
+            formula=forall(
+                [id_var, t, b],
+                Biconditional(
+                    lhs=PredApp("is_critical", (app("create", id_var, t, b),)),
+                    rhs=eq(app("classify", t, b), const("high")),
+                ),
+            ),
+        ),
+        # ── is_critical × resolve ──
+        # Predicate: is_critical, Constructor: resolve
+        # Criticality is preserved — resolving doesn't change severity.
+        Axiom(
+            label="is_critical_resolve",
+            formula=forall(
+                [tk],
+                Biconditional(
+                    lhs=PredApp("is_critical", (app("resolve", tk),)),
+                    rhs=PredApp("is_critical", (tk,)),
+                ),
+            ),
         ),
     )
 
@@ -301,7 +418,7 @@ def bug_tracker_spec() -> Spec:
 # ===================================================================
 
 
-def main():
+def main() -> None:
     examples = [
         nat_spec(),
         stack_spec(),

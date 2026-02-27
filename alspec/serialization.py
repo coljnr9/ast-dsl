@@ -9,6 +9,13 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from .signature import (
+    FnParam,
+    FnSymbol,
+    PredSymbol,
+    Signature,
+    Totality,
+)
 from .sorts import (
     AtomicSort,
     CoproductAlt,
@@ -18,14 +25,9 @@ from .sorts import (
     SortDecl,
     SortRef,
 )
-from .signature import (
-    FnParam,
-    FnSymbol,
-    PredSymbol,
-    Signature,
-    Totality,
-)
+from .spec import Axiom, Spec
 from .terms import (
+    Biconditional,
     Conjunction,
     Definedness,
     Disjunction,
@@ -35,7 +37,6 @@ from .terms import (
     FnApp,
     Formula,
     Implication,
-    Biconditional,
     Literal,
     Negation,
     PredApp,
@@ -43,8 +44,6 @@ from .terms import (
     UniversalQuant,
     Var,
 )
-from .spec import Axiom, Spec
-
 
 # ---------------------------------------------------------------------------
 # Sorts
@@ -75,14 +74,12 @@ def sort_from_json(d: dict[str, Any]) -> SortDecl:
         return AtomicSort(name=SortRef(d["name"]))
     elif t == "product":
         fields = tuple(
-            ProductField(name=f["name"], sort=SortRef(f["sort"]))
-            for f in d["fields"]
+            ProductField(name=f["name"], sort=SortRef(f["sort"])) for f in d["fields"]
         )
         return ProductSort(name=SortRef(d["name"]), fields=fields)
     elif t == "coproduct":
         alts = tuple(
-            CoproductAlt(tag=a["tag"], sort=SortRef(a["sort"]))
-            for a in d["alts"]
+            CoproductAlt(tag=a["tag"], sort=SortRef(a["sort"])) for a in d["alts"]
         )
         return CoproductSort(name=SortRef(d["name"]), alts=alts)
     raise ValueError(f"Unknown sort type: {t}")
@@ -301,8 +298,7 @@ def spec_to_json(sp: Spec) -> dict[str, Any]:
         "name": sp.name,
         "signature": signature_to_json(sp.signature),
         "axioms": [
-            {"label": a.label, "formula": formula_to_json(a.formula)}
-            for a in sp.axioms
+            {"label": a.label, "formula": formula_to_json(a.formula)} for a in sp.axioms
         ],
     }
 
