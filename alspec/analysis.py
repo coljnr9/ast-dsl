@@ -448,6 +448,56 @@ def _has_definedness_assertion(formula: Formula, fn_name: str) -> bool:
     assert_never(formula)
 
 
+def _has_witnessing_equation(formula: Formula, fn_name: str, sig: Signature) -> bool:
+    """Does this formula contain f(args) = t where t is definitely defined?
+
+    Catches witnessing equations buried inside compound guards (e.g.
+    Conjunction antecedents) that the decomposer cannot attribute to f
+    as a constrained symbol.  Symmetry is respected: t = f(args) counts
+    too.
+    """
+    if isinstance(formula, Equation):
+        if (
+            isinstance(formula.lhs, FnApp)
+            and formula.lhs.fn_name == fn_name
+            and _definitely_defined(formula.rhs, sig)
+        ):
+            return True
+        # Symmetric: rhs = f(args)
+        if (
+            isinstance(formula.rhs, FnApp)
+            and formula.rhs.fn_name == fn_name
+            and _definitely_defined(formula.lhs, sig)
+        ):
+            return True
+        return False
+    if isinstance(formula, PredApp):
+        return False
+    if isinstance(formula, Negation):
+        return _has_witnessing_equation(formula.formula, fn_name, sig)
+    if isinstance(formula, Conjunction):
+        return any(_has_witnessing_equation(f, fn_name, sig) for f in formula.conjuncts)
+    if isinstance(formula, Disjunction):
+        return any(_has_witnessing_equation(f, fn_name, sig) for f in formula.disjuncts)
+    if isinstance(formula, Implication):
+        return (
+            _has_witnessing_equation(formula.antecedent, fn_name, sig)
+            or _has_witnessing_equation(formula.consequent, fn_name, sig)
+        )
+    if isinstance(formula, Biconditional):
+        return (
+            _has_witnessing_equation(formula.lhs, fn_name, sig)
+            or _has_witnessing_equation(formula.rhs, fn_name, sig)
+        )
+    if isinstance(formula, UniversalQuant):
+        return _has_witnessing_equation(formula.body, fn_name, sig)
+    if isinstance(formula, ExistentialQuant):
+        return _has_witnessing_equation(formula.body, fn_name, sig)
+    if isinstance(formula, Definedness):
+        return False  # Definedness nodes are handled by the secondary scan
+    assert_never(formula)
+
+
 def _check_unwitnessed_partials(spec: Spec, index: AxiomIndex) -> list[Diagnostic]:
     """Detect partial functions with no definedness witness.
 
@@ -479,6 +529,14 @@ def _check_unwitnessed_partials(spec: Spec, index: AxiomIndex) -> list[Diagnosti
         if not witnessed:
             for axiom in spec.axioms:
                 if _has_definedness_assertion(axiom.formula, fn_name):
+                    witnessed = True
+                    break
+
+        # Tertiary: scan all axiom formulas for witnessing equations
+        # that the decomposer couldn't attribute (e.g. under Conjunction guards)
+        if not witnessed:
+            for axiom in spec.axioms:
+                if _has_witnessing_equation(axiom.formula, fn_name, spec.signature):
                     witnessed = True
                     break
 

@@ -1152,6 +1152,118 @@ class TestPartialRHSDoesNotWitness:
         assert "lookup" in names
 
 
+class TestWitnessedByConjunctionGuardedEquation:
+    """Tertiary scan: witnessing equation buried under a Conjunction guard.
+
+    Pattern: eq_id(v, v1) ∧ eq_id(v, v2) ⇒ diff(init(c, v), v1, v2) = compute_diff(c, c)
+    The Conjunction antecedent makes constrained=None, but the equation body
+    still witnesses diff because compute_diff(c, c) is definitely defined (total fn, Var args).
+    """
+
+    def test_conjunction_guarded_equation_witnesses(self) -> None:
+        """diff should NOT be flagged when a conjunctively-guarded axiom equates it to a total RHS."""
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+        from alspec.terms import Conjunction
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "K": atomic("K"), "D": atomic("D")},
+            functions={
+                "c": fn("c", [], "S"),
+                "mk": fn("mk", [("s", "S"), ("k", "K")], "S"),
+                "compute": fn("compute", [("s1", "S"), ("s2", "S")], "D"),
+                "diff": fn("diff", [("s", "S"), ("k1", "K"), ("k2", "K")], "D", total=False),
+            },
+            predicates={
+                "eq_k": pred("eq_k", [("k1", "K"), ("k2", "K")]),
+            },
+        )
+        s = var("s", "S")
+        k = var("k", "K")
+        k1 = var("k1", "K")
+        k2 = var("k2", "K")
+        cc = var("cc", "S")
+        spec = Spec(
+            name="TestConjGuardedWitness",
+            signature=sig,
+            axioms=(
+                # Conjunction guard → constrained=None, but body witnesses diff
+                Axiom(
+                    "diff_mk_hit_hit",
+                    forall(
+                        [cc, k, k1, k2],
+                        Implication(
+                            Conjunction((
+                                PredApp("eq_k", (k, k1)),
+                                PredApp("eq_k", (k, k2)),
+                            )),
+                            eq(
+                                app("diff", app("mk", cc, k), k1, k2),
+                                app("compute", cc, cc),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        unwitnessed = [d for d in diagnostics if d.check == "unwitnessed_partial"]
+        names = {d.message.split("'")[1] for d in unwitnessed}
+        assert "diff" not in names, f"diff should be witnessed via tertiary scan, got: {unwitnessed}"
+
+    def test_conjunction_guarded_partial_rhs_does_not_witness(self) -> None:
+        """If the RHS under a Conjunction guard is partial, it must NOT witness."""
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+        from alspec.terms import Conjunction
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "K": atomic("K"), "D": atomic("D")},
+            functions={
+                "c": fn("c", [], "S"),
+                "mk": fn("mk", [("s", "S"), ("k", "K")], "S"),
+                "other_partial": fn("other_partial", [("s", "S")], "D", total=False),
+                "diff": fn("diff", [("s", "S"), ("k1", "K"), ("k2", "K")], "D", total=False),
+            },
+            predicates={
+                "eq_k": pred("eq_k", [("k1", "K"), ("k2", "K")]),
+            },
+        )
+        k = var("k", "K")
+        k1 = var("k1", "K")
+        k2 = var("k2", "K")
+        cc = var("cc", "S")
+        spec = Spec(
+            name="TestConjGuardedNoWitness",
+            signature=sig,
+            axioms=(
+                # Conjunction guard, but RHS is partial — no witness
+                Axiom(
+                    "diff_mk_partial_rhs",
+                    forall(
+                        [cc, k, k1, k2],
+                        Implication(
+                            Conjunction((
+                                PredApp("eq_k", (k, k1)),
+                                PredApp("eq_k", (k, k2)),
+                            )),
+                            eq(
+                                app("diff", app("mk", cc, k), k1, k2),
+                                app("other_partial", cc),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        unwitnessed = [d for d in diagnostics if d.check == "unwitnessed_partial"]
+        names = {d.message.split("'")[1] for d in unwitnessed}
+        assert "diff" in names, "diff should NOT be witnessed when RHS is partial"
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Phase 4: Case split completeness — audit_spec.check == "case_split_*"
 # ──────────────────────────────────────────────────────────────────────────────
