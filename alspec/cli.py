@@ -1,11 +1,16 @@
 import argparse
 import asyncio
 import sys
+from collections.abc import Sequence
 
 from alspec.examples import main as run_examples
 from alspec.gen_reference import generate_reference
+from alspec.load import load_spec_from_file
 from alspec.llm import AsyncLLMClient
 from alspec.result import Err, Ok
+from alspec.score import score_spec
+from alspec.score_report import ScoreResult, print_score_diagnostics, print_score_table
+from alspec.spec import Spec
 
 
 async def handle_generate(prompt: str) -> int:
@@ -40,6 +45,50 @@ async def handle_generate(prompt: str) -> int:
             return 1
 
 
+def handle_score(
+    files: Sequence[str],
+    *,
+    verbose: bool,
+    audit: bool,
+    strict: bool,
+) -> int:
+    """Load, score, and report on a list of spec .py files."""
+    results: list[ScoreResult] = []
+
+    for path in files:
+        spec_or_err = load_spec_from_file(path)
+        match spec_or_err:
+            case str(err):
+                results.append(
+                    ScoreResult(
+                        file_path=path,
+                        spec_name="",
+                        success=False,
+                        error=err,
+                        score=None,
+                    )
+                )
+            case Spec() as spec:
+                score = score_spec(spec, strict=strict, audit=audit)
+                results.append(
+                    ScoreResult(
+                        file_path=path,
+                        spec_name=spec.name,
+                        success=True,
+                        error=None,
+                        score=score,
+                    )
+                )
+
+    print_score_table(results, sys.stdout)
+
+    if verbose:
+        print_score_diagnostics(results, sys.stdout)
+
+    any_failure = any(not r.success for r in results)
+    return 1 if any_failure else 0
+
+
 async def async_main() -> int:
     parser = argparse.ArgumentParser(
         prog="alspec",
@@ -59,6 +108,37 @@ async def async_main() -> int:
         help="Run textbook algebraic specification examples and print them as JSON.",
     )
 
+    # Command: score
+    score_parser = subparsers.add_parser(
+        "score",
+        help="Load one or more spec .py files and print a scoring summary table.",
+    )
+    score_parser.add_argument(
+        "files",
+        nargs="+",
+        metavar="FILE",
+        help="Spec .py file(s) to score. Shell globs are expanded by your shell.",
+    )
+    score_parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        default=False,
+        help="Print per-file diagnostics after the table.",
+    )
+    score_parser.add_argument(
+        "--audit",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Run adequacy audit checks (default: on).",
+    )
+    score_parser.add_argument(
+        "--strict",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Strict scoring: health is 0 or 1 (default: smooth degradation).",
+    )
+
     # Command: generate
     generate_parser = subparsers.add_parser(
         "generate", help="Generate a new spec from a prompt using an LLM."
@@ -76,6 +156,13 @@ async def async_main() -> int:
         case "examples":
             run_examples()
             return 0
+        case "score":
+            return handle_score(
+                args.files,
+                verbose=args.verbose,
+                audit=args.audit,
+                strict=args.strict,
+            )
         case "generate":
             return await handle_generate(args.prompt)
         case None:
