@@ -2160,3 +2160,37 @@ class TestGoldenBoundedCounterClean:
         diagnostics = audit_spec(spec)
         incomplete = [d for d in diagnostics if d.check == "case_split_incomplete"]
         assert incomplete == [], f"Unexpected incomplete splits in {spec.name}: {incomplete}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Malformed spec robustness — audit must not crash
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestAuditSurvivesMalformedSpec:
+    """Audit should not crash on specs with Terms in Formula positions."""
+
+    def test_fnapp_in_formula_position(self) -> None:
+        from alspec.helpers import atomic, fn
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={"S": atomic("S")},
+            functions={
+                "c": fn("c", [], "S"),
+                "f": fn("f", [("x", "S")], "S", total=False),
+            },
+            predicates={},
+        )
+        x = var("x", "S")
+        # Deliberately malformed: FnApp where Formula expected
+        bad_axiom = Axiom("bad", Implication(
+            FnApp("f", (x,)),  # Term, not Formula — malformed!
+            eq(app("f", x), const("c"))
+        ))
+        spec = Spec(name="Malformed", signature=sig, axioms=(bad_axiom,))
+        # Should not crash — may produce diagnostics or skip gracefully
+        diagnostics = audit_spec(spec)
+        # We just care it doesn't crash; diagnostic content doesn't matter
+        assert isinstance(diagnostics, tuple)

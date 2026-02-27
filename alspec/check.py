@@ -130,6 +130,13 @@ def check_term(term: Term, ctx: CheckContext, path: str) -> SortRef | None:
         ctx.observe_var(term.name, term.sort, path)
         return term.sort
     elif isinstance(term, FnApp):
+        if not isinstance(term.args, tuple):
+            ctx.error(
+                "malformed_node",
+                f"FnApp '{term.fn_name}' has non-tuple args: {type(term.args).__name__}",
+                path,
+            )
+            return None
         fn = ctx.sig.get_fn(term.fn_name)
         if fn is None:
             ctx.error("fn_declared", f"Function '{term.fn_name}' is not declared", path)
@@ -216,6 +223,13 @@ def check_formula(formula: Formula, ctx: CheckContext, path: str) -> None:
                 path,
             )
     elif isinstance(formula, PredApp):
+        if not isinstance(formula.args, tuple):
+            ctx.error(
+                "malformed_node",
+                f"PredApp '{formula.pred_name}' has non-tuple args: {type(formula.args).__name__}",
+                path,
+            )
+            return
         pred = ctx.sig.get_pred(formula.pred_name)
         if pred is None:
             ctx.error(

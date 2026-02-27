@@ -153,17 +153,16 @@ def render() -> str:
         - × `assign_ticket`: Same — both hit and miss preserve. One universal axiom.
 
         **`get_status` (partial — undefined when ticket doesn't exist — 6 axioms):**
-        - × `empty`: **omitted** — no tickets, so `get_status(empty, k)` is undefined.
+        - × `empty`: **omitted** — base constructor, no prior state.
         - × `create_ticket` hit: returns `open` — new tickets start open.
         - × `create_ticket` miss: delegates to `get_status(s, k2)`.
-        - × `resolve_ticket` hit: returns `resolved` — but only if the ticket exists
-          (needs `has_ticket` guard in the axiom).
+        - × `resolve_ticket` hit + has_ticket: returns `resolved`.
+        - × `resolve_ticket` hit + ¬has_ticket: delegates (no-op on nonexistent ticket).
         - × `resolve_ticket` miss: delegates.
-        - × `assign_ticket` hit: preserved — assigning doesn't change status.
-        - × `assign_ticket` miss: delegates.
+        - × `assign_ticket`: universal preservation (collapsible).
 
         **`get_severity` (partial — undefined when ticket doesn't exist — 4 axioms):**
-        - × `empty`: **omitted** — undefined.
+        - × `empty`: **omitted** — base constructor, no prior state.
         - × `create_ticket` hit: `classify(t, b)` — severity is set at creation.
         - × `create_ticket` miss: delegates.
         - × `resolve_ticket`: **No key dispatch needed!** Resolve doesn't change severity
@@ -175,15 +174,14 @@ def render() -> str:
         observer at all, regardless of key, you can collapse the hit/miss pair into
         a single axiom covering all keys.
 
-        **`get_assignee` (doubly partial — 4 axioms):**
-        - × `empty`: **omitted** — undefined.
-        - × `create_ticket` hit: **omitted** — even though the ticket exists at this
-          key after creation, `get_assignee` is still undefined because new tickets
-          have no assignee. This is the "doubly partial" case.
+        **`get_assignee` (doubly partial — 6 axioms):**
+        - × `empty`: **omitted** — base constructor, no prior state.
+        - × `create_ticket` hit: **explicit undefinedness** — new tickets have no
+          assignee. Use `Negation(Definedness(...))` because under loose semantics,
+          omission would leave the value unconstrained, not undefined.
         - × `create_ticket` miss: delegates.
-        - × `assign_ticket` hit: returns the new `UserId` (guarded by `has_ticket`) —
-          assigning to a nonexistent ticket is a no-op, so the axiom only fires when
-          the ticket actually exists.
+        - × `assign_ticket` hit + has_ticket: returns the new `UserId`.
+        - × `assign_ticket` hit + ¬has_ticket: delegates (no-op on nonexistent ticket).
         - × `assign_ticket` miss: delegates.
         - × `resolve_ticket`: universal preservation — resolve doesn't change assignee.
 
@@ -198,11 +196,11 @@ def render() -> str:
         **Completeness count:**
         - `eq_id` basis: 3 axioms (refl, sym, trans)
         - `has_ticket`: 5 axioms (empty + 2×create + 1×resolve_universal + 1×assign_universal)
-        - `get_status`: 6 axioms (2×create + 1×resolve_hit + 1×resolve_miss + 2×assign)
+        - `get_status`: 6 axioms (2×create + 2×resolve_hit + 1×resolve_miss + 1×assign_universal)
         - `get_severity`: 4 axioms (2×create + 1×resolve_universal + 1×assign_universal)
-        - `get_assignee`: 4 axioms (1×create_miss + 2×assign + 1×resolve_universal)
+        - `get_assignee`: 6 axioms (1×create_hit_undef + 1×create_miss + 2×assign_hit + 1×assign_miss + 1×resolve_universal)
         - `is_critical`: 5 axioms (empty + 2×create + 1×resolve + 1×assign)
-        - **Total: 27 axioms**
+        - **Total: 29 axioms**
 
         | Observer / Predicate | Constructor | Case | Axiom Label | Behavior |
         |---------------------|------------|------|-------------|----------|
@@ -214,22 +212,23 @@ def render() -> str:
         | `has_ticket` | `create_ticket` | miss | `has_ticket_create_miss` | delegates |
         | `has_ticket` | `resolve_ticket` | any | `has_ticket_resolve` | universal preservation |
         | `has_ticket` | `assign_ticket` | any | `has_ticket_assign` | universal preservation |
-        | `get_status` (partial) | `empty` | — | *(omitted)* | undefined |
+        | `get_status` (partial) | `empty` | — | *(omitted)* | base constructor |
         | `get_status` (partial) | `create_ticket` | hit | `get_status_create_hit` | `open` |
         | `get_status` (partial) | `create_ticket` | miss | `get_status_create_miss` | delegates |
-        | `get_status` (partial) | `resolve_ticket` | hit | `get_status_resolve_hit` | `resolved` (guarded) |
+        | `get_status` (partial) | `resolve_ticket` | hit | `get_status_resolve_hit` | `resolved` (guarded by `has_ticket`) |
+        | `get_status` (partial) | `resolve_ticket` | hit | `get_status_resolve_hit_noticket` | delegates (¬has_ticket) |
         | `get_status` (partial) | `resolve_ticket` | miss | `get_status_resolve_miss` | delegates |
-        | `get_status` (partial) | `assign_ticket` | hit | `get_status_assign_hit` | preserved |
-        | `get_status` (partial) | `assign_ticket` | miss | `get_status_assign_miss` | delegates |
-        | `get_severity` (partial) | `empty` | — | *(omitted)* | undefined |
+        | `get_status` (partial) | `assign_ticket` | any | `get_status_assign` | universal preservation |
+        | `get_severity` (partial) | `empty` | — | *(omitted)* | base constructor |
         | `get_severity` (partial) | `create_ticket` | hit | `get_severity_create_hit` | `classify(t, b)` |
         | `get_severity` (partial) | `create_ticket` | miss | `get_severity_create_miss` | delegates |
         | `get_severity` (partial) | `resolve_ticket` | any | `get_severity_resolve` | universal preservation |
         | `get_severity` (partial) | `assign_ticket` | any | `get_severity_assign` | universal preservation |
-        | `get_assignee` (partial) | `empty` | — | *(omitted)* | undefined |
-        | `get_assignee` (partial) | `create_ticket` | hit | *(omitted)* | undefined — no assignee |
+        | `get_assignee` (partial) | `empty` | — | *(omitted)* | base constructor |
+        | `get_assignee` (partial) | `create_ticket` | hit | `get_assignee_create_hit` | **explicit undefinedness** `¬def(...)` |
         | `get_assignee` (partial) | `create_ticket` | miss | `get_assignee_create_miss` | delegates |
         | `get_assignee` (partial) | `assign_ticket` | hit | `get_assignee_assign_hit` | returns `u` (guarded by `has_ticket`) |
+        | `get_assignee` (partial) | `assign_ticket` | hit | `get_assignee_assign_hit_noticket` | delegates (¬has_ticket) |
         | `get_assignee` (partial) | `assign_ticket` | miss | `get_assignee_assign_miss` | delegates |
         | `get_assignee` (partial) | `resolve_ticket` | any | `get_assignee_resolve` | universal preservation |
         | `is_critical` (pred) | `empty` | — | `is_critical_empty` | false |
@@ -244,7 +243,7 @@ def render() -> str:
 
         ```python
         from alspec import (
-            Axiom, Conjunction, Implication, Negation, PredApp,
+            Axiom, Conjunction, Definedness, Implication, Negation, PredApp,
             Signature, Spec,
             atomic, fn, pred, var, app, const, eq, forall, iff,
         )
@@ -309,7 +308,10 @@ def render() -> str:
           Use `Implication(Negation(PredApp("eq_id", (k, k2))), ...)` as the guard.
         - **Universal preservation**: The constructor doesn't affect the observer at ANY key.
           No guard needed — write a single equation for all `k2`.
-        - **Omitted case**: The observer is undefined for this constructor. No axiom.
+        - **Explicit undefinedness**: The observer should be undefined for this constructor.
+          Use `Negation(Definedness(app("observer", app("constructor", ...), k2)))`.
+        - **Both guard polarities**: When an axiom is guarded by a predicate (e.g.,
+          `has_ticket`), write axioms for BOTH the positive and negative case.
 
         ```python
         axioms = (
@@ -396,7 +398,7 @@ def render() -> str:
             ),
 
             # ━━ get_status: partial, key-dispatch ━━
-            # empty case OMITTED — undefined (no tickets)
+            # empty case OMITTED — base constructor, no prior state
 
             # PredApp inside Implication — hit: new tickets start open
             Axiom(
@@ -431,6 +433,21 @@ def render() -> str:
                 )),
             ),
 
+            # resolve_ticket hit WITHOUT ticket: no-op, delegates
+            # Under loose semantics, omitting this would leave the observer unconstrained
+            # on non-existent tickets after resolve — any value would be a valid model.
+            Axiom(
+                label="get_status_resolve_hit_noticket",
+                formula=forall([s, k, k2], Implication(
+                    PredApp("eq_id", (k, k2)),                      # Formula ✓
+                    Implication(
+                        Negation(PredApp("has_ticket", (s, k))),     # Formula ✓ — guard
+                        eq(app("get_status", app("resolve_ticket", s, k), k2),
+                           app("get_status", s, k2)),                # Term ✓
+                    ),
+                )),
+            ),
+
             # resolve_ticket miss: delegates
             Axiom(
                 label="get_status_resolve_miss",
@@ -441,28 +458,17 @@ def render() -> str:
                 )),
             ),
 
-            # assign_ticket hit: status preserved
+            # Universal preservation — assign doesn't change status for ANY key.
             Axiom(
-                label="get_status_assign_hit",
-                formula=forall([s, k, k2, u], Implication(
-                    PredApp("eq_id", (k, k2)),                      # Formula ✓
-                    eq(app("get_status", app("assign_ticket", s, k, u), k2),
-                       app("get_status", s, k2)),                    # Term ✓
-                )),
-            ),
-
-            # assign_ticket miss: delegates
-            Axiom(
-                label="get_status_assign_miss",
-                formula=forall([s, k, k2, u], Implication(
-                    Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
-                    eq(app("get_status", app("assign_ticket", s, k, u), k2),
-                       app("get_status", s, k2)),                    # Term ✓
+                label="get_status_assign",
+                formula=forall([s, k, k2, u], eq(
+                    app("get_status", app("assign_ticket", s, k, u), k2),
+                    app("get_status", s, k2),                        # Term ✓
                 )),
             ),
 
             # ━━ get_severity: partial, key-dispatch on create only ━━
-            # empty case OMITTED — undefined
+            # empty case OMITTED — base constructor, no prior state
 
             # create_ticket hit: severity = classify(t, b)
             Axiom(
@@ -504,10 +510,20 @@ def render() -> str:
             ),
 
             # ━━ get_assignee: doubly partial ━━
-            # empty case OMITTED — undefined (no tickets)
-            # create_ticket HIT case OMITTED — new tickets have no assignee,
-            #   so get_assignee(create_ticket(s, k, t, b), k) is undefined.
-            #   Even though the ticket exists, the observer is still undefined.
+            # empty case OMITTED — base constructor, no prior state
+
+            # create_ticket hit: EXPLICIT UNDEFINEDNESS — new tickets have no assignee.
+            # Under loose semantics, omitting this axiom would NOT make get_assignee
+            # undefined — it would leave it unconstrained (any user is a valid model).
+            Axiom(
+                label="get_assignee_create_hit",
+                formula=forall([s, k, k2, t, b], Implication(
+                    PredApp("eq_id", (k, k2)),                      # Formula ✓
+                    Negation(Definedness(
+                        app("get_assignee", app("create_ticket", s, k, t, b), k2)
+                    )),
+                )),
+            ),
 
             # create_ticket miss: delegates
             Axiom(
@@ -529,6 +545,19 @@ def render() -> str:
                         PredApp("has_ticket", (s, k)),              # Formula ✓ — guard
                         eq(app("get_assignee", app("assign_ticket", s, k, u), k2),
                            u),                                       # Term ✓
+                    ),
+                )),
+            ),
+
+            # assign_ticket hit WITHOUT ticket: no-op, delegates
+            Axiom(
+                label="get_assignee_assign_hit_noticket",
+                formula=forall([s, k, k2, u], Implication(
+                    PredApp("eq_id", (k, k2)),                      # Formula ✓
+                    Implication(
+                        Negation(PredApp("has_ticket", (s, k))),     # Formula ✓ — guard
+                        eq(app("get_assignee", app("assign_ticket", s, k, u), k2),
+                           app("get_assignee", s, k2)),              # Term ✓
                     ),
                 )),
             ),
@@ -616,7 +645,7 @@ def render() -> str:
         ### Summary
 
         | Feature | Where it appears |
-        |---------|-----------------|
+        |---------|-----------------| 
         | Atomic sorts | `TicketId`, `Title`, `Body`, `SeverityLevel`, `Status`, `UserId`, `Store` |
         | Enumeration (constants) | `open`/`resolved` for Status, `high` for SeverityLevel |
         | Key equality predicate | `eq_id` — used in every hit/miss dispatch |
@@ -631,6 +660,9 @@ def render() -> str:
         | **Conjunction in antecedent** | `eq_id_trans` — `Conjunction((PredApp(...), PredApp(...)))` as guard |
         | Partial observer | `get_status`, `get_severity`, `get_assignee` — undefined when ticket doesn't exist |
         | Doubly partial observer | `get_assignee` — undefined if no ticket OR no assignee |
+        | **Explicit undefinedness** | `get_assignee_create_hit` — `Negation(Definedness(...))` |
+        | **Both guard polarities** | `get_status_resolve_hit` (has_ticket) + `get_status_resolve_hit_noticket` (¬has_ticket) |
+        | **Definedness** node | `get_assignee_create_hit` uses `Definedness(Term)` wrapped in `Negation` |
         | Uninterpreted function | `classify` — appears in axioms but not defined by them |
         | Nested Implication | `get_status_resolve_hit`, `get_assignee_assign_hit` — guards inside key dispatch |
         """

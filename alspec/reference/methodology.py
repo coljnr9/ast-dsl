@@ -26,18 +26,7 @@ def render() -> str:
         """
         )
         + render_steps()
-        + textwrap.dedent(
-            """\
-        ### Partial Functions
-
-        - Declare partial functions with `total=False`.
-        - Omit the constructor case where the function is undefined.
-        - The partiality declaration itself encodes undefinedness — no explicit axiom needed.
-        - Example: `top : Stack →? Elem` has an axiom for `push` but not for `new`.
-
-        ---
-        """
-        )
+        + render_partial_functions()
     )
 
 
@@ -52,23 +41,129 @@ def render_steps() -> str:
         **Process:**
         1. List the constructors of the observer's primary argument sort.
         2. For each constructor, write an axiom specifying the observer applied to that constructor.
-        3. For **partial** observers, *omit* the constructor case where the function is
-           undefined. The `total=False` declaration handles the undefinedness — no explicit
-           "undefined" axiom is needed.
+        3. For **partial** observers, you still need axioms for ALL constructors — some will
+           be equations, some will be `Negation(Definedness(...))` assertions. The only
+           exception is base constructors with no prior state (see below).
 
-        **Axiom obligation table format:**
+        **Axiom obligation table format (Stack — base constructor omission is safe):**
 
         | Observer | Constructor | Axiom |
         |----------|------------|-------|
-        | `pop : Stack →? Stack` | `new` | *(omitted — pop is partial, undefined on new)* |
+        | `pop : Stack →? Stack` | `new` | *(omitted — base constructor, no prior state)* |
         | `pop : Stack →? Stack` | `push(S, e)` | `pop(push(S, e)) = S` |
-        | `top : Stack →? Elem` | `new` | *(omitted — top is partial, undefined on new)* |
+        | `top : Stack →? Elem` | `new` | *(omitted — base constructor, no prior state)* |
         | `top : Stack →? Elem` | `push(S, e)` | `top(push(S, e)) = e` |
         | `empty : Stack` | `new` | `empty(new)` |
         | `empty : Stack` | `push(S, e)` | `¬ empty(push(S, e))` |
 
-        **Completeness check:** If an observer has `k` constructors for its primary sort
-        and is total, it needs `k` axioms. If partial, it needs `k - (undefined cases)` axioms.
+        **Axiom obligation table format (FiniteMap — destructive constructor needs explicit undefinedness):**
 
+        | Observer | Constructor | Axiom |
+        |----------|------------|-------|
+        | `lookup : Map × Key →? Val` | `empty` | `¬def(lookup(empty, k))` — explicit undefinedness |
+        | `lookup : Map × Key →? Val` | `update` hit | `lookup(update(m,k,v), k2) = v` |
+        | `lookup : Map × Key →? Val` | `update` miss | delegates to `lookup(m, k2)` |
+        | `lookup : Map × Key →? Val` | `remove` hit | `¬def(lookup(remove(m,k), k2))` — explicit undefinedness |
+        | `lookup : Map × Key →? Val` | `remove` miss | delegates to `lookup(m, k2)` |
+
+        **Completeness check:** If an observer has `k` constructors for its primary sort
+        and is total, it needs `k` axioms. If partial, it still needs axioms for ALL
+        constructors — some will be equations, some will be `Negation(Definedness(...))`
+        assertions. The only exception is base constructors with no prior state.
+
+        """
+    )
+
+
+def render_partial_functions() -> str:
+    return textwrap.dedent(
+        """\
+        ### Partial Functions and Definedness
+
+        **Critical: Under loose semantics, omitting an axiom does NOT make a function
+        undefined — it leaves the interpretation unconstrained.** Any value is valid
+        in some model. To force undefinedness, you must write an explicit axiom.
+
+        **Three patterns for handling partiality:**
+
+        **Pattern 1: Partial constructors (e.g., `withdraw`, `remove_stock`, `inc`).**
+        Add a `Definedness` biconditional stating exactly when the constructor is defined.
+        Observer axioms only need the defined case — strict error propagation handles
+        the rest (undefined constructor → undefined observation automatically).
+
+        ```python
+        # withdraw is defined exactly when balance >= amount
+        Axiom("withdraw_def", forall([a, n], iff(
+            Definedness(app("withdraw", a, n)),
+            PredApp("geq", (app("balance", a), n))
+        )))
+        # Observer axioms only cover the defined case:
+        Axiom("balance_withdraw", forall([a, n], Implication(
+            PredApp("geq", (app("balance", a), n)),
+            eq(app("balance", app("withdraw", a, n)), app("sub", app("balance", a), n))
+        )))
+        ```
+
+        **Pattern 2: Partial observers becoming undefined (e.g., `lookup` after `remove`,
+        `get_assignee` after `create_ticket`).**
+        Write an explicit `Negation(Definedness(...))` axiom. This is required whenever
+        an observer should be undefined on a specific constructor — either because the
+        constructor destroys the relevant entry, or because the constructor creates an
+        entry without initializing this observer's value.
+
+        ```python
+        # Removing a key makes lookup explicitly undefined
+        Axiom("lookup_remove_hit", forall([m, k, k2], Implication(
+            PredApp("eq_key", (k, k2)),
+            Negation(Definedness(app("lookup", app("remove", m, k), k2)))
+        )))
+        # New tickets have no assignee — explicitly undefined
+        Axiom("get_assignee_create_hit", forall([s, k, k2, t, b], Implication(
+            PredApp("eq_id", (k, k2)),
+            Negation(Definedness(
+                app("get_assignee", app("create_ticket", s, k, t, b), k2)
+            ))
+        )))
+        ```
+
+        **Pattern 3: Total constructors with existence guards — both polarities needed.**
+        When a total constructor's observer axiom is guarded by an existence predicate
+        (e.g., `has_ticket`), the negated guard needs a delegation axiom. The operation
+        is a no-op on non-existent entries, but you must say so explicitly.
+
+        ```python
+        # resolve_ticket hit WITH ticket: status becomes resolved
+        Axiom("get_status_resolve_hit", forall([s, k, k2], Implication(
+            PredApp("eq_id", (k, k2)),
+            Implication(
+                PredApp("has_ticket", (s, k)),
+                eq(app("get_status", app("resolve_ticket", s, k), k2), const("resolved"))
+            )
+        )))
+        # resolve_ticket hit WITHOUT ticket: no-op, delegates
+        Axiom("get_status_resolve_hit_noticket", forall([s, k, k2], Implication(
+            PredApp("eq_id", (k, k2)),
+            Implication(
+                Negation(PredApp("has_ticket", (s, k))),
+                eq(app("get_status", app("resolve_ticket", s, k), k2), app("get_status", s, k2))
+            )
+        )))
+        ```
+
+        **The safe omission (base constructors only):**
+        For partial observers over **base constructors** with no prior state (like
+        `top(new)`, `pop(new)`), omission is acceptable. No constructor path ever
+        makes these defined and then reverts to the base state, so the unconstrained
+        interpretation is harmless. But when in doubt, write the explicit
+        `Negation(Definedness(...))` — it's never wrong to be explicit.
+
+        - Declare partial functions with `total=False`.
+        - Use `Definedness(term)` and `Negation(Definedness(term))` to control
+          where functions are defined or undefined.
+        - For partial constructors, always add a `Definedness` biconditional.
+        - For partial observers on destructive or non-initializing constructors,
+          always add `Negation(Definedness(...))`.
+
+        ---
         """
     )

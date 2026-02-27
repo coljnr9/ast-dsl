@@ -19,7 +19,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
-from typing import assert_never
 
 from .check import Diagnostic, Severity
 from .signature import Signature, Totality
@@ -412,7 +411,7 @@ def _definitely_defined(term: Term, sig: Signature) -> bool:
         if fn_sym.totality != Totality.TOTAL:
             return False  # partial function — never definitely defined
         return all(_definitely_defined(arg, sig) for arg in term.args)
-    assert_never(term)
+    return False  # Unknown/malformed node — can't match
 
 
 def _has_definedness_assertion(formula: Formula, fn_name: str) -> bool:
@@ -445,7 +444,7 @@ def _has_definedness_assertion(formula: Formula, fn_name: str) -> bool:
         return _has_definedness_assertion(formula.body, fn_name)
     if isinstance(formula, ExistentialQuant):
         return _has_definedness_assertion(formula.body, fn_name)
-    assert_never(formula)
+    return False  # Unknown/malformed node — can't match
 
 
 def _has_witnessing_equation(formula: Formula, fn_name: str, sig: Signature) -> bool:
@@ -495,7 +494,7 @@ def _has_witnessing_equation(formula: Formula, fn_name: str, sig: Signature) -> 
         return _has_witnessing_equation(formula.body, fn_name, sig)
     if isinstance(formula, Definedness):
         return False  # Definedness nodes are handled by the secondary scan
-    assert_never(formula)
+    return False  # Unknown/malformed node — can't match
 
 
 def _check_unwitnessed_partials(spec: Spec, index: AxiomIndex) -> list[Diagnostic]:
