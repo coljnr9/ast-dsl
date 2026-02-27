@@ -204,10 +204,22 @@ async def run_domain_eval(
                     success = True
                     score = score_spec(s, strict=False, audit=True)
 
-        # Set trace Output to a concise result summary — visible at the trace
-        # list level in the Langfuse UI without clicking into the trace.
+        # ----- Langfuse: full eval output -----
+        # Build a diagnostics list serialisable to JSON for the trace output.
+        diag_dicts: list[dict[str, str | None]] = []
         if score is not None:
-            # Count dead-symbol warnings before building the output dict.
+            diag_dicts = [
+                {
+                    "check": d.check,
+                    "severity": d.severity.value,
+                    "axiom": d.axiom,
+                    "message": d.message,
+                    "path": d.path,
+                }
+                for d in score.diagnostics
+            ]
+
+        if score is not None:
             unconstrained_count = sum(
                 1 for d in score.diagnostics
                 if d.check in ("unconstrained_fn", "unconstrained_pred", "orphan_sort")
@@ -218,8 +230,15 @@ async def run_domain_eval(
                     "health": round(score.health, 3),
                     "well_formed": score.well_formed,
                     "unconstrained_symbols": unconstrained_count,
+                    "error_count": score.error_count,
+                    "warning_count": score.warning_count,
+                    "diagnostics": diag_dicts,
+                    "analysis": analysis,
+                    "code": extracted_code,
                 }
             )
+
+            # Aggregate scores for dashboard filtering.
             langfuse.score_current_trace(
                 name="spec_health",
                 value=score.health,
@@ -234,10 +253,25 @@ async def run_domain_eval(
                 value=unconstrained_count,
                 comment="dead symbols detected by audit_spec",
             )
+
+            # Individual diagnostic scores — one per finding, filterable by name.
+            for i, d in enumerate(score.diagnostics):
+                langfuse.score_current_trace(
+                    name=f"diag:{d.check}",
+                    value=1.0 if d.severity.value == "error" else 0.5,
+                    comment=f"[{i}] {d.message}",
+                )
         else:
             error_msg = parse_error or checker_error or "unknown failure"
             langfuse.update_current_trace(
-                output={"success": False, "error": error_msg}
+                output={
+                    "success": False,
+                    "error": error_msg,
+                    "parse_error": parse_error,
+                    "checker_error": checker_error,
+                    "analysis": analysis,
+                    "code": extracted_code,
+                }
             )
             # Log hard zeros so failed traces are visible in score-based filters.
             langfuse.score_current_trace(
