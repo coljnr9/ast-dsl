@@ -1,7 +1,7 @@
-"""Auto-generate an LLM-consumable language reference for the many_sorted DSL.
+"""Auto-generate an LLM-consumable language reference for the alspec DSL.
 
 Documents the PUBLIC API: the helper functions an LLM uses to construct specs.
-Run: python -m many_sorted.gen_reference > LANGUAGE_REFERENCE.md
+Run: python -m alspec.gen_reference > LANGUAGE_REFERENCE.md
 """
 
 from __future__ import annotations
@@ -10,14 +10,14 @@ import json
 import inspect
 import textwrap
 
-from many_sorted.serialization import spec_to_json
-from examples.examples import (
+from alspec.serialization import spec_to_json
+from alspec.examples import (
     nat_spec,
     stack_spec,
     partial_order_spec,
     bug_tracker_spec,
 )
-from many_sorted.basis import ALL_BASIS_SPECS
+from alspec.basis import ALL_BASIS_SPECS
 
 
 def generate_reference() -> str:
@@ -30,7 +30,7 @@ def generate_reference() -> str:
     # Many-Sorted Algebraic Specification DSL — Language Reference
 
     This document is the complete reference for writing algebraic specifications
-    using the `many_sorted` Python DSL. A specification consists of:
+    using the `alspec` Python DSL. A specification consists of:
 
     - **Sorts** — the types (carrier sets)
     - **Function symbols** — typed operations over sorts
@@ -47,13 +47,13 @@ def generate_reference() -> str:
     Everything you need comes from two places:
 
     ```python
-    from many_sorted import (
+    from alspec import (
         # Core types (only needed occasionally)
         Axiom, Signature, Spec, SortRef,
         # Product/Coproduct sorts (when needed)
         ProductSort, ProductField, CoproductSort, CoproductAlt,
         # Formula types for complex axioms
-        Conjunction, Disjunction, Implication, Negation,
+        Conjunction, Disjunction, Implication, Biconditional, Negation,
         PredApp, Definedness,
         # Field access for product sorts
         FieldAccess,
@@ -202,6 +202,7 @@ def generate_reference() -> str:
     Conjunction((f1, f2, ...))              # f1 ∧ f2 ∧ ...
     Disjunction((f1, f2, ...))              # f1 ∨ f2 ∨ ...
     Implication(antecedent, consequent)     # antecedent ⇒ consequent
+    Biconditional(lhs, rhs)                 # lhs ⇔ rhs
     Definedness(term)                       # def(term) — for partial functions
     ```
 
@@ -222,6 +223,7 @@ def generate_reference() -> str:
              | Conjunction(tuple[Formula, ...])     ← all elements are Formulas
              | Disjunction(tuple[Formula, ...])     ← all elements are Formulas
              | Implication(Formula, Formula)        ← both are Formulas
+             | Biconditional(Formula, Formula)      ← both are Formulas
              | UniversalQuant(tuple[Var, ...], Formula)
              | ExistentialQuant(tuple[Var, ...], Formula)
              | Definedness(Term)                    ← inner is a Term
@@ -234,6 +236,7 @@ def generate_reference() -> str:
     const(...)  → FnApp     (a Term)
     eq(...)     → Equation  (a Formula)  ← takes two Terms, returns a Formula
     forall(...) → UniversalQuant (a Formula) ← takes Vars + a Formula
+    iff(...)    → Biconditional (a Formula)  ← takes two Formulas
     ```
 
     **Common illegal compositions:**
@@ -270,7 +273,7 @@ def generate_reference() -> str:
     Every `Spec` transparently round-trips to/from JSON:
 
     ```python
-    from many_sorted import dumps, loads
+    from alspec import dumps, loads
 
     json_str = dumps(spec)     # Spec → JSON string
     spec = loads(json_str)     # JSON string → Spec
@@ -340,7 +343,7 @@ def generate_reference() -> str:
 
     The following specifications are pre-built and verified. They cover the
     fundamental algebraic patterns that real specifications compose from.
-    Import them from `many_sorted.basis` rather than redefining from scratch.
+    Import them from `alspec.basis` rather than redefining from scratch.
 
     Sources: CASL Basic Libraries (CoFI, tool-checked by Hets),
     Sannella & Tarlecki "Foundations of Algebraic Specification" (2012).

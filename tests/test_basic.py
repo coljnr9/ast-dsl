@@ -1,4 +1,4 @@
-from many_sorted import AtomicSort, SortRef
+from alspec import AtomicSort, SortRef
 
 def test_atomic_sort():
     s = AtomicSort(name=SortRef("Nat"))

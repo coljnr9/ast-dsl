@@ -1,25 +1,9 @@
 import os
-from dataclasses import dataclass
-from typing import TypeVar, Generic
 
 from dotenv import load_dotenv
 from langfuse.openai import AsyncOpenAI
 
-# -----------------
-# Result Types
-# -----------------
-T = TypeVar("T")
-E = TypeVar("E", bound=Exception)
-
-@dataclass(frozen=True)
-class Ok(Generic[T]):
-    value: T
-
-@dataclass(frozen=True)
-class Err(Generic[E]):
-    error: E
-
-type Result[T, E] = Ok[T] | Err[E]
+from alspec.result import Ok, Err, Result
 
 # -----------------
 # Client

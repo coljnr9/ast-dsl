@@ -1,5 +1,6 @@
 import pytest
-from many_sorted.llm import AsyncLLMClient, Ok, Err
+from alspec.llm import AsyncLLMClient
+from alspec.result import Ok, Err
 
 class MockChoice:
     def __init__(self, content):

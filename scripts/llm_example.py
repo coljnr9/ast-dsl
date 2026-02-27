@@ -1,5 +1,6 @@
 import asyncio
-from many_sorted.llm import AsyncLLMClient, Ok, Err
+from alspec.llm import AsyncLLMClient
+from alspec.result import Ok, Err
 
 async def main():
     print("Initializing AsyncLLMClient from environment...")

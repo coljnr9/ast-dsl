@@ -9,82 +9,17 @@ References:
   - Sannella & Tarlecki, "Foundations of Algebraic Specification" (2012)
 """
 
-from many_sorted import (
+from alspec import (
     Axiom,
-    AtomicSort,
-    Conjunction,
-    Equation,
-    FnApp,
-    FnParam,
-    FnSymbol,
+    Signature,
+    Spec,
     Implication,
     Negation,
     PredApp,
-    PredSymbol,
-    Signature,
-    SortRef,
-    Spec,
-    Totality,
-    UniversalQuant,
-    Var,
+    Conjunction,
     dumps,
 )
-
-# ===================================================================
-# Helpers — short aliases to reduce noise in spec construction
-# ===================================================================
-
-S = SortRef
-
-
-def atomic(name: str) -> AtomicSort:
-    return AtomicSort(name=S(name))
-
-
-def param(name: str, sort: str) -> FnParam:
-    return FnParam(name=name, sort=S(sort))
-
-
-def fn(
-    name: str,
-    params: list[tuple[str, str]],
-    result: str,
-    total: bool = True,
-) -> FnSymbol:
-    return FnSymbol(
-        name=name,
-        params=tuple(param(n, s) for n, s in params),
-        result=S(result),
-        totality=Totality.TOTAL if total else Totality.PARTIAL,
-    )
-
-
-def pred(name: str, params: list[tuple[str, str]]) -> PredSymbol:
-    return PredSymbol(
-        name=name,
-        params=tuple(param(n, s) for n, s in params),
-    )
-
-
-def var(name: str, sort: str) -> Var:
-    return Var(name=name, sort=S(sort))
-
-
-def app(fn_name: str, *args: "Var | FnApp") -> FnApp:
-    return FnApp(fn_name=fn_name, args=tuple(args))
-
-
-def const(name: str) -> FnApp:
-    """Nullary function application — a constant."""
-    return FnApp(fn_name=name, args=())
-
-
-def eq(lhs: "Var | FnApp", rhs: "Var | FnApp") -> Equation:
-    return Equation(lhs=lhs, rhs=rhs)
-
-
-def forall(variables: list[Var], body: "Equation | Implication | PredApp | Conjunction | Negation") -> UniversalQuant:
-    return UniversalQuant(variables=tuple(variables), body=body)
+from alspec.helpers import S, atomic, fn, pred, var, app, const, eq, forall
 
 
 # ===================================================================
@@ -311,7 +246,7 @@ def bug_tracker_spec() -> Spec:
       - Ticket.severity has sort SeverityLevel
       - Therefore the equation is well-sorted.
     """
-    from many_sorted import FieldAccess, ProductField, ProductSort
+    from alspec import FieldAccess, ProductField, ProductSort
 
     id_var = var("id", "TicketId")
     t = var("t", "Title")

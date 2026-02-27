@@ -1,5 +1,5 @@
 [project]
-name = "many-sorted"
+name = "alspec"
 version = "0.1.0"
 description = "Building blocks for many-sorted algebraic specifications"
 readme = "README.md"
@@ -11,11 +11,10 @@ dependencies = [
 ]
 
 [project.scripts]
-many-sorted-examples = "examples.examples:main"
-many-sorted = "many_sorted.cli:main"
+alspec = "alspec.cli:main"
 
 [tool.setuptools]
-packages = ["many_sorted", "examples"]
+packages = ["alspec"]
 
 [dependency-groups]
 dev = [

@@ -2,9 +2,10 @@ import argparse
 import asyncio
 import sys
 
-from many_sorted.gen_reference import generate_reference
-from examples.examples import main as run_examples
-from many_sorted.llm import AsyncLLMClient, Ok, Err
+from alspec.examples import main as run_examples
+from alspec.gen_reference import generate_reference
+from alspec.llm import AsyncLLMClient
+from alspec.result import Ok, Err
 
 
 async def handle_generate(prompt: str) -> int:
@@ -41,7 +42,7 @@ async def handle_generate(prompt: str) -> int:
 
 async def async_main() -> int:
     parser = argparse.ArgumentParser(
-        prog="many-sorted",
+        prog="alspec",
         description="CLI for the many-sorted algebraic specification DSL",
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")

@@ -35,6 +35,7 @@ from .terms import (
     FnApp,
     Formula,
     Implication,
+    Biconditional,
     Literal,
     Negation,
     PredApp,
@@ -220,6 +221,12 @@ def formula_to_json(f: Formula) -> dict[str, Any]:
             "antecedent": formula_to_json(f.antecedent),
             "consequent": formula_to_json(f.consequent),
         }
+    elif isinstance(f, Biconditional):
+        return {
+            "type": "biconditional",
+            "lhs": formula_to_json(f.lhs),
+            "rhs": formula_to_json(f.rhs),
+        }
     elif isinstance(f, UniversalQuant):
         return {
             "type": "forall",
@@ -258,6 +265,11 @@ def formula_from_json(d: dict[str, Any]) -> Formula:
         return Implication(
             antecedent=formula_from_json(d["antecedent"]),
             consequent=formula_from_json(d["consequent"]),
+        )
+    elif t == "biconditional":
+        return Biconditional(
+            lhs=formula_from_json(d["lhs"]),
+            rhs=formula_from_json(d["rhs"]),
         )
     elif t == "forall":
         variables = tuple(term_from_json(v) for v in d["variables"])

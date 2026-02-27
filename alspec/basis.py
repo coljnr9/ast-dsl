@@ -15,80 +15,21 @@ Every spec here follows the methodology:
   4. Write axioms: one per (operation, constructor) pair
 
 Usage:
-    from many_sorted.basis import bool_spec, nat_spec, list_spec, ...
+    from alspec.basis import bool_spec, nat_spec, list_spec, ...
 """
 
-from many_sorted import (
+from alspec import (
     Axiom,
-    AtomicSort,
-    Conjunction,
-    Definedness,
-    Disjunction,
-    Equation,
-    ExistentialQuant,
-    FieldAccess,
-    FnApp,
-    FnParam,
-    FnSymbol,
-    Implication,
-    Literal,
-    Negation,
-    PredApp,
-    PredSymbol,
-    ProductField,
-    ProductSort,
     Signature,
-    SortRef,
     Spec,
-    Totality,
-    UniversalQuant,
-    Var,
+    Equation,
+    PredApp,
+    Negation,
+    Conjunction,
+    Disjunction,
+    Implication,
 )
-
-# ── Helpers (same as examples.py) ─────────────────────────────────
-
-S = SortRef
-
-
-def atomic(name: str) -> AtomicSort:
-    return AtomicSort(name=S(name))
-
-
-def param(name: str, sort: str) -> FnParam:
-    return FnParam(name=name, sort=S(sort))
-
-
-def fn(name: str, params: list[tuple[str, str]], result: str, total: bool = True) -> FnSymbol:
-    return FnSymbol(
-        name=name,
-        params=tuple(param(n, s) for n, s in params),
-        result=S(result),
-        totality=Totality.TOTAL if total else Totality.PARTIAL,
-    )
-
-
-def pred(name: str, params: list[tuple[str, str]]) -> PredSymbol:
-    return PredSymbol(name=name, params=tuple(param(n, s) for n, s in params))
-
-
-def var(name: str, sort: str) -> Var:
-    return Var(name=name, sort=S(sort))
-
-
-def app(fn_name: str, *args: Var | FnApp) -> FnApp:
-    return FnApp(fn_name=fn_name, args=tuple(args))
-
-
-def const(name: str) -> FnApp:
-    return FnApp(fn_name=name, args=())
-
-
-def eq(lhs: Var | FnApp | FieldAccess, rhs: Var | FnApp | FieldAccess) -> Equation:
-    return Equation(lhs=lhs, rhs=rhs)
-
-
-def forall(variables: list[Var], body) -> UniversalQuant:
-    return UniversalQuant(variables=tuple(variables), body=body)
+from alspec.helpers import S, atomic, fn, pred, var, app, const, eq, forall
 
 
 # =====================================================================
@@ -619,7 +560,7 @@ ALL_BASIS_SPECS = [
 
 
 if __name__ == "__main__":
-    from many_sorted import dumps
+    from alspec import dumps
 
     for spec_fn in ALL_BASIS_SPECS:
         sp = spec_fn()

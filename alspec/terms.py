@@ -153,6 +153,22 @@ class Implication:
 
 
 @dataclass(frozen=True)
+class Biconditional:
+    """Logical biconditional (if and only if).
+
+    Example: even(n) ⇔ ¬ odd(n)
+
+    Equivalent to Conjunction(Implication(lhs, rhs), Implication(rhs, lhs))
+    but provided as primitive because:
+    1. CASL includes ⇔ as a first-class connective.
+    2. LLMs consistently need it for predicate equivalence across constructors.
+    3. Without it, LLMs write one implication direction and forget the other.
+    """
+    lhs: Formula
+    rhs: Formula
+
+
+@dataclass(frozen=True)
 class UniversalQuant:
     """Universal quantification over variables.
 
@@ -192,6 +208,7 @@ Formula = Union[
     Conjunction,
     Disjunction,
     Implication,
+    Biconditional,
     UniversalQuant,
     ExistentialQuant,
     Definedness,
