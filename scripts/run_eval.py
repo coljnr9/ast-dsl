@@ -56,6 +56,7 @@ async def run_evals(
 
     timestamp = datetime.now().isoformat(timespec="seconds")
     session_id = f"eval-{timestamp}"
+    print(f"Langfuse Session ID: {session_id}\n", flush=True)
 
     results = []
 
