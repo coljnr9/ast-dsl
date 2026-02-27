@@ -1,5 +1,28 @@
 """alspec: Building blocks for many-sorted algebraic specifications."""
 
+from .helpers import (
+    S,
+    app,
+    atomic,
+    const,
+    eq,
+    exists,
+    fn,
+    forall,
+    iff,
+    param,
+    pred,
+    var,
+)
+from .result import Err, Ok, Result
+from .serialization import dumps, loads
+from .signature import (
+    FnParam,
+    FnSymbol,
+    PredSymbol,
+    Signature,
+    Totality,
+)
 from .sorts import (
     AtomicSort,
     CoproductAlt,
@@ -10,14 +33,9 @@ from .sorts import (
     SortKind,
     SortRef,
 )
-from .signature import (
-    FnParam,
-    FnSymbol,
-    PredSymbol,
-    Signature,
-    Totality,
-)
+from .spec import Axiom, Spec
 from .terms import (
+    Biconditional,
     Conjunction,
     Definedness,
     Disjunction,
@@ -27,7 +45,6 @@ from .terms import (
     FnApp,
     Formula,
     Implication,
-    Biconditional,
     Literal,
     Negation,
     PredApp,
@@ -35,30 +52,61 @@ from .terms import (
     UniversalQuant,
     Var,
 )
-from .spec import Axiom, Spec
-from .serialization import dumps, loads
-from .helpers import (
-    S, atomic, fn, pred, var, app, const, eq, forall, exists, iff
-)
-from .result import Ok, Err, Result
 
 __all__ = [
     # Sorts
-    "AtomicSort", "CoproductAlt", "CoproductSort", "ProductField",
-    "ProductSort", "SortDecl", "SortKind", "SortRef",
+    "AtomicSort",
+    "CoproductAlt",
+    "CoproductSort",
+    "ProductField",
+    "ProductSort",
+    "SortDecl",
+    "SortKind",
+    "SortRef",
     # Signature
-    "FnParam", "FnSymbol", "PredSymbol", "Signature", "Totality",
+    "FnParam",
+    "FnSymbol",
+    "PredSymbol",
+    "Signature",
+    "Totality",
     # Terms
-    "Conjunction", "Definedness", "Disjunction", "Equation",
-    "ExistentialQuant", "FieldAccess", "FnApp", "Formula",
-    "Implication", "Literal", "Negation", "PredApp", "Term",
-    "UniversalQuant", "Var", "Biconditional",
+    "Conjunction",
+    "Definedness",
+    "Disjunction",
+    "Equation",
+    "ExistentialQuant",
+    "FieldAccess",
+    "FnApp",
+    "Formula",
+    "Implication",
+    "Literal",
+    "Negation",
+    "PredApp",
+    "Term",
+    "UniversalQuant",
+    "Var",
+    "Biconditional",
     # Spec
-    "Axiom", "Spec",
+    "Axiom",
+    "Spec",
     # Serialization
-    "dumps", "loads",
+    "dumps",
+    "loads",
     # Helpers
-    "S", "atomic", "fn", "pred", "var", "app", "const", "eq", "forall", "exists", "iff",
+    "S",
+    "atomic",
+    "param",
+    "fn",
+    "pred",
+    "var",
+    "app",
+    "const",
+    "eq",
+    "forall",
+    "exists",
+    "iff",
     # Result
-    "Ok", "Err", "Result",
+    "Ok",
+    "Err",
+    "Result",
 ]
