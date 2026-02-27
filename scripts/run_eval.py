@@ -27,6 +27,7 @@ async def run_evals(
     tier: int | None,
     csv_out: str | None,
     verbose: bool,
+    use_tool_call: bool,
 ) -> None:
     client_res = AsyncLLMClient.from_env()
     match client_res:
@@ -54,13 +55,18 @@ async def run_evals(
     prompt_version = f"v3 (sha256: {hashlib.sha256(ref_text.encode()).hexdigest()[:8]})"
 
     timestamp = datetime.now().isoformat(timespec="seconds")
+    session_id = f"eval-{timestamp}"
 
     results = []
 
     for model in models:
         for domain in domains:
             print(f"Evaluating {domain.id} on {model}...", flush=True)
-            res = await run_domain_eval(client, domain, model)
+            res = await run_domain_eval(
+                client, domain, model,
+                session_id=session_id,
+                use_tool_call=use_tool_call,
+            )
             results.append(res)
 
     run = EvalRun(
@@ -116,6 +122,16 @@ def main(argv: Sequence[str] | None = None) -> None:
         action="store_true",
         help="Print detailed diagnostics.",
     )
+    parser.add_argument(
+        "--no-tool-call",
+        action="store_true",
+        default=False,
+        help=(
+            "Disable tool-call structured output and fall back to markdown "
+            "code-fence extraction. Use when the target model does not support "
+            "tool calling via OpenRouter."
+        ),
+    )
 
     args = parser.parse_args(argv)
 
@@ -129,6 +145,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             tier=args.tier,
             csv_out=args.csv,
             verbose=args.verbose,
+            use_tool_call=not args.no_tool_call,
         )
     )
 
