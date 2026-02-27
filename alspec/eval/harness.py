@@ -34,8 +34,11 @@ class EvalResult:
     model: str
     success: bool
     parse_error: str | None
+    checker_error: str | None
     score: SpecScore | None
-    raw_response: str
+    analysis: str | None  # The model's reasoning (from submit_spec tool call)
+    raw_response: str     # Raw text response (empty string when tool call used)
+    code: str | None      # Extracted / tool-provided code (for debugging)
     latency_ms: int
     token_count: int | None
 
@@ -48,7 +51,7 @@ class EvalRun:
     results: tuple[EvalResult, ...]
 
 
-def build_prompt(domain: DomainPrompt) -> list[dict[str, str]]:
+def build_prompt(domain: DomainPrompt, use_tool_call: bool) -> list[dict[str, str]]:
     """Build chat messages from templates. No hardcoded prompt content."""
     system = render(
         "system.md.j2",
@@ -63,7 +66,7 @@ def build_prompt(domain: DomainPrompt) -> list[dict[str, str]]:
         "generate_spec.md.j2",
         domain=domain,
         fn_name=domain.id.replace("-", "_") + "_spec",
-        methodology_steps=methodology.render_steps(),
+        use_tool_call=use_tool_call,
     )
     return [
         {"role": "system", "content": system},
@@ -72,7 +75,10 @@ def build_prompt(domain: DomainPrompt) -> list[dict[str, str]]:
 
 
 def extract_code(response: str) -> str | None:
-    """Extract Python code from a markdown block, or return original if no block found."""
+    """Extract Python code from a markdown block, or return original if no block found.
+
+    Legacy fallback used only when --no-tool-call is set.
+    """
     if "```python" in response:
         parts = response.split("```python")
         match parts:
@@ -118,9 +124,12 @@ def execute_spec_code(code: str, fn_name: str) -> Spec | str:
             return f"Function returned {type(spec).__name__}, expected Spec"
 
 
-@observe()
+@observe(capture_input=False, capture_output=False)
 async def run_domain_eval(
-    client: AsyncLLMClient, domain: DomainPrompt, model: str
+    client: AsyncLLMClient,
+    domain: DomainPrompt,
+    model: str,
+    use_tool_call: bool = True,
 ) -> EvalResult:
     """Run extraction and evaluation for a single domain and model.
 
@@ -128,14 +137,21 @@ async def run_domain_eval(
     ``propagate_attributes`` context manager attaches the trace name, metadata,
     and tags to that trace via OTel baggage. The nested ``generate_messages``
     call (also decorated with ``@observe``) becomes a child span automatically.
+
+    When ``use_tool_call=True`` (default), the model is forced to call the
+    ``submit_spec`` tool, returning structured ``analysis`` and ``code`` fields.
+    When ``use_tool_call=False``, falls back to markdown code-fence extraction.
     """
-    messages = build_prompt(domain)
+    messages = build_prompt(domain, use_tool_call=use_tool_call)
     fn_name = domain.id.replace("-", "_") + "_spec"
     model_short = model.split("/")[-1]
     trace_name = f"eval/{domain.id}/{model_short}"
 
     raw_response = ""
-    parse_error = None
+    parse_error: str | None = None
+    checker_error: str | None = None
+    analysis: str | None = None
+    extracted_code: str | None = None
     success = False
     score = None
     start_time = time.time()
@@ -146,28 +162,47 @@ async def run_domain_eval(
             "domain_id": domain.id,
             "complexity": str(domain.complexity),
             "model": model,
+            "use_tool_call": str(use_tool_call),
         },
         tags=[
             f"tier:{domain.complexity}",
             *sorted(domain.expected_features),
         ],
     ):
-        result = await client.generate_messages(messages, model=model)
+        if use_tool_call:
+            result = await client.generate_with_tool_call(messages, model=model)
 
-        match result:
-            case Err(e):
-                parse_error = f"API Error: {e}"
-            case Ok(content):
-                raw_response = content
-                extracted_code = extract_code(content) or ""
-                spec_or_err = execute_spec_code(extracted_code, fn_name)
+            match result:
+                case Err(e):
+                    parse_error = str(e)
+                case Ok((a, c)):
+                    analysis = a
+                    extracted_code = c
+        else:
+            text_result = await client.generate_messages(messages, model=model)
 
-                match spec_or_err:
-                    case str(err):
-                        parse_error = err
-                    case Spec() as s:
-                        success = True
-                        score = score_spec(s, strict=False)
+            match text_result:
+                case Err(e):
+                    parse_error = f"API Error: {e}"
+                case Ok(content):
+                    raw_response = content
+                    extracted_code = extract_code(content)
+                    match extracted_code:
+                        case None:
+                            parse_error = "Could not extract code from response"
+                        case _:
+                            pass
+
+        # Execute whatever code we extracted (tool-call or legacy)
+        if extracted_code is not None and parse_error is None:
+            spec_or_err = execute_spec_code(extracted_code, fn_name)
+
+            match spec_or_err:
+                case str(err):
+                    checker_error = err
+                case Spec() as s:
+                    success = True
+                    score = score_spec(s, strict=False)
 
     latency_ms = int((time.time() - start_time) * 1000)
 
@@ -190,10 +225,11 @@ async def run_domain_eval(
             value=1.0 if score.well_formed else 0.0,
         )
     else:
+        error_comment = parse_error or checker_error or "parse failed"
         langfuse.score_current_trace(
             name="spec_health",
             value=0.0,
-            comment=parse_error or "parse failed",
+            comment=error_comment,
         )
         langfuse.score_current_trace(
             name="obligation_coverage",
@@ -209,8 +245,11 @@ async def run_domain_eval(
         model=model,
         success=success,
         parse_error=parse_error,
+        checker_error=checker_error,
         score=score,
+        analysis=analysis,
         raw_response=raw_response,
+        code=extracted_code,
         latency_ms=latency_ms,
         token_count=None,
     )

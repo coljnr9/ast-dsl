@@ -1,3 +1,4 @@
+import json
 import os
 
 from dotenv import load_dotenv
@@ -9,6 +10,50 @@ load_dotenv()
 from langfuse.openai import AsyncOpenAI  # type: ignore[attr-defined]
 
 from alspec.result import Err, Ok, Result
+
+# ---------------------------------------------------------------------------
+# Tool schema — forces the model to emit structured analysis + code
+# ---------------------------------------------------------------------------
+
+SUBMIT_SPEC_TOOL: dict[str, object] = {
+    "type": "function",
+    "function": {
+        "name": "submit_spec",
+        "description": (
+            "Submit the completed algebraic specification. "
+            "You MUST complete the full analysis before writing code. "
+            "The analysis should show your reasoning: sort classification, "
+            "function roles, the complete axiom obligation table, and a "
+            "completeness count."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "analysis": {
+                    "type": "string",
+                    "description": (
+                        "Your complete analysis: identify sorts, classify "
+                        "functions as constructor/observer/uninterpreted, "
+                        "build the axiom obligation table, note tricky cases "
+                        "and design decisions, count expected axioms."
+                    ),
+                },
+                "code": {
+                    "type": "string",
+                    "description": (
+                        "Python code containing a single function that returns "
+                        "a Spec. Must implement every row of the obligation "
+                        "table from your analysis."
+                    ),
+                },
+            },
+            "required": ["analysis", "code"],
+        },
+    },
+}
+
+# tool_choice that forces the model to call submit_spec and nothing else
+_TOOL_CHOICE: dict[str, object] = {"type": "function", "function": {"name": "submit_spec"}}
 
 
 class AsyncLLMClient:
@@ -95,3 +140,64 @@ class AsyncLLMClient:
 
         except Exception as e:
             return Err(e)
+
+    async def generate_with_tool_call(
+        self,
+        messages: list[dict[str, str]],
+        model: str = "meta-llama/llama-3.1-8b-instruct",
+    ) -> Result[tuple[str, str], Exception]:
+        """Call the model with the submit_spec tool and return (analysis, code).
+
+        Forces the model to call ``submit_spec`` via ``tool_choice``, which
+        eliminates brittle code-fence extraction and requires the model to show
+        its reasoning in the ``analysis`` field before writing code.
+
+        Returns ``Ok((analysis, code))`` on success or ``Err(...)`` on failure.
+        The error message is a human-readable string suitable for storing in
+        ``EvalResult.parse_error``.
+        """
+        try:
+            response = await self._client.chat.completions.create(  # type: ignore[call-overload]
+                model=model,
+                messages=messages,
+                tools=[SUBMIT_SPEC_TOOL],
+                tool_choice=_TOOL_CHOICE,
+            )
+
+            match response.choices:
+                case []:
+                    return Err(RuntimeError("Model returned no choices."))
+                case [choice, *_]:
+                    pass
+                case _:
+                    return Err(RuntimeError("Unexpected response format from model."))
+
+        except Exception as e:
+            return Err(e)
+
+        # Validate tool_calls presence
+        tool_calls = choice.message.tool_calls
+        match tool_calls:
+            case None | []:
+                return Err(RuntimeError("Model did not use submit_spec tool"))
+            case [call, *_]:
+                pass
+
+        # Parse JSON arguments
+        try:
+            args: dict[str, object] = json.loads(call.function.arguments)
+        except Exception as e:
+            return Err(RuntimeError(f"Failed to parse tool call arguments: {e}"))
+
+        analysis = args.get("analysis")
+        code = args.get("code")
+
+        match (analysis, code):
+            case (str(a), str(c)):
+                return Ok((a, c))
+            case _:
+                return Err(
+                    RuntimeError(
+                        "submit_spec arguments missing 'analysis' or 'code' fields"
+                    )
+                )
