@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
 
-from .signature import Signature, Totality
+from .signature import Signature
 from .sorts import CoproductSort, ProductSort, SortKind, SortRef
 from .spec import Spec
 from .terms import (
@@ -64,7 +65,6 @@ class CheckContext:
     axiom_label: str | None
     diagnostics: list[Diagnostic] = field(default_factory=list)
     _var_env: list[dict[str, SortRef]] = field(default_factory=list)
-    _var_used: list[set[str]] = field(default_factory=list)
     _axiom_vars: dict[str, SortRef] = field(default_factory=dict)
 
     def error(self, check: str, message: str, path: str | None = None) -> None:
@@ -79,21 +79,17 @@ class CheckContext:
 
     def push_scope(self) -> None:
         self._var_env.append({})
-        self._var_used.append(set())
 
     def bind_vars(self, variables: tuple[Var, ...]) -> None:
         for v in variables:
             self._var_env[-1][v.name] = v.sort
 
-    def pop_scope(self) -> tuple[dict[str, SortRef], set[str]]:
-        env = self._var_env.pop()
-        used = self._var_used.pop()
-        return env, used
+    def pop_scope(self) -> None:
+        self._var_env.pop()
 
     def get_var_sort(self, name: str) -> SortRef | None:
         for i in range(len(self._var_env) - 1, -1, -1):
             if name in self._var_env[i]:
-                self._var_used[i].add(name)
                 return self._var_env[i][name]
         return None
 
@@ -101,7 +97,6 @@ class CheckContext:
         self.axiom_label = label
         self._axiom_vars = {}
         self._var_env = []
-        self._var_used = []
 
     def observe_var(self, name: str, sort: SortRef, path: str) -> None:
         if name in self._axiom_vars:
@@ -145,7 +140,6 @@ def check_term(term: Term, ctx: CheckContext, path: str) -> SortRef | None:
                 path,
             )
         else:
-            # Check arguments
             for i, (arg, param) in enumerate(zip(term.args, fn.params, strict=False)):
                 arg_sort = check_term(arg, ctx, f"{path}.args[{i}]")
                 if arg_sort is not None and arg_sort != param.sort:
@@ -275,26 +269,9 @@ def check_formula(formula: Formula, ctx: CheckContext, path: str) -> None:
         ctx.push_scope()
         ctx.bind_vars(formula.variables)
         check_formula(formula.body, ctx, f"{path}.body")
-        env, used = ctx.pop_scope()
-        for v in formula.variables:
-            if v.name not in used:
-                ctx.warning(
-                    "var_used",
-                    f"Variable '{v.name}' bound by quantifier is unused",
-                    f"{path}.variables",
-                )
+        ctx.pop_scope()
     elif isinstance(formula, Definedness):
         check_term(formula.term, ctx, f"{path}.term")
-
-
-def is_tautology(f: Formula) -> bool:
-    if isinstance(f, Equation) and f.lhs == f.rhs:
-        return True
-    if isinstance(f, Biconditional) and f.lhs == f.rhs:
-        return True
-    if isinstance(f, UniversalQuant):
-        return is_tautology(f.body)
-    return False
 
 
 def check_layer_1(spec: Spec, ctx: CheckContext) -> None:
@@ -347,237 +324,40 @@ def check_layer_1(spec: Spec, ctx: CheckContext) -> None:
                     )
 
     # no_name_collisions
-    names = [
+    name_lists = [
         spec.signature.sorts.keys(),
         spec.signature.functions.keys(),
         spec.signature.predicates.keys(),
     ]
-    items = []
-    for d in names:
+    items: list[str] = []
+    for d in name_lists:
         items.extend(list(d))
-    from collections import Counter
-
     counts = Counter(items)
     for name, c in counts.items():
         if c > 1:
             ctx.error("no_name_collisions", f"Name '{name}' has a collision")
 
 
-def get_used_sorts(spec: Spec) -> set[SortRef]:
-    used = set()
-    for fn in spec.signature.functions.values():
-        used.add(fn.result)
-
-    def visit(f: Formula) -> None:
-        if isinstance(f, (UniversalQuant, ExistentialQuant)):
-            for v in f.variables:
-                used.add(v.sort)
-            visit(f.body)
-        elif isinstance(f, Negation):
-            visit(f.formula)
-        elif isinstance(f, (Conjunction, Disjunction)):
-            subs = f.conjuncts if isinstance(f, Conjunction) else f.disjuncts
-            for s in subs:
-                visit(s)
-        elif isinstance(f, (Implication, Biconditional)):
-            visit(f.lhs if isinstance(f, Biconditional) else f.antecedent)
-            visit(f.rhs if isinstance(f, Biconditional) else f.consequent)
-
-    for ax in spec.axioms:
-        visit(ax.formula)
-    return used
-
-
-def check_layer_1_warnings(spec: Spec, ctx: CheckContext) -> None:
-    # no_empty_sorts
-    used_sorts = get_used_sorts(spec)
-    for sort_name in spec.signature.sorts:
-        if sort_name not in used_sorts:
-            ctx.warning(
-                "no_empty_sorts",
-                f"Sort '{sort_name}' has no function returning it and no variable quantified over it",
-            )
-
-
 def check_spec(spec: Spec) -> CheckResult:
     ctx = CheckContext(sig=spec.signature, axiom_label=None)
 
     check_layer_1(spec, ctx)
-    check_layer_1_warnings(spec, ctx)
 
-    # Layer 5: duplicate_axiom_labels
-    labels = []
+    # Structural: duplicate_axiom_labels
+    labels: list[str] = []
     for ax in spec.axioms:
         if ax.label in labels:
             ctx.error("duplicate_axiom_labels", f"Duplicate axiom label '{ax.label}'")
         labels.append(ax.label)
 
+    # Layer 2 & 3: Type checking & Var scoping (per axiom)
     for ax in spec.axioms:
         ctx.begin_axiom(ax.label)
-
-        # Layer 5: trivial_axiom
-        if is_tautology(ax.formula):
-            ctx.warning("trivial_axiom", "Axiom is a trivial tautology", "formula")
-
-        # Layer 5: axiom_quantified
-        has_vars = check_has_vars(ax.formula)
-        if has_vars and not isinstance(ax.formula, UniversalQuant):
-            ctx.warning(
-                "axiom_quantified",
-                "Axiom has free variables but is not wrapped in a universal quantifier",
-                "formula",
-            )
-
-        # Layer 2 & 3: Type checking & Var scoping
         check_formula(ax.formula, ctx, "formula")
 
-    # Layer 4: Obligations
-    check_obligations(spec, ctx)
-
-    # Sort diagnostics by severity, check, axiom_label
     def sort_key(d: Diagnostic) -> tuple[int, str, str]:
         severity_order = 0 if d.severity == Severity.ERROR else 1
         return (severity_order, d.check, d.axiom or "")
 
     sorted_diagnostics = tuple(sorted(ctx.diagnostics, key=sort_key))
     return CheckResult(spec.name, sorted_diagnostics)
-
-
-def check_has_vars(f: Formula) -> bool:
-    def visit_term(t: Term) -> bool:
-        if isinstance(t, Var):
-            return True
-        if isinstance(t, FnApp):
-            return any(visit_term(a) for a in t.args)
-        if isinstance(t, FieldAccess):
-            return visit_term(t.term)
-        return False
-
-    def visit(f: Formula) -> bool:
-        if isinstance(f, Equation):
-            return visit_term(f.lhs) or visit_term(f.rhs)
-        if isinstance(f, PredApp):
-            return any(visit_term(a) for a in f.args)
-        if isinstance(f, Definedness):
-            return visit_term(f.term)
-        if isinstance(f, Negation):
-            return visit(f.formula)
-        if isinstance(f, (Conjunction, Disjunction)):
-            subs = f.conjuncts if isinstance(f, Conjunction) else f.disjuncts
-            return any(visit(s) for s in subs)
-        if isinstance(f, (Implication, Biconditional)):
-            return visit(
-                f.lhs if isinstance(f, Biconditional) else f.antecedent
-            ) or visit(f.rhs if isinstance(f, Biconditional) else f.consequent)
-        if isinstance(f, (UniversalQuant, ExistentialQuant)):
-            # If bound here, we still consider the formula as having variables inside it from a free perspective if they were free?
-            # Wait, the rule says "unless the axiom has no free variables" - wait, let me re-read:
-            # "Every axiom's outermost formula is a UniversalQuant, unless the axiom has no free variables (e.g., ground equation). Violation: Axiom... where x and y are vars but the formula is not wrapped in forall."
-            # So if it DOES have vars, it must be wrapped in ∀.
-            return True
-        return False  # type: ignore[unreachable]
-
-    return visit(f)
-
-
-def get_subterm_fns(t: Term) -> list[str]:
-    if isinstance(t, FnApp):
-        res = [t.fn_name]
-        for a in t.args:
-            res.extend(get_subterm_fns(a))
-        return res
-    elif isinstance(t, FieldAccess):
-        return get_subterm_fns(t.term)
-    return []
-
-
-def extract_patterns(f: Formula) -> set[tuple[str, str]]:
-    patterns = set()
-
-    def visit_term_patterns(t: Term) -> None:
-        if isinstance(t, FnApp):
-            for a in t.args:
-                if isinstance(a, FnApp):
-                    patterns.add((t.fn_name, a.fn_name))
-                visit_term_patterns(a)
-        elif isinstance(t, FieldAccess):
-            visit_term_patterns(t.term)
-
-    def visit(f_n: Formula) -> None:
-        if isinstance(f_n, Equation):
-            visit_term_patterns(f_n.lhs)
-            visit_term_patterns(f_n.rhs)
-        elif isinstance(f_n, PredApp):
-            for a in f_n.args:
-                if isinstance(a, FnApp):
-                    patterns.add((f_n.pred_name, a.fn_name))
-                visit_term_patterns(a)
-        elif isinstance(f_n, Definedness):
-            visit_term_patterns(f_n.term)
-        elif isinstance(f_n, Negation):
-            visit(f_n.formula)
-        elif isinstance(f_n, (Conjunction, Disjunction)):
-            subs = f_n.conjuncts if isinstance(f_n, Conjunction) else f_n.disjuncts
-            for s in subs:
-                visit(s)
-        elif isinstance(f_n, (Implication, Biconditional)):
-            visit(f_n.lhs if isinstance(f_n, Biconditional) else f_n.antecedent)
-            visit(f_n.rhs if isinstance(f_n, Biconditional) else f_n.consequent)
-        elif isinstance(f_n, (UniversalQuant, ExistentialQuant)):
-            visit(f_n.body)
-
-    visit(f)
-    return patterns
-
-
-def compute_obligations(spec: Spec) -> list[tuple[str, str, bool, Totality]]:
-    # 1. Classify constructors vs observers
-    constructors_by_sort: dict[str, list[tuple[str, Totality]]] = {}
-    observers_by_sort: dict[str, list[tuple[str, Totality]]] = {}
-
-    for sort_name in spec.signature.sorts:
-        constructors_by_sort[sort_name] = []
-        observers_by_sort[sort_name] = []
-
-    for name, fn in spec.signature.functions.items():
-        if fn.result in spec.signature.sorts:
-            constructors_by_sort[fn.result].append((name, fn.totality))
-        if len(fn.params) > 0:
-            first_sort = fn.params[0].sort
-            if first_sort in spec.signature.sorts and fn.result != first_sort:
-                observers_by_sort[first_sort].append((name, fn.totality))
-
-    for name, pred in spec.signature.predicates.items():
-        if len(pred.params) > 0:
-            first_sort = pred.params[0].sort
-            if first_sort in spec.signature.sorts:
-                # predicates are inherently total unless we model undefinedness, which we don't for preds
-                observers_by_sort[first_sort].append((name, Totality.TOTAL))
-
-    patterns = set()
-    for ax in spec.axioms:
-        patterns.update(extract_patterns(ax.formula))
-
-    result = []
-    for sort_name in spec.signature.sorts:
-        for obs, obs_tot in observers_by_sort[sort_name]:
-            for con, _con_tot in constructors_by_sort[sort_name]:
-                has_ax = (obs, con) in patterns
-                result.append((obs, con, has_ax, obs_tot))
-
-    return result
-
-
-def check_obligations(spec: Spec, ctx: CheckContext) -> None:
-    ctx.axiom_label = None
-    obligations = compute_obligations(spec)
-    for obs, con, has_ax, obs_tot in obligations:
-        if not has_ax:
-            if obs_tot == Totality.TOTAL:
-                ctx.warning(
-                    "obligation_coverage",
-                    f"Total observer '{obs}' missing axiom for constructor '{con}'",
-                )
-            else:
-                # partial observer missing case -> no generic warning per `obligation_partial_skip`
-                pass

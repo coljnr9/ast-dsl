@@ -8,16 +8,16 @@ from alspec.eval.harness import EvalRun
 
 def print_summary_table(run: EvalRun, model: str, out: TextIO) -> None:
     """Print the summary table for a single model."""
-    out.write(f"\n{'=' * 74}\n")
+    out.write(f"\n{'=' * 62}\n")
     out.write(f"  Eval Run: {run.timestamp}  |  Model: {model}\n")
     out.write(f"  Prompt: {run.prompt_version}\n")
-    out.write(f"{'=' * 74}\n\n")
+    out.write(f"{'=' * 62}\n\n")
 
     out.write(
-        "  Domain                  │ Parse │ WF  │ Health │ Obligations │ Axioms │ Errors │ Warnings\n"
+        "  Domain                  │ Parse │ WF  │ Health │ Axioms │ Errors │ Warnings\n"
     )
     out.write(
-        "  ────────────────────────┼───────┼─────┼────────┼─────────────┼────────┼────────┼─────────\n"
+        "  ────────────────────────┼───────┼─────┼────────┼────────┼────────┼─────────\n"
     )
 
     results = [r for r in run.results if r.model == model]
@@ -25,8 +25,6 @@ def print_summary_table(run: EvalRun, model: str, out: TextIO) -> None:
     total_parse = 0
     total_wf = 0
     total_health = 0.0
-    total_obs_covered = 0
-    total_obs_total = 0
     total_axioms = 0
     total_errors = 0
     total_warnings = 0
@@ -44,7 +42,6 @@ def print_summary_table(run: EvalRun, model: str, out: TextIO) -> None:
 
         wf_mark = " — "
         health_str = " —  "
-        obs_str = "   —   "
         ax_str = " —  "
         err_str = " — "
         warn_str = " — "
@@ -57,40 +54,35 @@ def print_summary_table(run: EvalRun, model: str, out: TextIO) -> None:
                 if score.well_formed:
                     total_wf += 1
                 health_str = f"{score.health:4.2f}"
-                obs_str = f"{score.obligation_covered:>3}/{score.obligation_total:<3}"
                 ax_str = f"{score.axiom_count:>3} "
                 err_str = f" {score.error_count:>2} "
                 warn_str = f" {score.warning_count:>2} "
 
                 total_health += score.health
-                total_obs_covered += score.obligation_covered
-                total_obs_total += score.obligation_total
                 total_axioms += score.axiom_count
                 total_errors += score.error_count
                 total_warnings += score.warning_count
 
         out.write(
-            f"  {domain.id:<24}│ {parse_mark}│ {wf_mark} │  {health_str}  │   {obs_str}   │   {ax_str} │  {err_str}  │  {warn_str}\n"
+            f"  {domain.id:<24}│ {parse_mark}│ {wf_mark} │  {health_str}  │   {ax_str} │  {err_str}  │  {warn_str}\n"
         )
 
     out.write(
-        "  ────────────────────────┼───────┼─────┼────────┼─────────────┼────────┼────────┼─────────\n"
+        "  ────────────────────────┼───────┼─────┼────────┼────────┼────────┼─────────\n"
     )
 
     success_count = sum(1 for r in results if r.success)
     parse_pct = (total_parse / len(results)) * 100 if results else 0.0
     wf_pct = (total_wf / success_count) * 100 if success_count else 0.0
     mean_health = total_health / len(results) if results else 0.0
-    mean_obs = (total_obs_covered / total_obs_total) * 100 if total_obs_total else 0.0
 
     out.write(
-        f"  TOTALS                  │ {total_parse:>2}/{len(results):<2} │{total_wf:>2}/{success_count:<2}│  {mean_health:4.2f}  │ {total_obs_covered:>3}/{total_obs_total:<3}     │  {total_axioms:>3}   │  {total_errors:>2}   │  {total_warnings:>2}\n\n"
+        f"  TOTALS                  │ {total_parse:>2}/{len(results):<2} │{total_wf:>2}/{success_count:<2}│  {mean_health:4.2f}  │  {total_axioms:>3}   │  {total_errors:>2}   │  {total_warnings:>2}\n\n"
     )
 
     out.write(f"  Parse rate:        {parse_pct:5.1f}%\n")
     out.write(f"  Well-formed rate:  {wf_pct:5.1f}%\n")
-    out.write(f"  Mean health:       {mean_health:4.2f}\n")
-    out.write(f"  Mean obligation:   {mean_obs:5.1f}%\n\n")
+    out.write(f"  Mean health:       {mean_health:4.2f}\n\n")
 
 
 def print_multi_model_comparison(run: EvalRun, out: TextIO) -> None:
@@ -173,7 +165,6 @@ def print_feature_coverage(run: EvalRun, out: TextIO) -> None:
             continue
 
         mean_health = sum(domain_healths.values()) / len(domain_healths)
-        # Handle ties or empty
         worst_domain = ""
         worst_health = 100.0
         for k, v in domain_healths.items():
@@ -198,19 +189,37 @@ def print_detailed_diagnostics(run: EvalRun, out: TextIO) -> None:
         for result in results:
             health = result.score.health if result.score else 0.0
             out.write(f"  {result.domain_id} (health: {health:.2f})\n")
-            if not result.success:
-                out.write(f"    ✗ Parse failed: {result.parse_error}\n")
-                continue
 
-            match result.score:
-                case None:
-                    out.write("    ✗ Missing score despite success\n")
-                case score:
-                    for diag in score.diagnostics:
-                        if diag.severity == Severity.ERROR:
-                            out.write(f"    ✗ [{diag.check}] {diag.message}\\n")
-                        else:
-                            out.write(f"    ⚠ [{diag.check}] {diag.message}\\n")
+            if not result.success:
+                out.write(f"    ✗ Parse failed:   {result.parse_error}\n")
+                match result.checker_error:
+                    case str(err):
+                        out.write(f"    ✗ Checker error: {err}\n")
+                    case _:
+                        pass
+            else:
+                match result.score:
+                    case None:
+                        out.write("    ✗ Missing score despite success\n")
+                    case score:
+                        for diag in score.diagnostics:
+                            if diag.severity == Severity.ERROR:
+                                out.write(f"    ✗ [{diag.check}] {diag.message}\n")
+                            else:
+                                out.write(f"    ⚠ [{diag.check}] {diag.message}\n")
+
+            match result.analysis:
+                case str(analysis):
+                    truncated = analysis[:2000]
+                    suffix = "... [truncated]" if len(analysis) > 2000 else ""
+                    out.write(f"\n    --- Analysis ---\n")
+                    for line in truncated.splitlines():
+                        out.write(f"    {line}\n")
+                    if suffix:
+                        out.write(f"    {suffix}\n")
+                case _:
+                    pass
+
             out.write("\n")
 
 
@@ -228,7 +237,6 @@ def export_csv(run: EvalRun, path: str) -> None:
                 "success",
                 "well_formed",
                 "health",
-                "obligation_ratio",
                 "error_count",
                 "warning_count",
                 "axiom_count",
@@ -259,7 +267,6 @@ def export_csv(run: EvalRun, path: str) -> None:
                         result.success,
                         False,
                         0.0,
-                        0.0,
                         0,
                         0,
                         0,
@@ -281,7 +288,6 @@ def export_csv(run: EvalRun, path: str) -> None:
                         result.success,
                         score.well_formed,
                         score.health,
-                        score.obligation_ratio,
                         score.error_count,
                         score.warning_count,
                         score.axiom_count,

@@ -32,10 +32,6 @@ def format_report(score: SpecScore) -> str:
                     f"    - [{diag.check}]{axiom_str} {diag.message} (WARNING)"
                 )
 
-    cov_pct = int(score.obligation_ratio * 100) if score.obligation_total > 0 else 100
-    lines.append(
-        f"  Obligations: {score.obligation_covered}/{score.obligation_total} covered ({cov_pct}%)"
-    )
     lines.append(
         f"  Signature: {score.sort_count} sorts, {score.function_count} functions, {score.predicate_count} predicates, {score.axiom_count} axioms"
     )
@@ -50,9 +46,6 @@ def report_json(score: SpecScore) -> dict[str, Any]:
         "well_formed": score.well_formed,
         "error_count": score.error_count,
         "warning_count": score.warning_count,
-        "obligation_total": score.obligation_total,
-        "obligation_covered": score.obligation_covered,
-        "obligation_ratio": score.obligation_ratio,
         "health": score.health,
         "sort_count": score.sort_count,
         "function_count": score.function_count,
