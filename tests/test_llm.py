@@ -31,10 +31,10 @@ class MockAsyncOpenAI:
 @pytest.mark.asyncio
 async def test_llm_client_success() -> None:
     client = AsyncLLMClient("fake_key")
-    # Mock the internal client
     client._client = MockAsyncOpenAI([MockChoice("Hello, world!")])
 
-    result = await client.generate_text("Say hello")
+    messages = [{"role": "user", "content": "Say hello"}]
+    result = await client.generate_messages(messages)
 
     match result:
         case Ok(content):
@@ -46,10 +46,10 @@ async def test_llm_client_success() -> None:
 @pytest.mark.asyncio
 async def test_llm_client_empty_choices() -> None:
     client = AsyncLLMClient("fake_key")
-    # Mock the internal client
     client._client = MockAsyncOpenAI([])
 
-    result = await client.generate_text("Say hello")
+    messages = [{"role": "user", "content": "Say hello"}]
+    result = await client.generate_messages(messages)
 
     match result:
         case Ok(content):
@@ -63,14 +63,14 @@ async def test_llm_client_empty_choices() -> None:
 async def test_llm_client_exception_handling() -> None:
     client = AsyncLLMClient("fake_key")
 
-    # Force an exception by passing an object that doesn't have a create method
     class BrokenMockChatCompletions:
         async def create(self, **kwargs):
             raise ConnectionError("API is down")
 
     client._client.chat.completions = BrokenMockChatCompletions()
 
-    result = await client.generate_text("Say hello")
+    messages = [{"role": "user", "content": "Say hello"}]
+    result = await client.generate_messages(messages)
 
     match result:
         case Ok(content):

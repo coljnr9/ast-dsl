@@ -36,9 +36,8 @@ class EvalResult:
     parse_error: str | None
     checker_error: str | None
     score: SpecScore | None
-    analysis: str | None  # The model's reasoning (from submit_spec tool call)
-    raw_response: str     # Raw text response (empty string when tool call used)
-    code: str | None      # Extracted / tool-provided code (for debugging)
+    analysis: str | None  # The model's chain-of-thought (from submit_spec tool)
+    code: str | None      # Extracted / tool-provided code
     latency_ms: int
     token_count: int | None
 
@@ -75,10 +74,7 @@ def build_prompt(domain: DomainPrompt, use_tool_call: bool) -> list[dict[str, st
 
 
 def extract_code(response: str) -> str | None:
-    """Extract Python code from a markdown block, or return original if no block found.
-
-    Legacy fallback used only when --no-tool-call is set.
-    """
+    """Extract Python code from a markdown block. Fallback for non-tool-call runs."""
     if "```python" in response:
         parts = response.split("```python")
         match parts:
@@ -99,8 +95,6 @@ def extract_code(response: str) -> str | None:
 def execute_spec_code(code: str, fn_name: str) -> Spec | str:
     """Execute LLM-generated code and call the spec function."""
     namespace: dict[str, Any] = {}
-
-    # Provide alspec imports in the namespace
     exec("from alspec import *", namespace)
     exec("from alspec.helpers import *", namespace)
 
@@ -133,21 +127,24 @@ async def run_domain_eval(
 ) -> EvalResult:
     """Run extraction and evaluation for a single domain and model.
 
-    The ``@observe()`` decorator creates a root trace in Langfuse. The
-    ``propagate_attributes`` context manager attaches the trace name, metadata,
-    and tags to that trace via OTel baggage. The nested ``generate_messages``
-    call (also decorated with ``@observe``) becomes a child span automatically.
+    Langfuse trace structure:
+      Trace: eval/{domain.id}/{model_short}
+        Input:  domain.description (human-readable task)
+        Output: {success, health, error} summary
+        └── Generation: completions.create()  ← auto-captured by langfuse.openai
+              Input:  [system prompt, user prompt]
+              Output: tool call / assistant text
 
-    When ``use_tool_call=True`` (default), the model is forced to call the
-    ``submit_spec`` tool, returning structured ``analysis`` and ``code`` fields.
-    When ``use_tool_call=False``, falls back to markdown code-fence extraction.
+    ``@observe(capture_input=False, capture_output=False)`` suppresses the
+    default behaviour of serialising Python function args as the trace I/O.
+    We set trace-level I/O explicitly via ``update_current_trace`` so the
+    Langfuse UI shows meaningful natural-language content, not object dumps.
     """
     messages = build_prompt(domain, use_tool_call=use_tool_call)
     fn_name = domain.id.replace("-", "_") + "_spec"
     model_short = model.split("/")[-1]
     trace_name = f"eval/{domain.id}/{model_short}"
 
-    raw_response = ""
     parse_error: str | None = None
     checker_error: str | None = None
     analysis: str | None = None
@@ -169,6 +166,10 @@ async def run_domain_eval(
             *sorted(domain.expected_features),
         ],
     ):
+        # Set trace Input to the human-readable domain description so the
+        # Langfuse UI shows what task this eval run was solving.
+        langfuse.update_current_trace(input=domain.description)
+
         if use_tool_call:
             result = await client.generate_with_tool_call(messages, model=model)
 
@@ -185,7 +186,6 @@ async def run_domain_eval(
                 case Err(e):
                     parse_error = f"API Error: {e}"
                 case Ok(content):
-                    raw_response = content
                     extracted_code = extract_code(content)
                     match extracted_code:
                         case None:
@@ -193,7 +193,6 @@ async def run_domain_eval(
                         case _:
                             pass
 
-        # Execute whatever code we extracted (tool-call or legacy)
         if extracted_code is not None and parse_error is None:
             spec_or_err = execute_spec_code(extracted_code, fn_name)
 
@@ -204,41 +203,48 @@ async def run_domain_eval(
                     success = True
                     score = score_spec(s, strict=False)
 
-    latency_ms = int((time.time() - start_time) * 1000)
-
-    # Log quality scores to the current trace via get_current_trace_id().
-    # We always log, even on parse failures — hard zeros keep failed traces
-    # visible in score-based dashboard filters (missing scores = invisible rows).
-    if score is not None:
-        langfuse.score_current_trace(
-            name="spec_health",
-            value=score.health,
-            comment=f"errors={score.error_count} warnings={score.warning_count}",
-        )
-        langfuse.score_current_trace(
-            name="obligation_coverage",
-            value=score.obligation_ratio,
-            comment=f"{score.obligation_covered}/{score.obligation_total} pairs covered",
-        )
-        langfuse.score_current_trace(
-            name="well_formed",
-            value=1.0 if score.well_formed else 0.0,
-        )
-    else:
-        error_comment = parse_error or checker_error or "parse failed"
-        langfuse.score_current_trace(
-            name="spec_health",
-            value=0.0,
-            comment=error_comment,
-        )
-        langfuse.score_current_trace(
-            name="obligation_coverage",
-            value=0.0,
-            comment="spec not parsed",
-        )
-        langfuse.score_current_trace(name="well_formed", value=0.0)
+        # Set trace Output to a concise result summary — visible at the trace
+        # list level in the Langfuse UI without clicking into the trace.
+        if score is not None:
+            langfuse.update_current_trace(
+                output={
+                    "success": True,
+                    "health": round(score.health, 3),
+                    "obligation_coverage": round(score.obligation_ratio, 3),
+                    "well_formed": score.well_formed,
+                }
+            )
+            langfuse.score_current_trace(
+                name="spec_health",
+                value=score.health,
+                comment=f"errors={score.error_count} warnings={score.warning_count}",
+            )
+            langfuse.score_current_trace(
+                name="obligation_coverage",
+                value=score.obligation_ratio,
+                comment=f"{score.obligation_covered}/{score.obligation_total} pairs covered",
+            )
+            langfuse.score_current_trace(
+                name="well_formed",
+                value=1.0 if score.well_formed else 0.0,
+            )
+        else:
+            error_msg = parse_error or checker_error or "unknown failure"
+            langfuse.update_current_trace(
+                output={"success": False, "error": error_msg}
+            )
+            # Log hard zeros so failed traces are visible in score-based filters.
+            langfuse.score_current_trace(
+                name="spec_health", value=0.0, comment=error_msg
+            )
+            langfuse.score_current_trace(
+                name="obligation_coverage", value=0.0, comment="spec not parsed"
+            )
+            langfuse.score_current_trace(name="well_formed", value=0.0)
 
     langfuse.flush()
+
+    latency_ms = int((time.time() - start_time) * 1000)
 
     return EvalResult(
         domain_id=domain.id,
@@ -248,7 +254,6 @@ async def run_domain_eval(
         checker_error=checker_error,
         score=score,
         analysis=analysis,
-        raw_response=raw_response,
         code=extracted_code,
         latency_ms=latency_ms,
         token_count=None,

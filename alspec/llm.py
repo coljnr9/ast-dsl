@@ -52,12 +52,17 @@ SUBMIT_SPEC_TOOL: dict[str, object] = {
     },
 }
 
-# tool_choice that forces the model to call submit_spec and nothing else
 _TOOL_CHOICE: dict[str, object] = {"type": "function", "function": {"name": "submit_spec"}}
 
 
 class AsyncLLMClient:
-    """An asynchronous LLM client that wraps the OpenAI SDK for OpenRouter."""
+    """An asynchronous LLM client that wraps the OpenAI SDK for OpenRouter.
+
+    Uses ``from langfuse.openai import AsyncOpenAI`` as the drop-in replacement,
+    which automatically instruments every ``completions.create()`` call as a
+    Langfuse generation, capturing input messages and output text. No manual
+    tracing code is needed in this class.
+    """
 
     def __init__(self, api_key: str):
         self._client = AsyncOpenAI(
@@ -79,44 +84,80 @@ class AsyncLLMClient:
                     ValueError("OPENROUTER_API_KEY not found or empty in environment.")
                 )
 
-    async def generate_text(
-        self, prompt: str, model: str = "meta-llama/llama-3.1-8b-instruct"
-    ) -> Result[str, Exception]:
-        """Generates text from the given prompt using the specified model."""
+    async def generate_with_tool_call(
+        self,
+        messages: list[dict[str, str]],
+        model: str = "meta-llama/llama-3.1-8b-instruct",
+    ) -> Result[tuple[str, str], Exception]:
+        """Call the model with the submit_spec tool and return (analysis, code).
+
+        Forces the model to call ``submit_spec`` via ``tool_choice``, which
+        eliminates brittle code-fence extraction and requires the model to show
+        its reasoning in the ``analysis`` field before writing code.
+
+        The ``langfuse.openai`` wrapper automatically captures this call as a
+        generation span (input messages + tool response output) nested under
+        whatever trace is active in the caller.
+
+        Returns ``Ok((analysis, code))`` on success or ``Err(...)`` on failure.
+        """
         try:
-            response = await self._client.chat.completions.create(
+            response = await self._client.chat.completions.create(  # type: ignore[call-overload]
                 model=model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
+                tools=[SUBMIT_SPEC_TOOL],
+                tool_choice=_TOOL_CHOICE,
             )
 
             match response.choices:
-                case [choice, *_]:
-                    match choice.message.content:
-                        case str(content):
-                            return Ok(content)
-                        case _:
-                            return Err(
-                                RuntimeError("Model response content was not a string.")
-                            )
                 case []:
                     return Err(RuntimeError("Model returned no choices."))
+                case [choice, *_]:
+                    pass
                 case _:
                     return Err(RuntimeError("Unexpected response format from model."))
 
         except Exception as e:
             return Err(e)
 
+        tool_calls = choice.message.tool_calls
+        match tool_calls:
+            case None | []:
+                return Err(RuntimeError("Model did not use submit_spec tool"))
+            case [call, *_]:
+                pass
+
+        try:
+            args: dict[str, object] = json.loads(call.function.arguments)
+        except Exception as e:
+            return Err(RuntimeError(f"Failed to parse tool call arguments: {e}"))
+
+        analysis = args.get("analysis")
+        code = args.get("code")
+
+        match (analysis, code):
+            case (str(a), str(c)):
+                return Ok((a, c))
+            case _:
+                return Err(
+                    RuntimeError(
+                        "submit_spec arguments missing 'analysis' or 'code' fields"
+                    )
+                )
+
     async def generate_messages(
         self,
         messages: list[dict[str, str]],
         model: str = "meta-llama/llama-3.1-8b-instruct",
     ) -> Result[str, Exception]:
-        """Generates text from a list of messages using the specified model.
+        """Fallback: plain chat completion without tool forcing.
 
-        The ``@observe(as_type="generation")`` decorator creates a proper child
-        span in the Langfuse trace hierarchy. When called from inside an
-        ``@observe()``-decorated function, the generation is automatically nested
-        under the parent trace — no manual ``trace_id`` threading required.
+        Used only when ``use_tool_call=False`` is passed to ``run_domain_eval``.
+        Output is raw text that requires code-fence extraction. Prefer
+        ``generate_with_tool_call`` for all normal eval runs.
+
+        The ``langfuse.openai`` wrapper automatically captures this call as a
+        generation span nested under the active trace.
         """
         try:
             response = await self._client.chat.completions.create(
@@ -140,64 +181,3 @@ class AsyncLLMClient:
 
         except Exception as e:
             return Err(e)
-
-    async def generate_with_tool_call(
-        self,
-        messages: list[dict[str, str]],
-        model: str = "meta-llama/llama-3.1-8b-instruct",
-    ) -> Result[tuple[str, str], Exception]:
-        """Call the model with the submit_spec tool and return (analysis, code).
-
-        Forces the model to call ``submit_spec`` via ``tool_choice``, which
-        eliminates brittle code-fence extraction and requires the model to show
-        its reasoning in the ``analysis`` field before writing code.
-
-        Returns ``Ok((analysis, code))`` on success or ``Err(...)`` on failure.
-        The error message is a human-readable string suitable for storing in
-        ``EvalResult.parse_error``.
-        """
-        try:
-            response = await self._client.chat.completions.create(  # type: ignore[call-overload]
-                model=model,
-                messages=messages,
-                tools=[SUBMIT_SPEC_TOOL],
-                tool_choice=_TOOL_CHOICE,
-            )
-
-            match response.choices:
-                case []:
-                    return Err(RuntimeError("Model returned no choices."))
-                case [choice, *_]:
-                    pass
-                case _:
-                    return Err(RuntimeError("Unexpected response format from model."))
-
-        except Exception as e:
-            return Err(e)
-
-        # Validate tool_calls presence
-        tool_calls = choice.message.tool_calls
-        match tool_calls:
-            case None | []:
-                return Err(RuntimeError("Model did not use submit_spec tool"))
-            case [call, *_]:
-                pass
-
-        # Parse JSON arguments
-        try:
-            args: dict[str, object] = json.loads(call.function.arguments)
-        except Exception as e:
-            return Err(RuntimeError(f"Failed to parse tool call arguments: {e}"))
-
-        analysis = args.get("analysis")
-        code = args.get("code")
-
-        match (analysis, code):
-            case (str(a), str(c)):
-                return Ok((a, c))
-            case _:
-                return Err(
-                    RuntimeError(
-                        "submit_spec arguments missing 'analysis' or 'code' fields"
-                    )
-                )
