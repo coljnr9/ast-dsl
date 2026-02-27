@@ -1,14 +1,15 @@
 import os
 
 from dotenv import load_dotenv
+
+# load_dotenv MUST run before get_client() so the LANGFUSE_* env vars
+# are visible when the Langfuse client initializes.
+load_dotenv()
+
 from langfuse import get_client, observe
 from langfuse.openai import AsyncOpenAI  # type: ignore[attr-defined]
 
 from alspec.result import Err, Ok, Result
-
-# -----------------
-# Client
-# -----------------
 
 langfuse = get_client()
 

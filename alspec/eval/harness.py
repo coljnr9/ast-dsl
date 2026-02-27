@@ -2,6 +2,12 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from dotenv import load_dotenv
+
+# load_dotenv MUST run before get_client() so the LANGFUSE_* env vars
+# are visible when the Langfuse client initializes.
+load_dotenv()
+
 from langfuse import get_client, observe, propagate_attributes
 
 from alspec.eval.domains import DomainPrompt
