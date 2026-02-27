@@ -24,14 +24,7 @@ def render() -> str:
                  | Definedness(Term)                    ← inner is a Term
         ```
 
-        ### Illegal Compositions (memorize these)
-
-        | Expression | Why it's wrong |
-        |-----------|---------------|
-        | `eq(PredApp(...), ...)` | PredApp is a Formula, eq needs Terms |
-        | `eq(Definedness(...), ...)` | Definedness is a Formula, eq needs Terms |
-        | `Negation(app(...))` | app returns a Term, Negation needs a Formula |
-        | `Implication(app(...), ...)` | app returns a Term, Implication needs Formulas |
+        ### Valid Compositions
 
         | Expression | Why it's correct |
         |-----------|-----------------|

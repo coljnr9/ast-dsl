@@ -4,7 +4,7 @@ import textwrap
 def render() -> str:
     return textwrap.dedent(
         """\
-        ## 6. Worked Example: Bug Tracker
+        ## 6. Worked Example: Bug Tracker with Ticket Store
 
         This section walks through the complete methodology for producing a
         specification. Follow these steps in order for every spec you write.
@@ -29,149 +29,211 @@ def render() -> str:
           In CASL, model this as an **atomic sort with nullary constructors** (not a
           CoproductSort — Status has no carried data, it's just labels).
 
-        - `Ticket` — This is the central domain object. Tickets have observable
-          properties (id, title, body, severity, status). → **product sort**
+        - `Store` — This is the central domain object. We're modeling a **collection**
+          of tickets, not a single ticket. Individual tickets don't exist as first-class
+          values — they're implicit in the Store. All ticket properties are accessed
+          through store observers with a `TicketId` key.
 
-          *Note: Even though Ticket is a product sort, we don't use FieldAccess to
-          read its fields — we use observer functions (get_severity, get_status, etc.)
-          that we define axioms for. The ProductSort declaration documents the
-          structure; the axioms define the behavior.*
+          *Why not have a `Ticket` sort?* Because we want the FiniteMap pattern:
+          the Store is indexed by TicketId, and all observations go through the Store.
+          This is the standard algebraic approach for collections. Making Ticket a
+          separate sort would require modeling insertion/lookup separately, adding
+          complexity without benefit.
 
         | Sort | Kind | Rationale |
         |------|------|----------|
-        | `TicketId` | atomic | Opaque identifier — no internal structure |
+        | `TicketId` | atomic | Opaque identifier — keys for lookup |
         | `Title` | atomic | Opaque text blob |
         | `Body` | atomic | Opaque text blob |
         | `SeverityLevel` | atomic | Uninterpreted — populated by `classify` |
-        | `Status` | atomic (enumeration) | Finite set: `open`, `resolved`. Modeled as nullary constructors |
+        | `Status` | atomic (enumeration) | `open`, `resolved` as nullary constructors |
         | `UserId` | atomic | Opaque identifier for assignees |
-        | `Ticket` | product | Has observable fields: id, title, body, severity, status |
+        | `Store` | atomic | The collection — opaque, behavior defined by axioms |
 
-        ### Step 2: Classify Functions as Constructors or Observers
+        ### Step 2: Classify Functions and Predicates
 
         **Constructors** build values of a sort. **Observers** query or decompose them.
         Every observer owes axioms against every constructor of its primary sort.
 
         **Reasoning through each function:**
 
-        - `create : TicketId × Title × Body → Ticket` — Builds a new Ticket from
-          parts. This is clearly a **constructor**. Total (you can always create a ticket).
+        - `empty : → Store` — **Constructor**. Creates an empty store with no tickets.
 
-        - `resolve : Ticket → Ticket` — Takes a Ticket, returns a Ticket. This is a
-          **constructor** because it produces a new Ticket value (with different status).
-          Even though the result sort equals the input sort, it's *building* a new
-          value, not *extracting* information.
+        - `create_ticket : Store × TicketId × Title × Body → Store` — **Constructor**.
+          Adds a new ticket to the store. Takes the existing store and returns a
+          new store with one more ticket. Total.
 
-        - `assign : Ticket × UserId → Ticket` — Same pattern as resolve: produces
-          a new Ticket with an assignee set. **Constructor**, total.
+        - `resolve_ticket : Store × TicketId → Store` — **Constructor**. Transitions
+          a ticket's status to resolved. Total — resolving a nonexistent ticket
+          is a no-op (the store is unchanged).
 
-        - `classify : Title × Body → SeverityLevel` — This is interesting. Nothing in
-          our spec defines what classify returns — no axiom has classify on the left
-          side of an equation. It appears only *inside* other axioms (e.g.,
-          `get_severity(create(id, t, b)) = classify(t, b)`). This makes it
-          **uninterpreted** — the spec constrains how it's used but not what it
-          computes. At implementation time, this could be an LLM call, a rules engine,
-          or a lookup table.
+        - `assign_ticket : Store × TicketId × UserId → Store` — **Constructor**.
+          Sets the assignee on a ticket. Total — assigning to a nonexistent ticket
+          is a no-op.
 
-        - `get_severity : Ticket → SeverityLevel` — Takes a Ticket, returns something
-          that isn't a Ticket. Classic **observer**. Total (every ticket has a severity).
+        - `classify : Title × Body → SeverityLevel` — **Uninterpreted**. Nothing in
+          the spec defines what classify returns. It appears only *inside* other
+          axioms (e.g., `get_severity(...) = classify(t, b)`). At implementation
+          time, this could be an LLM call, a rules engine, or a lookup table.
 
-        - `get_status : Ticket → Status` — Same pattern. **Observer**, total.
+        - `get_status : Store × TicketId →? Status` — **Observer**, **partial**.
+          Undefined if the ticket doesn't exist in the store. Every ticket that
+          exists has a status, but querying a nonexistent ticket is undefined.
 
-        - `get_assignee : Ticket →? UserId` — Observer, but **partial**. Why partial?
-          Because a freshly created ticket has no assignee — `get_assignee(create(...))`
-          is undefined. This is the key design decision: we don't want a "no user"
-          sentinel value; we want genuine undefinedness.
+        - `get_severity : Store × TicketId →? SeverityLevel` — **Observer**, **partial**.
+          Same reason as get_status.
+
+        - `get_assignee : Store × TicketId →? UserId` — **Observer**, **doubly partial**.
+          Undefined for TWO reasons: the ticket might not exist, AND even if it does,
+          it might not have an assignee yet. A freshly created ticket has no assignee.
 
         - `open`, `resolved` — Nullary constructors of Status (enumeration constants).
 
-        - `high` — Nullary constructor of SeverityLevel (needed for is_critical definition).
+        - `high` — Nullary constructor of SeverityLevel (needed for is_critical).
 
-        - `is_critical` — **Predicate observer** on Ticket. Holds iff the ticket's
-          severity is `high`. We'll use Biconditional to express this equivalence.
+        **Reasoning through predicates:**
+
+        - `eq_id : TicketId × TicketId` — **Helper predicate** for key equality.
+          We need this for dispatch: when `create_ticket(s, k, ...)` is observed at
+          key `k2`, we split on whether `eq_id(k, k2)` holds (hit) or not (miss).
+
+          *Critical:* `eq_id` is a PREDICATE, not a function returning Bool. This means
+          using `PredApp("eq_id", ...)` everywhere — never `app("eq_id", ...)`.
+
+        - `has_ticket : Store × TicketId` — **Predicate observer** on Store. True iff
+          a ticket with that ID exists in the store. Total over the store.
+
+        - `is_critical : Store × TicketId` — **Predicate observer** on Store. True iff
+          the ticket exists AND its severity is `high`.
 
         | Function | Role | Profile | Notes |
-        |----------|------|---------|------|
-        | `create` | constructor | `TicketId × Title × Body → Ticket` | total |
-        | `resolve` | constructor | `Ticket → Ticket` | total, transitions status |
-        | `assign` | constructor | `Ticket × UserId → Ticket` | total, sets assignee |
-        | `classify` | uninterpreted | `Title × Body → SeverityLevel` | total, not defined by any axiom |
-        | `get_severity` | observer | `Ticket → SeverityLevel` | total |
-        | `get_status` | observer | `Ticket → Status` | total |
-        | `get_assignee` | observer | `Ticket →? UserId` | **partial** — undefined until assigned |
-        | `open` | constant | `→ Status` | enumeration value |
-        | `resolved` | constant | `→ Status` | enumeration value |
-        | `high` | constant | `→ SeverityLevel` | for defining `is_critical` |
+        |----------|------|---------|-------|
+        | `empty` | constructor | `→ Store` | Empty store, no tickets |
+        | `create_ticket` | constructor | `Store × TicketId × Title × Body → Store` | Adds a new ticket |
+        | `resolve_ticket` | constructor | `Store × TicketId → Store` | Transitions status (no-op if nonexistent) |
+        | `assign_ticket` | constructor | `Store × TicketId × UserId → Store` | Sets assignee (no-op if nonexistent) |
+        | `classify` | uninterpreted | `Title × Body → SeverityLevel` | Filled at implementation time |
+        | `get_status` | observer | `Store × TicketId →? Status` | **Partial** — undefined if ticket doesn't exist |
+        | `get_severity` | observer | `Store × TicketId →? SeverityLevel` | **Partial** — same |
+        | `get_assignee` | observer | `Store × TicketId →? UserId` | **Partial** — doubly: nonexistent ticket OR no assignee |
+        | `open` | constant | `→ Status` | Enumeration value |
+        | `resolved` | constant | `→ Status` | Enumeration value |
+        | `high` | constant | `→ SeverityLevel` | For `is_critical` definition |
 
-        | Predicate | Role | Profile |
-        |-----------|------|--------|
-        | `is_critical` | observer | `Ticket` |
+        | Predicate | Role | Profile | Notes |
+        |-----------|------|---------|-------|
+        | `eq_id` | helper | `TicketId × TicketId` | Key equality for dispatch |
+        | `has_ticket` | observer | `Store × TicketId` | True iff ticket with that ID exists |
+        | `is_critical` | observer | `Store × TicketId` | True iff ticket exists and severity is high |
 
         ### Step 3: Build the Axiom Obligation Table
 
-        List every (observer, constructor) pair. For partial observers, identify which
-        constructor cases produce undefined results — these rows produce no axiom.
+        Store constructors: `empty`, `create_ticket`, `resolve_ticket`, `assign_ticket`
 
-        Ticket constructors: `create`, `resolve`, `assign`
+        This is where key-dispatch makes things interesting. Every observer takes a
+        `TicketId` key, and `create_ticket`, `resolve_ticket`, `assign_ticket` also
+        take a `TicketId`. So for each (observer, constructor) pair we get a **hit/miss
+        split**: does the constructor's key match the observer's key?
 
-        **Working through each observer systematically:**
+        **`eq_id` basis axioms (2 axioms):**
+        Before the obligation table, we need reflexivity and symmetry for the key
+        equality predicate. These are structural — they don't come from
+        observer×constructor pairs.
 
-        **`get_severity` (total, 3 constructors → 3 axioms):**
-        - × `create`: Severity is determined at creation time by `classify(t, b)`.
-          This is a *defining* axiom — it connects the observer to the constructor's arguments.
-        - × `resolve`: Resolving a ticket doesn't change its severity. **Preservation**.
-        - × `assign`: Assigning a ticket doesn't change its severity. **Preservation**.
+        **`has_ticket` (predicate, total over store — 7 axioms):**
+        - × `empty`: false — no tickets in an empty store.
+        - × `create_ticket` hit: true — we just added a ticket at this key.
+        - × `create_ticket` miss: delegates to `has_ticket(s, k2)` — creating a
+          ticket at key `k` doesn't affect whether a ticket exists at a different key `k2`.
+        - × `resolve_ticket` hit: preserves — `has_ticket(resolve_ticket(s, k), k) ⟺ has_ticket(s, k)`.
+        - × `resolve_ticket` miss: delegates.
+        - × `assign_ticket` hit: preserves.
+        - × `assign_ticket` miss: delegates.
 
-        **`get_status` (total, 3 constructors → 3 axioms):**
-        - × `create`: New tickets start with status `open`.
-        - × `resolve`: Status becomes `resolved`. This is the *point* of the resolve constructor.
-        - × `assign`: Assigning doesn't change status. **Preservation**.
+        **`get_status` (partial — undefined when ticket doesn't exist — 6 axioms):**
+        - × `empty`: **omitted** — no tickets, so `get_status(empty, k)` is undefined.
+        - × `create_ticket` hit: returns `open` — new tickets start open.
+        - × `create_ticket` miss: delegates to `get_status(s, k2)`.
+        - × `resolve_ticket` hit: returns `resolved` — but only if the ticket exists
+          (needs `has_ticket` guard in the axiom).
+        - × `resolve_ticket` miss: delegates.
+        - × `assign_ticket` hit: preserved — assigning doesn't change status.
+        - × `assign_ticket` miss: delegates.
 
-        **`get_assignee` (PARTIAL, 3 constructors → 2 axioms + 1 omitted):**
-        - × `create`: **OMITTED** — `get_assignee` is undefined on new tickets.
-          No axiom needed; the `total=False` declaration handles undefinedness.
-        - × `resolve`: Tricky case! Resolving a ticket should preserve the assignee
-          *if one exists*, and leave it undefined if it didn't have one. This requires
-          TWO things: a `Definedness` biconditional (definedness is preserved) and a
-          value equation (when defined, the value is preserved). The value equation
-          uses strong equality — it holds when both sides are defined and equal, or
-          both undefined.
-        - × `assign`: Returns the newly assigned `UserId`. This is the defining axiom.
+        **`get_severity` (partial — undefined when ticket doesn't exist — 4 axioms):**
+        - × `empty`: **omitted** — undefined.
+        - × `create_ticket` hit: `classify(t, b)` — severity is set at creation.
+        - × `create_ticket` miss: delegates.
+        - × `resolve_ticket`: **No key dispatch needed!** Resolve doesn't change severity
+          for ANY ticket, regardless of which key matches. We can write a single
+          universal axiom: `get_severity(resolve_ticket(s, k), k2) = get_severity(s, k2)`.
+        - × `assign_ticket`: Same — assign doesn't change severity. One universal axiom.
 
-        **`is_critical` (predicate, 3 constructors → 3 axioms):**
-        - × `create`: Critical iff `classify(t, b) = high`. Use `Biconditional` to
-          express this equivalence — `is_critical(create(...)) ⟺ classify(t,b) = high`.
-          Not `Implication`! We need both directions.
-        - × `resolve`: Criticality preserved. Use `Biconditional` with the same predicate
-          on the inner ticket.
-        - × `assign`: Criticality preserved. Same pattern as resolve.
+        *This is an important simplification:* when a constructor doesn't affect an
+        observer at all, regardless of key, you can collapse the hit/miss pair into
+        a single axiom covering all keys.
 
-        | Observer / Predicate | Constructor | Defined? | Axiom Label | Expected behavior |
-        |---------------------|------------|----------|-------------|------------------|
-        | `get_severity` (total) | `create` | ✓ | `get_severity_create` | `classify(t, b)` |
-        | `get_severity` (total) | `resolve` | ✓ | `get_severity_resolve` | preserved |
-        | `get_severity` (total) | `assign` | ✓ | `get_severity_assign` | preserved |
-        | `get_status` (total) | `create` | ✓ | `get_status_create` | `open` |
-        | `get_status` (total) | `resolve` | ✓ | `get_status_resolve` | `resolved` |
-        | `get_status` (total) | `assign` | ✓ | `get_status_assign` | preserved |
-        | `get_assignee` (**partial**) | `create` | **✗** | *(omitted)* | undefined — no assignee yet |
-        | `get_assignee` (**partial**) | `resolve` | depends | `get_assignee_resolve` | preserved (definedness + value) |
-        | `get_assignee` (**partial**) | `assign` | ✓ | `get_assignee_assign` | returns new `UserId` |
-        | `is_critical` (pred) | `create` | ✓ | `is_critical_create` | `⟺ classify = high` |
-        | `is_critical` (pred) | `resolve` | ✓ | `is_critical_resolve` | preserved |
-        | `is_critical` (pred) | `assign` | ✓ | `is_critical_assign` | preserved |
+        **`get_assignee` (doubly partial — 4 axioms):**
+        - × `empty`: **omitted** — undefined.
+        - × `create_ticket` hit: **omitted** — even though the ticket exists at this
+          key after creation, `get_assignee` is still undefined because new tickets
+          have no assignee. This is the "doubly partial" case.
+        - × `create_ticket` miss: delegates.
+        - × `assign_ticket` hit: returns the new `UserId`.
+        - × `assign_ticket` miss: delegates.
+        - × `resolve_ticket`: universal preservation — resolve doesn't change assignee.
 
-        **Completeness check:** 3 + 3 + 2 + 3 = 11 value-equation axioms,
-        plus 1 definedness biconditional for `get_assignee_resolve` = **12 axioms**.
-        Adding the resolve value axiom separately: **total 13 axioms**.
+        **`is_critical` (predicate — 5 axioms):**
+        - × `empty`: false — no tickets, so nothing is critical.
+        - × `create_ticket` hit: `⟺ classify(t, b) = high` — critical iff severity is high.
+        - × `create_ticket` miss: delegates.
+        - × `resolve_ticket`: universal preservation (criticality depends on severity,
+          which resolve doesn't change).
+        - × `assign_ticket`: universal preservation.
 
-        *Wait — let's recount carefully:*
-        - `get_severity`: 3 axioms (create, resolve, assign)
-        - `get_status`: 3 axioms (create, resolve, assign)
-        - `get_assignee`: 3 axioms (resolve_definedness, resolve_value, assign)
-          — create is **omitted**
-        - `is_critical`: 3 axioms (create, resolve, assign)
-        - **Total: 12 value/predicate axioms + 1 definedness biconditional = 13 axioms**
+        **Completeness count:**
+        - `eq_id` basis: 2 axioms (refl, sym)
+        - `has_ticket`: 7 axioms (empty + 2×create + 2×resolve + 2×assign)
+        - `get_status`: 6 axioms (2×create + 1×resolve_hit + 1×resolve_miss + 2×assign)
+        - `get_severity`: 4 axioms (2×create + 1×resolve_universal + 1×assign_universal)
+        - `get_assignee`: 4 axioms (1×create_miss + 2×assign + 1×resolve_universal)
+        - `is_critical`: 5 axioms (empty + 2×create + 1×resolve + 1×assign)
+        - **Total: 28 axioms**
+
+        | Observer / Predicate | Constructor | Case | Axiom Label | Behavior |
+        |---------------------|------------|------|-------------|----------|
+        | `eq_id` (basis) | — | — | `eq_id_refl` | reflexivity |
+        | `eq_id` (basis) | — | — | `eq_id_sym` | symmetry |
+        | `has_ticket` | `empty` | — | `has_ticket_empty` | false |
+        | `has_ticket` | `create_ticket` | hit | `has_ticket_create_hit` | true |
+        | `has_ticket` | `create_ticket` | miss | `has_ticket_create_miss` | delegates |
+        | `has_ticket` | `resolve_ticket` | hit | `has_ticket_resolve_hit` | preserves |
+        | `has_ticket` | `resolve_ticket` | miss | `has_ticket_resolve_miss` | delegates |
+        | `has_ticket` | `assign_ticket` | hit | `has_ticket_assign_hit` | preserves |
+        | `has_ticket` | `assign_ticket` | miss | `has_ticket_assign_miss` | delegates |
+        | `get_status` (partial) | `empty` | — | *(omitted)* | undefined |
+        | `get_status` (partial) | `create_ticket` | hit | `get_status_create_hit` | `open` |
+        | `get_status` (partial) | `create_ticket` | miss | `get_status_create_miss` | delegates |
+        | `get_status` (partial) | `resolve_ticket` | hit | `get_status_resolve_hit` | `resolved` (guarded) |
+        | `get_status` (partial) | `resolve_ticket` | miss | `get_status_resolve_miss` | delegates |
+        | `get_status` (partial) | `assign_ticket` | hit | `get_status_assign_hit` | preserved |
+        | `get_status` (partial) | `assign_ticket` | miss | `get_status_assign_miss` | delegates |
+        | `get_severity` (partial) | `empty` | — | *(omitted)* | undefined |
+        | `get_severity` (partial) | `create_ticket` | hit | `get_severity_create_hit` | `classify(t, b)` |
+        | `get_severity` (partial) | `create_ticket` | miss | `get_severity_create_miss` | delegates |
+        | `get_severity` (partial) | `resolve_ticket` | any | `get_severity_resolve` | universal preservation |
+        | `get_severity` (partial) | `assign_ticket` | any | `get_severity_assign` | universal preservation |
+        | `get_assignee` (partial) | `empty` | — | *(omitted)* | undefined |
+        | `get_assignee` (partial) | `create_ticket` | hit | *(omitted)* | undefined — no assignee |
+        | `get_assignee` (partial) | `create_ticket` | miss | `get_assignee_create_miss` | delegates |
+        | `get_assignee` (partial) | `assign_ticket` | hit | `get_assignee_assign_hit` | returns `u` |
+        | `get_assignee` (partial) | `assign_ticket` | miss | `get_assignee_assign_miss` | delegates |
+        | `get_assignee` (partial) | `resolve_ticket` | any | `get_assignee_resolve` | universal preservation |
+        | `is_critical` (pred) | `empty` | — | `is_critical_empty` | false |
+        | `is_critical` (pred) | `create_ticket` | hit | `is_critical_create_hit` | `⟺ classify = high` |
+        | `is_critical` (pred) | `create_ticket` | miss | `is_critical_create_miss` | delegates |
+        | `is_critical` (pred) | `resolve_ticket` | any | `is_critical_resolve` | universal preservation |
+        | `is_critical` (pred) | `assign_ticket` | any | `is_critical_assign` | universal preservation |
 
         ### Step 4: Write the Signature
 
@@ -179,17 +241,17 @@ def render() -> str:
 
         ```python
         from alspec import (
-            Axiom, Signature, Spec, S,
-            atomic, fn, pred, var, app, const, eq, forall, iff,
-            ProductSort, ProductField,
-            Biconditional, PredApp, Negation, Definedness,
+            Axiom, Biconditional, Implication, Negation, PredApp,
+            Signature, Spec,
+            atomic, fn, pred, var, app, const, eq, forall,
         )
 
-        # Variables
-        id_var = var("id", "TicketId")
+        # Variables — note two TicketId variables for key dispatch
+        s = var("s", "Store")
+        k = var("k", "TicketId")        # constructor's key
+        k2 = var("k2", "TicketId")      # observer's key
         t = var("t", "Title")
         b = var("b", "Body")
-        tk = var("tk", "Ticket")
         u = var("u", "UserId")
 
         sig = Signature(
@@ -200,156 +262,351 @@ def render() -> str:
                 "SeverityLevel": atomic("SeverityLevel"),
                 "Status": atomic("Status"),
                 "UserId": atomic("UserId"),
-                "Ticket": ProductSort(
-                    name=S("Ticket"),
-                    fields=(
-                        ProductField("id", S("TicketId")),
-                        ProductField("title", S("Title")),
-                        ProductField("body", S("Body")),
-                        ProductField("severity", S("SeverityLevel")),
-                        ProductField("status", S("Status")),
-                    ),
-                ),
+                "Store": atomic("Store"),
             },
             functions={
-                # Uninterpreted function — filled by LLM at code-gen time
+                # Store constructors
+                "empty": fn("empty", [], "Store"),
+                "create_ticket": fn("create_ticket",
+                    [("s", "Store"), ("k", "TicketId"), ("t", "Title"), ("b", "Body")], "Store"),
+                "resolve_ticket": fn("resolve_ticket",
+                    [("s", "Store"), ("k", "TicketId")], "Store"),
+                "assign_ticket": fn("assign_ticket",
+                    [("s", "Store"), ("k", "TicketId"), ("u", "UserId")], "Store"),
+                # Uninterpreted
                 "classify": fn("classify", [("t", "Title"), ("b", "Body")], "SeverityLevel"),
-                # Constructors for Ticket
-                "create": fn("create", [("id", "TicketId"), ("t", "Title"), ("b", "Body")], "Ticket"),
-                "resolve": fn("resolve", [("tk", "Ticket")], "Ticket"),
-                "assign": fn("assign", [("tk", "Ticket"), ("u", "UserId")], "Ticket"),
-                # Observers
-                "get_severity": fn("get_severity", [("tk", "Ticket")], "SeverityLevel"),
-                "get_status": fn("get_status", [("tk", "Ticket")], "Status"),
-                "get_assignee": fn("get_assignee", [("tk", "Ticket")], "UserId", total=False),
-                # Status constants (enumeration)
+                # Partial observers
+                "get_status": fn("get_status",
+                    [("s", "Store"), ("k", "TicketId")], "Status", total=False),
+                "get_severity": fn("get_severity",
+                    [("s", "Store"), ("k", "TicketId")], "SeverityLevel", total=False),
+                "get_assignee": fn("get_assignee",
+                    [("s", "Store"), ("k", "TicketId")], "UserId", total=False),
+                # Enumeration constants
                 "open": fn("open", [], "Status"),
                 "resolved": fn("resolved", [], "Status"),
-                # SeverityLevel constants
                 "high": fn("high", [], "SeverityLevel"),
             },
             predicates={
-                "is_critical": pred("is_critical", [("tk", "Ticket")]),
+                "eq_id": pred("eq_id", [("k1", "TicketId"), ("k2", "TicketId")]),
+                "has_ticket": pred("has_ticket", [("s", "Store"), ("k", "TicketId")]),
+                "is_critical": pred("is_critical", [("s", "Store"), ("k", "TicketId")]),
             },
         )
         ```
 
         ### Step 5: Fill in Axioms from the Obligation Table
 
-        Work through the table row by row. Each row becomes one `Axiom`.
+        Work through the table row by row. Key concepts:
+
+        - **Hit case**: `eq_id(k, k2)` holds — the constructor's key matches the observer's key.
+          Use `Implication(PredApp("eq_id", (k, k2)), ...)` as the guard.
+        - **Miss case**: `eq_id(k, k2)` does NOT hold — different keys.
+          Use `Implication(Negation(PredApp("eq_id", (k, k2))), ...)` as the guard.
+        - **Universal preservation**: The constructor doesn't affect the observer at ANY key.
+          No guard needed — write a single equation for all `k2`.
+        - **Omitted case**: The observer is undefined for this constructor. No axiom.
 
         ```python
         axioms = (
-            # ━━ get_severity: total, 3 constructors → 3 axioms ━━
+            # ━━ eq_id basis ━━
 
-            # get_severity × create: severity comes from classify
             Axiom(
-                label="get_severity_create",
-                formula=forall([id_var, t, b], eq(
-                    app("get_severity", app("create", id_var, t, b)),
-                    app("classify", t, b),
+                label="eq_id_refl",
+                formula=forall([k],
+                    PredApp("eq_id", (k, k)),                       # Formula ✓
+                ),
+            ),
+            Axiom(
+                label="eq_id_sym",
+                formula=forall([k, k2], Implication(
+                    PredApp("eq_id", (k, k2)),                      # Formula ✓
+                    PredApp("eq_id", (k2, k)),                      # Formula ✓
                 )),
             ),
-            # get_severity × resolve: severity preserved
+
+            # ━━ has_ticket: total predicate ━━
+
+            # Negation(PredApp) as complete formula — no tickets in empty store
+            Axiom(
+                label="has_ticket_empty",
+                formula=forall([k], Negation(
+                    PredApp("has_ticket", (const("empty"), k)),      # Formula ✓
+                )),
+            ),
+
+            # Implication(PredApp, PredApp) — hit: ticket just created
+            Axiom(
+                label="has_ticket_create_hit",
+                formula=forall([s, k, k2, t, b], Implication(
+                    PredApp("eq_id", (k, k2)),                      # Formula ✓
+                    PredApp("has_ticket", (app("create_ticket", s, k, t, b), k2)),  # Formula ✓
+                )),
+            ),
+
+            # Implication(Negation(PredApp), Biconditional(PredApp, PredApp)) — miss
+            Axiom(
+                label="has_ticket_create_miss",
+                formula=forall([s, k, k2, t, b], Implication(
+                    Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
+                    Biconditional(
+                        lhs=PredApp("has_ticket", (app("create_ticket", s, k, t, b), k2)),  # Formula ✓
+                        rhs=PredApp("has_ticket", (s, k2)),         # Formula ✓
+                    ),
+                )),
+            ),
+
+            # resolve_ticket hit: preserved
+            Axiom(
+                label="has_ticket_resolve_hit",
+                formula=forall([s, k, k2], Implication(
+                    PredApp("eq_id", (k, k2)),                      # Formula ✓
+                    Biconditional(
+                        lhs=PredApp("has_ticket", (app("resolve_ticket", s, k), k2)),  # Formula ✓
+                        rhs=PredApp("has_ticket", (s, k2)),         # Formula ✓
+                    ),
+                )),
+            ),
+
+            # resolve_ticket miss: delegates
+            Axiom(
+                label="has_ticket_resolve_miss",
+                formula=forall([s, k, k2], Implication(
+                    Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
+                    Biconditional(
+                        lhs=PredApp("has_ticket", (app("resolve_ticket", s, k), k2)),  # Formula ✓
+                        rhs=PredApp("has_ticket", (s, k2)),         # Formula ✓
+                    ),
+                )),
+            ),
+
+            # assign_ticket hit: preserved
+            Axiom(
+                label="has_ticket_assign_hit",
+                formula=forall([s, k, k2, u], Implication(
+                    PredApp("eq_id", (k, k2)),                      # Formula ✓
+                    Biconditional(
+                        lhs=PredApp("has_ticket", (app("assign_ticket", s, k, u), k2)),  # Formula ✓
+                        rhs=PredApp("has_ticket", (s, k2)),         # Formula ✓
+                    ),
+                )),
+            ),
+
+            # assign_ticket miss: delegates
+            Axiom(
+                label="has_ticket_assign_miss",
+                formula=forall([s, k, k2, u], Implication(
+                    Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
+                    Biconditional(
+                        lhs=PredApp("has_ticket", (app("assign_ticket", s, k, u), k2)),  # Formula ✓
+                        rhs=PredApp("has_ticket", (s, k2)),         # Formula ✓
+                    ),
+                )),
+            ),
+
+            # ━━ get_status: partial, key-dispatch ━━
+            # empty case OMITTED — undefined (no tickets)
+
+            # PredApp inside Implication — hit: new tickets start open
+            Axiom(
+                label="get_status_create_hit",
+                formula=forall([s, k, k2, t, b], Implication(
+                    PredApp("eq_id", (k, k2)),                      # Formula ✓
+                    eq(app("get_status", app("create_ticket", s, k, t, b), k2),
+                       const("open")),                               # Term ✓
+                )),
+            ),
+
+            # Negation(PredApp) inside Implication — miss: delegates
+            Axiom(
+                label="get_status_create_miss",
+                formula=forall([s, k, k2, t, b], Implication(
+                    Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
+                    eq(app("get_status", app("create_ticket", s, k, t, b), k2),
+                       app("get_status", s, k2)),                    # Term ✓
+                )),
+            ),
+
+            # resolve_ticket hit: becomes resolved (guarded by has_ticket)
+            Axiom(
+                label="get_status_resolve_hit",
+                formula=forall([s, k, k2], Implication(
+                    PredApp("eq_id", (k, k2)),                      # Formula ✓
+                    Implication(
+                        PredApp("has_ticket", (s, k)),               # Formula ✓ — guard
+                        eq(app("get_status", app("resolve_ticket", s, k), k2),
+                           const("resolved")),                       # Term ✓
+                    ),
+                )),
+            ),
+
+            # resolve_ticket miss: delegates
+            Axiom(
+                label="get_status_resolve_miss",
+                formula=forall([s, k, k2], Implication(
+                    Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
+                    eq(app("get_status", app("resolve_ticket", s, k), k2),
+                       app("get_status", s, k2)),                    # Term ✓
+                )),
+            ),
+
+            # assign_ticket hit: status preserved
+            Axiom(
+                label="get_status_assign_hit",
+                formula=forall([s, k, k2, u], Implication(
+                    PredApp("eq_id", (k, k2)),                      # Formula ✓
+                    eq(app("get_status", app("assign_ticket", s, k, u), k2),
+                       app("get_status", s, k2)),                    # Term ✓
+                )),
+            ),
+
+            # assign_ticket miss: delegates
+            Axiom(
+                label="get_status_assign_miss",
+                formula=forall([s, k, k2, u], Implication(
+                    Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
+                    eq(app("get_status", app("assign_ticket", s, k, u), k2),
+                       app("get_status", s, k2)),                    # Term ✓
+                )),
+            ),
+
+            # ━━ get_severity: partial, key-dispatch on create only ━━
+            # empty case OMITTED — undefined
+
+            # create_ticket hit: severity = classify(t, b)
+            Axiom(
+                label="get_severity_create_hit",
+                formula=forall([s, k, k2, t, b], Implication(
+                    PredApp("eq_id", (k, k2)),                      # Formula ✓
+                    eq(app("get_severity", app("create_ticket", s, k, t, b), k2),
+                       app("classify", t, b)),                       # Term ✓
+                )),
+            ),
+
+            # create_ticket miss: delegates
+            Axiom(
+                label="get_severity_create_miss",
+                formula=forall([s, k, k2, t, b], Implication(
+                    Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
+                    eq(app("get_severity", app("create_ticket", s, k, t, b), k2),
+                       app("get_severity", s, k2)),                  # Term ✓
+                )),
+            ),
+
+            # Universal preservation — resolve doesn't change severity for ANY ticket.
+            # No key dispatch needed: one axiom covers all k2.
             Axiom(
                 label="get_severity_resolve",
-                formula=forall([tk], eq(
-                    app("get_severity", app("resolve", tk)),
-                    app("get_severity", tk),
+                formula=forall([s, k, k2], eq(
+                    app("get_severity", app("resolve_ticket", s, k), k2),
+                    app("get_severity", s, k2),                      # Term ✓
                 )),
             ),
-            # get_severity × assign: severity preserved
+
+            # Universal preservation — assign doesn't change severity either.
             Axiom(
                 label="get_severity_assign",
-                formula=forall([tk, u], eq(
-                    app("get_severity", app("assign", tk, u)),
-                    app("get_severity", tk),
+                formula=forall([s, k, k2, u], eq(
+                    app("get_severity", app("assign_ticket", s, k, u), k2),
+                    app("get_severity", s, k2),                      # Term ✓
                 )),
             ),
 
-            # ━━ get_status: total, 3 constructors → 3 axioms ━━
+            # ━━ get_assignee: doubly partial ━━
+            # empty case OMITTED — undefined (no tickets)
+            # create_ticket HIT case OMITTED — new tickets have no assignee,
+            #   so get_assignee(create_ticket(s, k, t, b), k) is undefined.
+            #   Even though the ticket exists, the observer is still undefined.
 
-            # get_status × create: new tickets start open
+            # create_ticket miss: delegates
             Axiom(
-                label="get_status_create",
-                formula=forall([id_var, t, b], eq(
-                    app("get_status", app("create", id_var, t, b)),
-                    const("open"),
-                )),
-            ),
-            # get_status × resolve: status becomes resolved
-            Axiom(
-                label="get_status_resolve",
-                formula=forall([tk], eq(
-                    app("get_status", app("resolve", tk)),
-                    const("resolved"),
-                )),
-            ),
-            # get_status × assign: status preserved (assigning doesn't change status)
-            Axiom(
-                label="get_status_assign",
-                formula=forall([tk, u], eq(
-                    app("get_status", app("assign", tk, u)),
-                    app("get_status", tk),
+                label="get_assignee_create_miss",
+                formula=forall([s, k, k2, t, b], Implication(
+                    Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
+                    eq(app("get_assignee", app("create_ticket", s, k, t, b), k2),
+                       app("get_assignee", s, k2)),                  # Term ✓
                 )),
             ),
 
-            # ━━ get_assignee: PARTIAL, 3 constructors → 2 axioms (undefined on create) ━━
-            #
-            # create: OMITTED — get_assignee is partial and undefined on new tickets.
-            #         No axiom needed; the total=False declaration handles this.
+            # assign_ticket hit: returns the new UserId
+            Axiom(
+                label="get_assignee_assign_hit",
+                formula=forall([s, k, k2, u], Implication(
+                    PredApp("eq_id", (k, k2)),                      # Formula ✓
+                    eq(app("get_assignee", app("assign_ticket", s, k, u), k2),
+                       u),                                           # Term ✓
+                )),
+            ),
 
-            # get_assignee × resolve: assignee preserved across resolution
-            # This uses Definedness in a biconditional — if the ticket had an assignee
-            # before, it still has one after; if it didn't, it still doesn't.
+            # assign_ticket miss: delegates
+            Axiom(
+                label="get_assignee_assign_miss",
+                formula=forall([s, k, k2, u], Implication(
+                    Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
+                    eq(app("get_assignee", app("assign_ticket", s, k, u), k2),
+                       app("get_assignee", s, k2)),                  # Term ✓
+                )),
+            ),
+
+            # Universal preservation — resolve doesn't change assignee.
             Axiom(
                 label="get_assignee_resolve",
-                formula=forall([tk], Biconditional(
-                    lhs=Definedness(app("get_assignee", app("resolve", tk))),
-                    rhs=Definedness(app("get_assignee", tk)),
-                )),
-            ),
-            # When defined, the value is preserved:
-            Axiom(
-                label="get_assignee_resolve_value",
-                formula=forall([tk], eq(
-                    app("get_assignee", app("resolve", tk)),
-                    app("get_assignee", tk),
-                )),
-            ),
-            # get_assignee × assign: returns the new UserId
-            Axiom(
-                label="get_assignee_assign",
-                formula=forall([tk, u], eq(
-                    app("get_assignee", app("assign", tk, u)),
-                    u,
+                formula=forall([s, k, k2], eq(
+                    app("get_assignee", app("resolve_ticket", s, k), k2),
+                    app("get_assignee", s, k2),                      # Term ✓
                 )),
             ),
 
-            # ━━ is_critical: predicate, 3 constructors → 3 axioms ━━
+            # ━━ is_critical: predicate ━━
 
-            # is_critical × create: critical iff classify returns high
+            # empty: no tickets → not critical
             Axiom(
-                label="is_critical_create",
-                formula=forall([id_var, t, b], Biconditional(
-                    lhs=PredApp("is_critical", (app("create", id_var, t, b),)),
-                    rhs=eq(app("classify", t, b), const("high")),
+                label="is_critical_empty",
+                formula=forall([k], Negation(
+                    PredApp("is_critical", (const("empty"), k)),     # Formula ✓
                 )),
             ),
-            # is_critical × resolve: criticality preserved
+
+            # create_ticket hit: critical iff severity is high
+            # PredApp inside Biconditional with eq
+            Axiom(
+                label="is_critical_create_hit",
+                formula=forall([s, k, k2, t, b], Implication(
+                    PredApp("eq_id", (k, k2)),                      # Formula ✓
+                    Biconditional(
+                        lhs=PredApp("is_critical", (app("create_ticket", s, k, t, b), k2)),  # Formula ✓
+                        rhs=eq(app("classify", t, b), const("high")),  # Formula (Equation) ✓
+                    ),
+                )),
+            ),
+
+            # create_ticket miss: delegates
+            Axiom(
+                label="is_critical_create_miss",
+                formula=forall([s, k, k2, t, b], Implication(
+                    Negation(PredApp("eq_id", (k, k2))),            # Formula ✓
+                    Biconditional(
+                        lhs=PredApp("is_critical", (app("create_ticket", s, k, t, b), k2)),  # Formula ✓
+                        rhs=PredApp("is_critical", (s, k2)),         # Formula ✓
+                    ),
+                )),
+            ),
+
+            # Universal preservation — resolve doesn't change criticality.
             Axiom(
                 label="is_critical_resolve",
-                formula=forall([tk], Biconditional(
-                    lhs=PredApp("is_critical", (app("resolve", tk),)),
-                    rhs=PredApp("is_critical", (tk,)),
+                formula=forall([s, k, k2], Biconditional(
+                    lhs=PredApp("is_critical", (app("resolve_ticket", s, k), k2)),  # Formula ✓
+                    rhs=PredApp("is_critical", (s, k2)),            # Formula ✓
                 )),
             ),
-            # is_critical × assign: criticality preserved (assignment doesn't affect severity)
+
+            # Universal preservation — assign doesn't change criticality.
             Axiom(
                 label="is_critical_assign",
-                formula=forall([tk, u], Biconditional(
-                    lhs=PredApp("is_critical", (app("assign", tk, u),)),
-                    rhs=PredApp("is_critical", (tk,)),
+                formula=forall([s, k, k2, u], Biconditional(
+                    lhs=PredApp("is_critical", (app("assign_ticket", s, k, u), k2)),  # Formula ✓
+                    rhs=PredApp("is_critical", (s, k2)),            # Formula ✓
                 )),
             ),
         )
@@ -360,17 +617,20 @@ def render() -> str:
         ### Summary
 
         | Feature | Where it appears |
-        |---------|------------------|
-        | Atomic sorts | `TicketId`, `Title`, `Body`, `SeverityLevel`, `Status`, `UserId` |
-        | Product sort | `Ticket` with 5 named fields |
+        |---------|-----------------|
+        | Atomic sorts | `TicketId`, `Title`, `Body`, `SeverityLevel`, `Status`, `UserId`, `Store` |
         | Enumeration (constants) | `open`/`resolved` for Status, `high` for SeverityLevel |
-        | Total observer | `get_severity`, `get_status` — one axiom per constructor |
-        | **Partial observer** | `get_assignee` — undefined on `create`, defined on `assign`/`resolve` |
-        | Predicate observer | `is_critical` — uses `Biconditional` for equivalence |
-        | Uninterpreted function | `classify` — appears in axioms but is not defined by them |
-        | Preservation pattern | Severity, status, criticality, assignee preserved across irrelevant constructors |
-        | `Definedness` | Used in `get_assignee_resolve` to express definedness preservation |
-        | `Biconditional` | Used for predicate equivalence and definedness preservation |
-        | Strong equation on partial terms | `get_assignee_resolve_value` — holds when both sides defined and equal, or both undefined |
+        | Key equality predicate | `eq_id` — used in every hit/miss dispatch |
+        | Store pattern (FiniteMap) | `Store` indexed by `TicketId`, no explicit `Ticket` sort |
+        | **Hit/miss key dispatch** | `Implication(PredApp("eq_id", ...), ...)` vs `Implication(Negation(PredApp("eq_id", ...)), ...)` |
+        | **PredApp inside Implication** | Every hit/miss guard uses `PredApp("eq_id", ...)` as the antecedent |
+        | **Negation(PredApp) as formula** | `has_ticket_empty`, `is_critical_empty` |
+        | **Biconditional(PredApp, PredApp)** | `has_ticket_create_miss`, preservation axioms |
+        | **Biconditional(PredApp, Equation)** | `is_critical_create_hit` — critical iff severity = high |
+        | **Universal preservation** | `get_severity_resolve`, `get_severity_assign`, etc. — no key dispatch needed |
+        | Partial observer | `get_status`, `get_severity`, `get_assignee` — undefined when ticket doesn't exist |
+        | Doubly partial observer | `get_assignee` — undefined if no ticket OR no assignee |
+        | Uninterpreted function | `classify` — appears in axioms but not defined by them |
+        | Nested Implication | `get_status_resolve_hit` — `has_ticket` guard inside key dispatch |
         """
     )
