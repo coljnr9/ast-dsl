@@ -30,7 +30,7 @@ from alspec import (
     Spec,
 )
 from alspec.helpers import app, atomic, const, eq, fn, forall, pred, var
-from alspec.terms import Term
+from alspec.terms import Definedness, Term
 
 # =====================================================================
 # Bool
@@ -618,7 +618,11 @@ def finite_map_spec() -> Spec:
     )
 
     axioms = (
-        # lookup on empty: partial, undefined → no axiom needed (partiality)
+        # lookup on empty: explicitly undefined (¬Defined(lookup(empty, k)))
+        Axiom(
+            "lookup_empty_undef",
+            forall([k], Negation(Definedness(app("lookup", const("empty"), k)))),
+        ),
         # lookup on update: 2 cases (same key, different key)
         Axiom(
             "lookup_update_hit",

@@ -202,16 +202,22 @@ async def run_domain_eval(
                     checker_error = err
                 case Spec() as s:
                     success = True
-                    score = score_spec(s, strict=False)
+                    score = score_spec(s, strict=False, audit=True)
 
         # Set trace Output to a concise result summary — visible at the trace
         # list level in the Langfuse UI without clicking into the trace.
         if score is not None:
+            # Count dead-symbol warnings before building the output dict.
+            unconstrained_count = sum(
+                1 for d in score.diagnostics
+                if d.check in ("unconstrained_fn", "unconstrained_pred", "orphan_sort")
+            )
             langfuse.update_current_trace(
                 output={
                     "success": True,
                     "health": round(score.health, 3),
                     "well_formed": score.well_formed,
+                    "unconstrained_symbols": unconstrained_count,
                 }
             )
             langfuse.score_current_trace(
@@ -222,6 +228,11 @@ async def run_domain_eval(
             langfuse.score_current_trace(
                 name="well_formed",
                 value=1.0 if score.well_formed else 0.0,
+            )
+            langfuse.score_current_trace(
+                name="unconstrained_symbols",
+                value=unconstrained_count,
+                comment="dead symbols detected by audit_spec",
             )
         else:
             error_msg = parse_error or checker_error or "unknown failure"

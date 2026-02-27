@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .analysis import audit_spec
 from .check import Diagnostic, check_spec
 from .spec import Spec
 
@@ -20,12 +21,30 @@ class SpecScore:
     diagnostics: tuple[Diagnostic, ...]
 
 
-def score_spec(spec: Spec, *, strict: bool = True) -> SpecScore:
-    """Check a spec and produce a quality score."""
+def score_spec(spec: Spec, *, strict: bool = True, audit: bool = False) -> SpecScore:
+    """Check a spec and produce a quality score.
+
+    Parameters
+    ----------
+    strict:
+        If True, health = 0.0 when any checker error is present; otherwise
+        health degrades smoothly by 0.15 per error.
+    audit:
+        If True, run adequacy checks (audit_spec) and include their WARNING-
+        level diagnostics in the returned SpecScore.  Audit diagnostics are
+        counted in warning_count but NEVER affect well_formed or health —
+        they are informational only.
+    """
     result = check_spec(spec)
 
+    # Only checker errors affect well-formedness and health.
     error_count = len(result.errors)
-    warning_count = len(result.warnings)
+
+    audit_diagnostics = audit_spec(spec) if audit else ()
+    all_diagnostics = result.diagnostics + audit_diagnostics
+
+    # Checker warnings + audit warnings both count toward warning_count.
+    warning_count = len(result.warnings) + len(audit_diagnostics)
 
     if strict:
         health = 0.0 if error_count > 0 else 1.0
@@ -49,5 +68,5 @@ def score_spec(spec: Spec, *, strict: bool = True) -> SpecScore:
         function_count=function_count,
         predicate_count=predicate_count,
         axiom_count=axiom_count,
-        diagnostics=result.diagnostics,
+        diagnostics=all_diagnostics,
     )
