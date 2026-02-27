@@ -2,8 +2,15 @@ Write an algebraic specification for the following system:
 
 {{ domain.description }}
 
-Follow the methodology:
-{{ methodology_steps }}
+Follow the methodology from the reference. In your analysis, work through every
+step: identify sorts, classify functions, build the complete obligation table,
+and note any tricky cases or design decisions. Then implement the spec in code.
 
-Return a single Python function named `{{ fn_name }}` that returns a `Spec`.
-Ensure you respond ONLY with valid Python code that returns the `Spec` object as described in the reference, nothing else. Do not format with markdown blocks, just the code.
+{% if use_tool_call %}
+Call the submit_spec tool with your analysis and code.
+{% else %}
+Return your response as two sections:
+1. **Analysis** — your complete reasoning (sorts, classification, obligation table, tricky cases, completeness count).
+2. **Code** — a single Python code block containing the spec function.
+{% endif %}
+The function must be named `{{ fn_name }}` and return a `Spec`.
