@@ -535,13 +535,13 @@ def _check_orphan_sorts(spec: Spec) -> list[Diagnostic]:
 
 
 def audit_spec(spec: Spec) -> tuple[Diagnostic, ...]:
-    """Run adequacy checks on a spec. Returns WARNING-level diagnostics.
+    """Run adequacy checks on a spec. Returns diagnostics.
 
     These checks go beyond well-formedness (which the checker verifies)
     to detect structural patterns that indicate likely semantic deficiencies.
     Every check is formally grounded — no heuristics, no fuzzy matching.
 
-    Builds the AxiomIndex internally.  Phase 4 will add more checks here.
+    Builds the AxiomIndex internally.
     """
     index = AxiomIndex.from_spec(spec)
     diagnostics: list[Diagnostic] = []
@@ -549,4 +549,211 @@ def audit_spec(spec: Spec) -> tuple[Diagnostic, ...]:
     diagnostics.extend(_check_unconstrained_preds(spec, index))
     diagnostics.extend(_check_orphan_sorts(spec))
     diagnostics.extend(_check_unwitnessed_partials(spec, index))  # Phase 3
+    diagnostics.extend(_check_case_splits(spec, index))           # Phase 4
     return tuple(diagnostics)
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Case split completeness
+# ---------------------------------------------------------------------------
+
+
+def _extract_constructor(rec: AxiomRecord) -> str | None:
+    """Extract the constructor name from an axiom record's body.
+
+    For an equation body like ``obs(ctor(m, k, v), k2) = rhs``,
+    the constructor is the FnApp in the first argument of the outermost
+    observer FnApp on the equation's LHS.
+
+    For a PredApp, Negation(PredApp), or Biconditional with a PredApp,
+    looks at the PredApp's first argument for a constructor FnApp.
+
+    Returns None when the body structure doesn't match these patterns.
+    """
+    body = rec.body
+
+    if isinstance(body, Equation):
+        if isinstance(body.lhs, FnApp) and body.lhs.args:
+            first_arg = body.lhs.args[0]
+            if isinstance(first_arg, FnApp):
+                return first_arg.fn_name
+        return None
+
+    # Bare PredApp: pred(ctor(args...), ...)
+    if isinstance(body, PredApp):
+        if body.args:
+            first_arg = body.args[0]
+            if isinstance(first_arg, FnApp):
+                return first_arg.fn_name
+        return None
+
+    # Negation(PredApp): ¬pred(ctor(args...), ...)
+    if isinstance(body, Negation) and isinstance(body.formula, PredApp):
+        inner = body.formula
+        if inner.args:
+            first_arg = inner.args[0]
+            if isinstance(first_arg, FnApp):
+                return first_arg.fn_name
+        return None
+
+    # Biconditional with PredApp on LHS: pred(ctor(args...), ...) ⇔ ...
+    if isinstance(body, Biconditional):
+        pred_app: PredApp | None = None
+        if isinstance(body.lhs, PredApp):
+            pred_app = body.lhs
+        elif isinstance(body.rhs, PredApp):
+            pred_app = body.rhs
+        if pred_app is not None and pred_app.args:
+            first_arg = pred_app.args[0]
+            if isinstance(first_arg, FnApp):
+                return first_arg.fn_name
+        return None
+
+    return None
+
+
+def _guard_key(guard: Guard) -> tuple[str, tuple[str, ...]]:
+    """Build a syntactic key for a guard.
+
+    Uses ``(pred_name, tuple_of_arg_reprs)`` where each arg is either
+    the variable name (for Var) or its repr (for complex terms).
+    This is intentionally conservative: only syntactically identical
+    guards are considered the same predicate dispatch.
+    """
+    arg_parts: list[str] = []
+    for arg in guard.args:
+        if isinstance(arg, Var):
+            arg_parts.append(arg.name)
+        else:
+            arg_parts.append(repr(arg))
+    return (guard.pred_name, tuple(arg_parts))
+
+
+def _check_group(
+    obs_name: str,
+    con_name: str,
+    records: list[AxiomRecord],
+    diagnostics: list[Diagnostic],
+) -> None:
+    """Check a single (observer, constructor) group for case split completeness.
+
+    If any record has no guards, the group has a universal axiom covering
+    all inputs — no case split is needed.  If a group has BOTH guarded and
+    unguarded axioms, emits a ``case_split_mixed`` warning (possible
+    redundancy).
+
+    For purely guarded groups, each guard predicate (by syntactic key)
+    must appear in both positive and negative polarity.
+    """
+    unguarded = [r for r in records if not r.guards]
+    guarded = [r for r in records if r.guards]
+
+    if unguarded:
+        # Universal axiom covers all inputs — skip case split check.
+        # But warn if the group also has guarded axioms (redundancy).
+        if guarded:
+            diagnostics.append(
+                Diagnostic(
+                    check="case_split_mixed",
+                    severity=Severity.WARNING,
+                    axiom=None,
+                    message=(
+                        f"'{obs_name}' over '{con_name}': group has both "
+                        f"guarded and unguarded axioms (possible redundancy)"
+                    ),
+                    path=None,
+                )
+            )
+        return
+
+    # Build map: guard_key → set of polarities seen
+    guard_groups: dict[tuple[str, tuple[str, ...]], set[str]] = {}
+    for rec in guarded:
+        for guard in rec.guards:
+            gk = _guard_key(guard)
+            if gk not in guard_groups:
+                guard_groups[gk] = set()
+            guard_groups[gk].add(guard.polarity)
+
+    for (pred_name, _arg_key), polarities in guard_groups.items():
+        if polarities == {"+"}:
+            diagnostics.append(
+                Diagnostic(
+                    check="case_split_incomplete",
+                    severity=Severity.WARNING,
+                    axiom=None,
+                    message=(
+                        f"'{obs_name}' over '{con_name}': has '{pred_name}' "
+                        f"positive guard but missing negative (miss branch)"
+                    ),
+                    path=None,
+                )
+            )
+        elif polarities == {"-"}:
+            diagnostics.append(
+                Diagnostic(
+                    check="case_split_incomplete",
+                    severity=Severity.WARNING,
+                    axiom=None,
+                    message=(
+                        f"'{obs_name}' over '{con_name}': has '{pred_name}' "
+                        f"negative guard but missing positive (hit branch)"
+                    ),
+                    path=None,
+                )
+            )
+        # {"+", "-"} — complete, no diagnostic
+
+
+def _check_case_splits(spec: Spec, index: AxiomIndex) -> list[Diagnostic]:
+    """Detect incomplete predicate-based case splits.
+
+    For each (observer, constructor) group with predicate guards,
+    verifies both polarities are present. Uses syntactic matching
+    on guard predicate name and argument variable names.
+
+    Also reports coverage: how many axioms/pairs were checkable.
+    """
+    diagnostics: list[Diagnostic] = []
+
+    # Group by (observer_name, constructor_name).
+    # The observer is rec.constrained.name; the constructor is extracted
+    # from the body's LHS structure.
+    groups: dict[tuple[str, str], list[AxiomRecord]] = {}
+    for rec in index.records:
+        if rec.constrained is None:
+            continue
+        constructor = _extract_constructor(rec)
+        if constructor is None:
+            continue
+        key = (rec.constrained.name, constructor)
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(rec)
+
+    # Check each group
+    for (obs_name, con_name), records in groups.items():
+        _check_group(obs_name, con_name, records, diagnostics)
+
+    # Coverage report
+    total_axioms = len(spec.axioms)
+    decomposed = sum(1 for rec in index.records if rec.constrained is not None)
+    grouped = sum(len(recs) for recs in groups.values())
+    invisible = total_axioms - decomposed
+    checkable_pairs = len(groups)
+
+    diagnostics.append(
+        Diagnostic(
+            check="case_split_coverage",
+            severity=Severity.INFO,
+            axiom=None,
+            message=(
+                f"Case split check covered {grouped}/{total_axioms} axioms "
+                f"across {checkable_pairs} observer×constructor pairs; "
+                f"{invisible} axioms not decomposable"
+            ),
+            path=None,
+        )
+    )
+
+    return diagnostics

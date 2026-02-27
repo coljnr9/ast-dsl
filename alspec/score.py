@@ -40,11 +40,17 @@ def score_spec(spec: Spec, *, strict: bool = True, audit: bool = False) -> SpecS
     # Only checker errors affect well-formedness and health.
     error_count = len(result.errors)
 
+    from .check import Severity
+
     audit_diagnostics = audit_spec(spec) if audit else ()
     all_diagnostics = result.diagnostics + audit_diagnostics
 
-    # Checker warnings + audit warnings both count toward warning_count.
-    warning_count = len(result.warnings) + len(audit_diagnostics)
+    # Checker warnings + audit WARNINGs count toward warning_count.
+    # INFO-level diagnostics (e.g., coverage reports) are excluded.
+    audit_warnings = sum(
+        1 for d in audit_diagnostics if d.severity == Severity.WARNING
+    )
+    warning_count = len(result.warnings) + audit_warnings
 
     if strict:
         health = 0.0 if error_count > 0 else 1.0

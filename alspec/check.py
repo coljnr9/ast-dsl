@@ -30,6 +30,7 @@ from .terms import (
 class Severity(Enum):
     ERROR = "error"
     WARNING = "warning"
+    INFO = "info"
 
 
 @dataclass(frozen=True)

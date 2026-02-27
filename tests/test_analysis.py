@@ -1147,3 +1147,346 @@ class TestPartialRHSDoesNotWitness:
         names = {d.message.split("'")[1] for d in unwitnessed}
         assert "lookup" in names
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 4: Case split completeness — audit_spec.check == "case_split_*"
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestCompleteCaseSplitClean:
+    """Standard FiniteMap hit/miss pair should produce no case_split_incomplete."""
+
+    def test_complete_case_split_clean(self) -> None:
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+        from alspec.terms import Negation
+
+        sig = Signature(
+            sorts={
+                "K": atomic("K"),
+                "V": atomic("V"),
+                "M": atomic("M"),
+            },
+            functions={
+                "empty": fn("empty", [], "M"),
+                "put": fn("put", [("m", "M"), ("k", "K"), ("v", "V")], "M"),
+                "get": fn("get", [("m", "M"), ("k", "K")], "V", total=False),
+            },
+            predicates={"eq_id": pred("eq_id", [("k1", "K"), ("k2", "K")])},
+        )
+        k = var("k", "K")
+        k2 = var("k2", "K")
+        m = var("m", "M")
+        v = var("v", "V")
+        spec = Spec(
+            name="TestComplete",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_put_hit",
+                    forall(
+                        [m, k, k2, v],
+                        Implication(
+                            PredApp("eq_id", (k, k2)),
+                            eq(app("get", app("put", m, k, v), k2), v),
+                        ),
+                    ),
+                ),
+                Axiom(
+                    "get_put_miss",
+                    forall(
+                        [m, k, k2, v],
+                        Implication(
+                            Negation(PredApp("eq_id", (k, k2))),
+                            eq(
+                                app("get", app("put", m, k, v), k2),
+                                app("get", m, k2),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        incomplete = [d for d in diagnostics if d.check == "case_split_incomplete"]
+        assert incomplete == []
+
+
+class TestMissingMissBranch:
+    """Hit axiom without corresponding miss should be flagged."""
+
+    def test_missing_miss_branch(self) -> None:
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={
+                "K": atomic("K"),
+                "V": atomic("V"),
+                "M": atomic("M"),
+            },
+            functions={
+                "empty": fn("empty", [], "M"),
+                "put": fn("put", [("m", "M"), ("k", "K"), ("v", "V")], "M"),
+                "get": fn("get", [("m", "M"), ("k", "K")], "V", total=False),
+            },
+            predicates={"eq_id": pred("eq_id", [("k1", "K"), ("k2", "K")])},
+        )
+        k = var("k", "K")
+        k2 = var("k2", "K")
+        m = var("m", "M")
+        v = var("v", "V")
+        spec = Spec(
+            name="TestMissingMiss",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_put_hit",
+                    forall(
+                        [m, k, k2, v],
+                        Implication(
+                            PredApp("eq_id", (k, k2)),
+                            eq(app("get", app("put", m, k, v), k2), v),
+                        ),
+                    ),
+                ),
+                # No miss axiom!
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        incomplete = [d for d in diagnostics if d.check == "case_split_incomplete"]
+        assert len(incomplete) == 1
+        assert "missing negative" in incomplete[0].message
+
+
+class TestMissingHitBranch:
+    """Miss axiom without corresponding hit should be flagged."""
+
+    def test_missing_hit_branch(self) -> None:
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+        from alspec.terms import Negation
+
+        sig = Signature(
+            sorts={
+                "K": atomic("K"),
+                "V": atomic("V"),
+                "M": atomic("M"),
+            },
+            functions={
+                "empty": fn("empty", [], "M"),
+                "put": fn("put", [("m", "M"), ("k", "K"), ("v", "V")], "M"),
+                "get": fn("get", [("m", "M"), ("k", "K")], "V", total=False),
+            },
+            predicates={"eq_id": pred("eq_id", [("k1", "K"), ("k2", "K")])},
+        )
+        k = var("k", "K")
+        k2 = var("k2", "K")
+        m = var("m", "M")
+        v = var("v", "V")
+        spec = Spec(
+            name="TestMissingHit",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_put_miss",
+                    forall(
+                        [m, k, k2, v],
+                        Implication(
+                            Negation(PredApp("eq_id", (k, k2))),
+                            eq(
+                                app("get", app("put", m, k, v), k2),
+                                app("get", m, k2),
+                            ),
+                        ),
+                    ),
+                ),
+                # No hit axiom!
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        incomplete = [d for d in diagnostics if d.check == "case_split_incomplete"]
+        assert len(incomplete) == 1
+        assert "missing positive" in incomplete[0].message
+
+
+class TestUniversalAxiomSkipsCheck:
+    """Unguarded axiom means no case split needed — no incomplete warning."""
+
+    def test_universal_axiom_skips_check(self) -> None:
+        from alspec.helpers import atomic, fn
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={
+                "K": atomic("K"),
+                "V": atomic("V"),
+                "M": atomic("M"),
+            },
+            functions={
+                "empty": fn("empty", [], "M"),
+                "assign": fn("assign", [("m", "M"), ("k", "K"), ("v", "V")], "M"),
+                "get_severity": fn(
+                    "get_severity", [("m", "M"), ("k", "K")], "V"
+                ),
+            },
+            predicates={},
+        )
+        k2 = var("k2", "K")
+        m = var("m", "M")
+        k = var("k", "K")
+        v = var("v", "V")
+        spec = Spec(
+            name="TestUniversal",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_severity_assign",
+                    forall(
+                        [m, k, k2, v],
+                        eq(
+                            app("get_severity", app("assign", m, k, v), k2),
+                            app("get_severity", m, k2),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        incomplete = [d for d in diagnostics if d.check == "case_split_incomplete"]
+        assert incomplete == []
+
+
+class TestMixedGuardedUnguardedWarns:
+    """Group with both guarded and unguarded axioms should warn about redundancy."""
+
+    def test_mixed_guarded_unguarded_warns(self) -> None:
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={
+                "K": atomic("K"),
+                "V": atomic("V"),
+                "M": atomic("M"),
+            },
+            functions={
+                "empty": fn("empty", [], "M"),
+                "put": fn("put", [("m", "M"), ("k", "K"), ("v", "V")], "M"),
+                "get": fn("get", [("m", "M"), ("k", "K")], "V"),
+            },
+            predicates={"eq_id": pred("eq_id", [("k1", "K"), ("k2", "K")])},
+        )
+        k = var("k", "K")
+        k2 = var("k2", "K")
+        m = var("m", "M")
+        v = var("v", "V")
+        spec = Spec(
+            name="TestMixed",
+            signature=sig,
+            axioms=(
+                # Guarded hit
+                Axiom(
+                    "get_put_hit",
+                    forall(
+                        [m, k, k2, v],
+                        Implication(
+                            PredApp("eq_id", (k, k2)),
+                            eq(app("get", app("put", m, k, v), k2), v),
+                        ),
+                    ),
+                ),
+                # AND an unguarded universal
+                Axiom(
+                    "get_put_all",
+                    forall(
+                        [m, k, k2, v],
+                        eq(
+                            app("get", app("put", m, k, v), k2),
+                            app("get", m, k2),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        mixed = [d for d in diagnostics if d.check == "case_split_mixed"]
+        assert len(mixed) == 1
+        assert "guarded and unguarded" in mixed[0].message
+
+
+class TestCoverageReportEmitted:
+    """Every audit should produce exactly one case_split_coverage INFO diagnostic."""
+
+    def test_coverage_report_emitted(self) -> None:
+        from alspec.check import Severity
+        from alspec.helpers import atomic, fn
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={"S": atomic("S")},
+            functions={"c": fn("c", [], "S")},
+            predicates={},
+        )
+        spec = Spec(name="Minimal", signature=sig, axioms=())
+        diagnostics = audit_spec(spec)
+        coverage = [d for d in diagnostics if d.check == "case_split_coverage"]
+        assert len(coverage) == 1
+        assert coverage[0].severity == Severity.INFO
+
+    def test_coverage_counts_finite_map(self) -> None:
+        """FiniteMap spec should report some axioms covered."""
+        spec = finite_map_spec()
+        diagnostics = audit_spec(spec)
+        coverage = [d for d in diagnostics if d.check == "case_split_coverage"]
+        assert len(coverage) == 1
+        # Should mention at least 2 axioms covered (hit + miss)
+        msg = coverage[0].message
+        assert "observer×constructor pairs" in msg
+
+
+@pytest.mark.parametrize(
+    "spec_fn",
+    ALL_BASIS_SPECS,
+    ids=lambda f: f.__name__,
+)
+def test_basis_specs_no_incomplete_splits(spec_fn) -> None:  # type: ignore[no-untyped-def]
+    """Every basis spec should have complete case splits (no false positives)."""
+    spec = spec_fn()
+    diagnostics = audit_spec(spec)
+    incomplete = [d for d in diagnostics if d.check == "case_split_incomplete"]
+    assert incomplete == [], f"Unexpected incomplete splits in {spec.name}: {incomplete}"
+
+
+class TestCaseSplitInfoNotCountedAsWarning:
+    """INFO-level coverage diagnostics must not inflate the warning count."""
+
+    def test_info_not_in_warning_count(self) -> None:
+        from alspec.helpers import atomic, fn
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={"S": atomic("S")},
+            functions={"c": fn("c", [], "S")},
+            predicates={},
+        )
+        # Reference c in an axiom to avoid unconstrained_fn warning
+        spec = Spec(
+            name="Minimal",
+            signature=sig,
+            axioms=(Axiom("c_eq", eq(const("c"), const("c"))),),
+        )
+
+        from alspec.score import score_spec
+
+        score = score_spec(spec, audit=True)
+        # The only audit diagnostic should be the INFO coverage report,
+        # which should not be counted as a warning.
+        assert score.warning_count == 0
