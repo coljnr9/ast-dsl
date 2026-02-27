@@ -210,21 +210,42 @@ def _try_extract_guard(formula: Formula) -> Guard | None:
     return None
 
 
-def _extract_guards(formula: Formula) -> tuple[tuple[Guard, ...], Formula]:
-    """Peel off leading simple-guard Implications, returning (guards, body).
+def _peel_body(
+    formula: Formula,
+    depth: int = 0,
+) -> tuple[tuple[Guard, ...], Formula]:
+    """Recursively peel Implication layers, collecting PredApp guards.
 
-    Critical behaviour: when try_extract_guard returns None (complex
-    antecedent), the entire Implication becomes the body with no guards
-    extracted.  This correctly handles property axioms like antisymmetry.
+    For each Implication encountered:
+    - If antecedent is PredApp → extract as Positive guard, recurse into consequent
+    - If antecedent is Negation(PredApp) → extract as Negative guard, recurse into consequent
+    - If antecedent is anything else (Equation, Definedness, Conjunction, ...) →
+      DON'T extract a guard, but DO recurse into the consequent
+
+    The depth limit (10) is a safety net against pathologically deep formulas;
+    in practice algebraic specs are 2-4 levels deep.
+
+    Returns (collected_guards, terminal_body).
     """
-    if isinstance(formula, Implication):
-        guard = _try_extract_guard(formula.antecedent)
-        if guard is not None:
-            inner_guards, body = _extract_guards(formula.consequent)
-            return ((guard,) + inner_guards, body)
-        # Complex antecedent — don't decompose further; whole Implication is body.
+    if not isinstance(formula, Implication) or depth >= 10:
         return ((), formula)
-    return ((), formula)
+
+    guard = _try_extract_guard(formula.antecedent)
+    if guard is not None:
+        inner_guards, body = _peel_body(formula.consequent, depth + 1)
+        return ((guard,) + inner_guards, body)
+
+    # Non-PredApp antecedent (Equation, Conjunction, Definedness, ...)
+    # — skip the guard but recurse into the consequent so we can still
+    # reach the terminal body and extract the constrained symbol.
+    if isinstance(formula.antecedent, Conjunction):
+        # Conjunction antecedents (e.g. antisymmetry) are property axioms;
+        # treat the entire Implication as the terminal body so they stay
+        # constrained=None, preserving existing behaviour.
+        return ((), formula)
+
+    inner_guards, body = _peel_body(formula.consequent, depth + 1)
+    return (inner_guards, body)
 
 
 # ---------------------------------------------------------------------------
@@ -252,6 +273,12 @@ def _identify_constrained(
 
     if isinstance(body, Negation) and isinstance(body.formula, PredApp):
         return (ConstrainedSymbol(name=body.formula.pred_name, kind="predicate"), None)
+
+    if isinstance(body, Negation) and isinstance(body.formula, Definedness):
+        inner = body.formula
+        if isinstance(inner.term, FnApp):
+            return (ConstrainedSymbol(name=inner.term.fn_name, kind="function"), None)
+        return (None, None)
 
     if isinstance(body, Biconditional):
         if isinstance(body.lhs, PredApp):
@@ -335,7 +362,7 @@ def decompose_axiom(axiom: Axiom) -> AxiomRecord:
     axioms whose structure is unusual.
     """
     variables, stripped = _strip_quantifiers(axiom.formula)
-    guards, body = _extract_guards(stripped)
+    guards, body = _peel_body(stripped)
     constrained, equation_rhs = _identify_constrained(body)
 
     fns: set[str] = set()
@@ -609,6 +636,24 @@ def _extract_constructor(rec: AxiomRecord) -> str | None:
                 return first_arg.fn_name
         return None
 
+    # Negation(Definedness(FnApp(obs, ctor(...), ...))): ¬def(obs(ctor(args...), ...))
+    if isinstance(body, Negation) and isinstance(body.formula, Definedness):
+        inner_fn = body.formula.term
+        if isinstance(inner_fn, FnApp) and inner_fn.args:
+            first_arg = inner_fn.args[0]
+            if isinstance(first_arg, FnApp):
+                return first_arg.fn_name
+        return None
+
+    # Bare Definedness(FnApp(obs, ctor(...), ...)): def(obs(ctor(args...), ...))
+    if isinstance(body, Definedness):
+        inner_fn = body.term
+        if isinstance(inner_fn, FnApp) and inner_fn.args:
+            first_arg = inner_fn.args[0]
+            if isinstance(first_arg, FnApp):
+                return first_arg.fn_name
+        return None
+
     return None
 
 
@@ -633,18 +678,31 @@ def _check_group(
     obs_name: str,
     con_name: str,
     records: list[AxiomRecord],
+    spec: Spec,
     diagnostics: list[Diagnostic],
 ) -> None:
     """Check a single (observer, constructor) group for case split completeness.
+
+    If the constructor is declared partial (total=False), skip all
+    case_split_incomplete checks for this group.  When a partial constructor
+    is undefined, strict error propagation makes any observer over it also
+    undefined — no axiom is needed or useful for that case, so a one-sided
+    guard is correct by design.
 
     If any record has no guards, the group has a universal axiom covering
     all inputs — no case split is needed.  If a group has BOTH guarded and
     unguarded axioms, emits a ``case_split_mixed`` warning (possible
     redundancy).
 
-    For purely guarded groups, each guard predicate (by syntactic key)
-    must appear in both positive and negative polarity.
+    For purely guarded groups over total constructors, each guard predicate
+    (by syntactic key) must appear in both positive and negative polarity.
     """
+    # Partial constructor suppression: the undefined case is determined by
+    # strict error propagation, so one-sided guards are semantically correct.
+    con_fn = spec.signature.functions.get(con_name)
+    if con_fn is not None and con_fn.totality != Totality.TOTAL:
+        return
+
     unguarded = [r for r in records if not r.guards]
     guarded = [r for r in records if r.guards]
 
@@ -733,7 +791,7 @@ def _check_case_splits(spec: Spec, index: AxiomIndex) -> list[Diagnostic]:
 
     # Check each group
     for (obs_name, con_name), records in groups.items():
-        _check_group(obs_name, con_name, records, diagnostics)
+        _check_group(obs_name, con_name, records, spec, diagnostics)
 
     # Coverage report
     total_axioms = len(spec.axioms)

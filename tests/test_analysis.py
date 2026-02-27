@@ -29,6 +29,8 @@ from alspec.helpers import app, const, eq, forall, iff, var
 from alspec.spec import Axiom
 from alspec.terms import (
     Biconditional,
+    Conjunction,
+    Definedness,
     Equation,
     FnApp,
     Implication,
@@ -245,7 +247,9 @@ class TestFiniteMapSpec:
 
     def test_by_constrained_lookup(self) -> None:
         labels = {r.label for r in self.index.by_constrained["lookup"]}
-        assert labels == {"lookup_update_hit", "lookup_update_miss"}
+        # lookup_empty_undef is now correctly identified as constraining lookup
+        # (Negation(Definedness(FnApp("lookup",...)))) is a valid constraint.
+        assert labels == {"lookup_update_hit", "lookup_update_miss", "lookup_empty_undef"}
 
     def test_by_constrained_eq_key(self) -> None:
         labels = {r.label for r in self.index.by_constrained["eq_key"]}
@@ -1490,3 +1494,557 @@ class TestCaseSplitInfoNotCountedAsWarning:
         # The only audit diagnostic should be the INFO coverage report,
         # which should not be counted as a warning.
         assert score.warning_count == 0
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Recursive Implication Peeling — _peel_body
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestNestedEquationGuardPeels:
+    """Implication(PredApp, Implication(Equation, Equation)) should extract
+    the outer PredApp as a guard and the inner Equation as the constrained body."""
+
+    def test_nested_equation_guard_peels(self) -> None:
+        """Mimics get_status_borrow_hit_succ structure:
+        PredApp ⇒ (Equation ⇒ Equation)."""
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+        from alspec.terms import Definedness
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "K": atomic("K"), "V": atomic("V")},
+            functions={
+                "empty": fn("empty", [], "S"),
+                "update": fn("update", [("s", "S"), ("k", "K"), ("v", "V")], "S"),
+                "get": fn("get", [("s", "S"), ("k", "K")], "V"),
+                "status": fn("status", [("s", "S"), ("k", "K")], "V"),
+            },
+            predicates={"eq_id": pred("eq_id", [("k1", "K"), ("k2", "K")])},
+        )
+        s, k, k2, v = var("s", "S"), var("k", "K"), var("k2", "K"), var("v", "V")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_update_hit_succ",
+                    forall(
+                        [s, k, k2, v],
+                        Implication(
+                            PredApp("eq_id", (k, k2)),
+                            Implication(
+                                eq(app("status", s, k), const("active")),
+                                eq(app("get", app("update", s, k, v), k2), v),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        index = AxiomIndex.from_spec(spec)
+        rec = index.records[0]
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get"
+        assert len(rec.guards) == 1
+        assert rec.guards[0].pred_name == "eq_id"
+        assert rec.guards[0].polarity == "+"
+
+    def test_negation_equation_guard_peels(self) -> None:
+        """Implication(PredApp, Implication(Negation(Equation), Equation)):
+        outer PredApp guard, Negation(Equation) antecedent skipped, inner Eq is body."""
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "K": atomic("K"), "V": atomic("V")},
+            functions={
+                "empty": fn("empty", [], "S"),
+                "update": fn("update", [("s", "S"), ("k", "K"), ("v", "V")], "S"),
+                "get": fn("get", [("s", "S"), ("k", "K")], "V"),
+                "status": fn("status", [("s", "S"), ("k", "K")], "V"),
+            },
+            predicates={"eq_id": pred("eq_id", [("k1", "K"), ("k2", "K")])},
+        )
+        s, k, k2, v = var("s", "S"), var("k", "K"), var("k2", "K"), var("v", "V")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_update_hit_fail",
+                    forall(
+                        [s, k, k2, v],
+                        Implication(
+                            PredApp("eq_id", (k, k2)),
+                            Implication(
+                                Negation(eq(app("status", s, k), const("active"))),
+                                eq(app("get", app("update", s, k, v), k2), v),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        index = AxiomIndex.from_spec(spec)
+        rec = index.records[0]
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get"
+        assert len(rec.guards) == 1
+        assert rec.guards[0].pred_name == "eq_id"
+
+
+class TestNegationDefinednessConstrained:
+    """Negation(Definedness(FnApp(...))) should extract constrained function."""
+
+    def test_negation_definedness_constrained(self) -> None:
+        """PredApp ⇒ Negation(Definedness(FnApp(...))): outer guard + constrained fn."""
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+        from alspec.terms import Definedness
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "K": atomic("K"), "V": atomic("V")},
+            functions={
+                "empty": fn("empty", [], "S"),
+                "add": fn("add", [("s", "S"), ("k", "K")], "S"),
+                "get": fn("get", [("s", "S"), ("k", "K")], "V", total=False),
+            },
+            predicates={"eq_id": pred("eq_id", [("k1", "K"), ("k2", "K")])},
+        )
+        s, k, k2 = var("s", "S"), var("k", "K"), var("k2", "K")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_add_hit_undef",
+                    forall(
+                        [s, k, k2],
+                        Implication(
+                            PredApp("eq_id", (k, k2)),
+                            Negation(Definedness(app("get", app("add", s, k), k2))),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        index = AxiomIndex.from_spec(spec)
+        rec = index.records[0]
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get"
+        assert rec.constrained.kind == "function"
+        assert len(rec.guards) == 1
+        assert rec.guards[0].pred_name == "eq_id"
+
+    def test_bare_negation_definedness_constrained(self) -> None:
+        """Bare Negation(Definedness(FnApp(...))) with no guard."""
+        from alspec.helpers import atomic, fn
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+        from alspec.terms import Definedness
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "K": atomic("K"), "V": atomic("V")},
+            functions={
+                "empty": fn("empty", [], "S"),
+                "get": fn("get", [("s", "S"), ("k", "K")], "V", total=False),
+            },
+            predicates={},
+        )
+        k = var("k", "K")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_empty_undef",
+                    forall([k], Negation(Definedness(app("get", const("empty"), k)))),
+                ),
+            ),
+        )
+        index = AxiomIndex.from_spec(spec)
+        rec = index.records[0]
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get"
+        assert rec.constrained.kind == "function"
+        assert rec.guards == ()
+
+    def test_bare_definedness_constrained(self) -> None:
+        """Definedness(FnApp(...)) as body should extract constrained function."""
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+        from alspec.terms import Definedness
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "K": atomic("K"), "V": atomic("V")},
+            functions={
+                "empty": fn("empty", [], "S"),
+                "add": fn("add", [("s", "S"), ("k", "K")], "S"),
+                "get": fn("get", [("s", "S"), ("k", "K")], "V", total=False),
+            },
+            predicates={"eq_id": pred("eq_id", [("k1", "K"), ("k2", "K")])},
+        )
+        s, k, k2 = var("s", "S"), var("k", "K"), var("k2", "K")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_add_hit_def",
+                    forall(
+                        [s, k, k2],
+                        Implication(
+                            PredApp("eq_id", (k, k2)),
+                            Definedness(app("get", app("add", s, k), k2)),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        index = AxiomIndex.from_spec(spec)
+        rec = index.records[0]
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get"
+        assert len(rec.guards) == 1
+        assert rec.guards[0].pred_name == "eq_id"
+
+
+class TestTripleNestedImplication:
+    """Three levels of Implication: PredApp guard, then Equation guard,
+    then PredApp guard, then body. Should collect both PredApp guards."""
+
+    def test_triple_nested_collects_both_predapp_guards(self) -> None:
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "K": atomic("K"), "V": atomic("V")},
+            functions={
+                "empty": fn("empty", [], "S"),
+                "update": fn("update", [("s", "S"), ("k", "K"), ("v", "V")], "S"),
+                "get": fn("get", [("s", "S"), ("k", "K")], "V"),
+                "status": fn("status", [("s", "S"), ("k", "K")], "V"),
+            },
+            predicates={
+                "eq_id": pred("eq_id", [("k1", "K"), ("k2", "K")]),
+                "active": pred("active", [("s", "S"), ("k", "K")]),
+            },
+        )
+        s, k, k2, v = var("s", "S"), var("k", "K"), var("k2", "K"), var("v", "V")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "deep",
+                    forall(
+                        [s, k, k2, v],
+                        Implication(
+                            PredApp("eq_id", (k, k2)),
+                            Implication(
+                                eq(app("status", s, k), const("ok")),
+                                Implication(
+                                    PredApp("active", (s, k)),
+                                    eq(app("get", app("update", s, k, v), k2), v),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        index = AxiomIndex.from_spec(spec)
+        rec = index.records[0]
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get"
+        assert len(rec.guards) == 2
+        assert rec.guards[0].pred_name == "eq_id"
+        assert rec.guards[1].pred_name == "active"
+
+
+class TestConjunctionAntecedentStillOpaqueBody:
+    """Conjunction antecedent must still make the whole Implication the body
+    (preserving existing property-axiom behaviour)."""
+
+    def test_conjunction_antecedent_stays_constrained_none(self) -> None:
+        """antisymmetry-style: Conj(PredApp, PredApp) ⇒ Equation. No constrained."""
+        from alspec.helpers import atomic, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={"E": atomic("E")},
+            functions={},
+            predicates={"leq": pred("leq", [("x", "E"), ("y", "E")])},
+        )
+        x, y = var("x", "E"), var("y", "E")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "antisymmetry",
+                    forall(
+                        [x, y],
+                        Implication(
+                            Conjunction((
+                                PredApp("leq", (x, y)),
+                                PredApp("leq", (y, x)),
+                            )),
+                            eq(x, y),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        index = AxiomIndex.from_spec(spec)
+        rec = index.records[0]
+        assert rec.guards == ()
+        assert rec.constrained is None
+        assert isinstance(rec.body, Implication)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Library-lending golden spec integration tests
+# ──────────────────────────────────────────────────────────────────────────────
+
+import importlib.util
+import sys
+
+
+def _load_library_lending():  # type: ignore[no-untyped-def]
+    """Load library_lending_spec() from the golden directory."""
+    import pathlib
+    path = pathlib.Path(__file__).parent.parent / "golden" / "library-lending.py"
+    spec = importlib.util.spec_from_file_location("library_lending", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    return module.library_lending_spec
+
+
+class TestLibraryLendingDecomposition:
+    """After the recursive peeling fix, only eq_id_trans should have constrained=None."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self) -> None:
+        library_lending_spec = _load_library_lending()
+        self.spec = library_lending_spec()
+        self.index = AxiomIndex.from_spec(self.spec)
+
+    def test_only_eq_id_trans_is_none(self) -> None:
+        none_records = [rec for rec in self.index.records if rec.constrained is None]
+        none_labels = {rec.label for rec in none_records}
+        assert none_labels == {"eq_id_trans"}, (
+            f"Unexpected None records: {none_labels}"
+        )
+
+    def test_get_status_borrow_hit_succ_constrained(self) -> None:
+        rec = _record_by_label(self.index, "get_status_borrow_hit_succ")
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get_status"
+        assert len(rec.guards) == 1
+        assert rec.guards[0].pred_name == "eq_id"
+        assert rec.guards[0].polarity == "+"
+
+    def test_get_status_borrow_hit_fail_constrained(self) -> None:
+        rec = _record_by_label(self.index, "get_status_borrow_hit_fail")
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get_status"
+        assert len(rec.guards) == 1
+        assert rec.guards[0].pred_name == "eq_id"
+
+    def test_get_status_return_hit_succ_constrained(self) -> None:
+        rec = _record_by_label(self.index, "get_status_return_hit_succ")
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get_status"
+
+    def test_get_status_return_hit_fail_constrained(self) -> None:
+        rec = _record_by_label(self.index, "get_status_return_hit_fail")
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get_status"
+
+    def test_get_borrower_register_hit_negdef_constrained(self) -> None:
+        """get_borrower_register_hit uses Negation(Definedness(...)) as body."""
+        rec = _record_by_label(self.index, "get_borrower_register_hit")
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get_borrower"
+        assert rec.constrained.kind == "function"
+        assert len(rec.guards) == 1
+        assert rec.guards[0].pred_name == "eq_id"
+
+    def test_get_borrower_borrow_hit_succ_constrained(self) -> None:
+        rec = _record_by_label(self.index, "get_borrower_borrow_hit_succ")
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get_borrower"
+
+    def test_get_borrower_borrow_hit_fail_constrained(self) -> None:
+        rec = _record_by_label(self.index, "get_borrower_borrow_hit_fail")
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get_borrower"
+
+    def test_get_borrower_return_hit_succ_negdef_constrained(self) -> None:
+        """get_borrower_return_hit_succ: PredApp ⇒ (Equation ⇒ Negation(Definedness))."""
+        rec = _record_by_label(self.index, "get_borrower_return_hit_succ")
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get_borrower"
+        assert len(rec.guards) == 1
+        assert rec.guards[0].pred_name == "eq_id"
+
+    def test_get_borrower_return_hit_fail_constrained(self) -> None:
+        rec = _record_by_label(self.index, "get_borrower_return_hit_fail")
+        assert rec.constrained is not None
+        assert rec.constrained.name == "get_borrower"
+
+
+class TestLibraryLendingPhase4:
+    """After decomposer fix, library-lending should have 0 case_split_incomplete warnings."""
+
+    def test_no_incomplete_splits(self) -> None:
+        library_lending_spec = _load_library_lending()
+        spec = library_lending_spec()
+        diagnostics = audit_spec(spec)
+        incomplete = [d for d in diagnostics if d.check == "case_split_incomplete"]
+        assert incomplete == [], f"Unexpected: {incomplete}"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 4: Partial-constructor case split suppression
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _load_golden(filename: str):  # type: ignore[no-untyped-def]
+    """Load a spec factory function from the golden directory."""
+    import pathlib
+
+    path = pathlib.Path(__file__).parent.parent / "golden" / filename
+    spec = importlib.util.spec_from_file_location(filename.replace("-", "_").removesuffix(".py"), path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    return module
+
+
+class TestPartialConstructorSuppressesWarning:
+    """Observer over partial constructor with a one-sided guard should NOT warn."""
+
+    def test_partial_constructor_suppresses_case_split(self) -> None:
+        """Partial 'remove' constructor — only positive 'has' guard — no warning."""
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "K": atomic("K"), "V": atomic("V")},
+            functions={
+                "empty": fn("empty", [], "S"),
+                "remove": fn("remove", [("s", "S"), ("k", "K")], "S", total=False),
+                "get": fn("get", [("s", "S"), ("k", "K")], "V"),
+            },
+            predicates={
+                "eq_id": pred("eq_id", [("k1", "K"), ("k2", "K")]),
+                "has": pred("has", [("s", "S"), ("k", "K")]),
+            },
+        )
+        s, k, k2 = var("s", "S"), var("k", "K"), var("k2", "K")
+        spec = Spec(
+            name="TestPartial",
+            signature=sig,
+            axioms=(
+                # Only the "has" positive guard (defined case), no negative.
+                # This is correct: when ¬has, remove(s,k) is undefined, and
+                # get(⊥, k2) is undefined by strict error propagation.
+                Axiom(
+                    "get_remove_hit",
+                    forall(
+                        [s, k, k2],
+                        Implication(
+                            PredApp("eq_id", (k, k2)),
+                            Implication(
+                                PredApp("has", (s, k)),
+                                eq(app("get", app("remove", s, k), k2), app("get", s, k2)),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        incomplete = [d for d in diagnostics if d.check == "case_split_incomplete"]
+        assert incomplete == []
+
+
+class TestTotalConstructorStillWarns:
+    """Observer over a TOTAL constructor with a one-sided guard SHOULD warn."""
+
+    def test_total_constructor_still_warns(self) -> None:
+        """Total 'resolve' constructor — only positive 'has' guard — should warn."""
+        from alspec.helpers import atomic, fn, pred
+        from alspec.signature import Signature
+        from alspec.spec import Spec
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "K": atomic("K"), "V": atomic("V")},
+            functions={
+                "empty": fn("empty", [], "S"),
+                "resolve": fn("resolve", [("s", "S"), ("k", "K")], "S"),  # TOTAL
+                "get": fn("get", [("s", "S"), ("k", "K")], "V"),
+                "done": fn("done", [], "V"),
+            },
+            predicates={
+                "eq_id": pred("eq_id", [("k1", "K"), ("k2", "K")]),
+                "has": pred("has", [("s", "S"), ("k", "K")]),
+            },
+        )
+        s, k, k2 = var("s", "S"), var("k", "K"), var("k2", "K")
+        spec = Spec(
+            name="TestTotal",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_resolve_hit",
+                    forall(
+                        [s, k, k2],
+                        Implication(
+                            PredApp("eq_id", (k, k2)),
+                            Implication(
+                                PredApp("has", (s, k)),
+                                eq(app("get", app("resolve", s, k), k2), const("done")),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        diagnostics = audit_spec(spec)
+        incomplete = [d for d in diagnostics if d.check == "case_split_incomplete"]
+        # Should warn about the missing negative 'has' branch
+        assert len(incomplete) >= 1
+
+
+class TestGoldenBankAccountClean:
+    """bank-account golden spec should have 0 case_split_incomplete after suppression."""
+
+    def test_bank_account_clean(self) -> None:
+        module = _load_golden("bank-account.py")
+        spec = module.bank_account_spec()
+        diagnostics = audit_spec(spec)
+        incomplete = [d for d in diagnostics if d.check == "case_split_incomplete"]
+        assert incomplete == [], f"Unexpected incomplete splits in {spec.name}: {incomplete}"
+
+
+class TestGoldenBoundedCounterClean:
+    """bounded-counter golden spec should have 0 case_split_incomplete after suppression."""
+
+    def test_bounded_counter_clean(self) -> None:
+        module = _load_golden("bounded-counter.py")
+        spec = module.bounded_counter_spec()
+        diagnostics = audit_spec(spec)
+        incomplete = [d for d in diagnostics if d.check == "case_split_incomplete"]
+        assert incomplete == [], f"Unexpected incomplete splits in {spec.name}: {incomplete}"
