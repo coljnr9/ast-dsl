@@ -15,6 +15,28 @@ def render() -> str:
         identifier), product (struct with fields), or enumeration (finite set of
         constants).
 
+        **Reasoning through each sort:**
+
+        - `TicketId`, `Title`, `Body`, `UserId` — These are identifiers or text blobs
+          with no internal structure we need to reason about. → **atomic**
+
+        - `SeverityLevel` — This could be an enumeration (low/medium/high), but we're
+          going to let `classify` determine severity, so we only need `high` as a
+          named constant for the `is_critical` predicate. The other values exist but
+          we don't need to name them all. → **atomic**, with `high` as a constant
+
+        - `Status` — Finite set: open, resolved. These are the only two values.
+          In CASL, model this as an **atomic sort with nullary constructors** (not a
+          CoproductSort — Status has no carried data, it's just labels).
+
+        - `Ticket` — This is the central domain object. Tickets have observable
+          properties (id, title, body, severity, status). → **product sort**
+
+          *Note: Even though Ticket is a product sort, we don't use FieldAccess to
+          read its fields — we use observer functions (get_severity, get_status, etc.)
+          that we define axioms for. The ProductSort declaration documents the
+          structure; the axioms define the behavior.*
+
         | Sort | Kind | Rationale |
         |------|------|----------|
         | `TicketId` | atomic | Opaque identifier — no internal structure |
@@ -27,15 +49,53 @@ def render() -> str:
 
         ### Step 2: Classify Functions as Constructors or Observers
 
-        **Constructors** build values of a sort. **Observers** query them.
+        **Constructors** build values of a sort. **Observers** query or decompose them.
         Every observer owes axioms against every constructor of its primary sort.
+
+        **Reasoning through each function:**
+
+        - `create : TicketId × Title × Body → Ticket` — Builds a new Ticket from
+          parts. This is clearly a **constructor**. Total (you can always create a ticket).
+
+        - `resolve : Ticket → Ticket` — Takes a Ticket, returns a Ticket. This is a
+          **constructor** because it produces a new Ticket value (with different status).
+          Even though the result sort equals the input sort, it's *building* a new
+          value, not *extracting* information.
+
+        - `assign : Ticket × UserId → Ticket` — Same pattern as resolve: produces
+          a new Ticket with an assignee set. **Constructor**, total.
+
+        - `classify : Title × Body → SeverityLevel` — This is interesting. Nothing in
+          our spec defines what classify returns — no axiom has classify on the left
+          side of an equation. It appears only *inside* other axioms (e.g.,
+          `get_severity(create(id, t, b)) = classify(t, b)`). This makes it
+          **uninterpreted** — the spec constrains how it's used but not what it
+          computes. At implementation time, this could be an LLM call, a rules engine,
+          or a lookup table.
+
+        - `get_severity : Ticket → SeverityLevel` — Takes a Ticket, returns something
+          that isn't a Ticket. Classic **observer**. Total (every ticket has a severity).
+
+        - `get_status : Ticket → Status` — Same pattern. **Observer**, total.
+
+        - `get_assignee : Ticket →? UserId` — Observer, but **partial**. Why partial?
+          Because a freshly created ticket has no assignee — `get_assignee(create(...))`
+          is undefined. This is the key design decision: we don't want a "no user"
+          sentinel value; we want genuine undefinedness.
+
+        - `open`, `resolved` — Nullary constructors of Status (enumeration constants).
+
+        - `high` — Nullary constructor of SeverityLevel (needed for is_critical definition).
+
+        - `is_critical` — **Predicate observer** on Ticket. Holds iff the ticket's
+          severity is `high`. We'll use Biconditional to express this equivalence.
 
         | Function | Role | Profile | Notes |
         |----------|------|---------|------|
         | `create` | constructor | `TicketId × Title × Body → Ticket` | total |
         | `resolve` | constructor | `Ticket → Ticket` | total, transitions status |
         | `assign` | constructor | `Ticket × UserId → Ticket` | total, sets assignee |
-        | `classify` | uninterpreted | `Title × Body → SeverityLevel` | total, filled at code-gen time |
+        | `classify` | uninterpreted | `Title × Body → SeverityLevel` | total, not defined by any axiom |
         | `get_severity` | observer | `Ticket → SeverityLevel` | total |
         | `get_status` | observer | `Ticket → Status` | total |
         | `get_assignee` | observer | `Ticket →? UserId` | **partial** — undefined until assigned |
@@ -49,11 +109,42 @@ def render() -> str:
 
         ### Step 3: Build the Axiom Obligation Table
 
-        List every (observer, constructor) pair. For partial observers, mark
-        the constructor cases where the function is undefined — these rows
-        produce no axiom.
+        List every (observer, constructor) pair. For partial observers, identify which
+        constructor cases produce undefined results — these rows produce no axiom.
 
         Ticket constructors: `create`, `resolve`, `assign`
+
+        **Working through each observer systematically:**
+
+        **`get_severity` (total, 3 constructors → 3 axioms):**
+        - × `create`: Severity is determined at creation time by `classify(t, b)`.
+          This is a *defining* axiom — it connects the observer to the constructor's arguments.
+        - × `resolve`: Resolving a ticket doesn't change its severity. **Preservation**.
+        - × `assign`: Assigning a ticket doesn't change its severity. **Preservation**.
+
+        **`get_status` (total, 3 constructors → 3 axioms):**
+        - × `create`: New tickets start with status `open`.
+        - × `resolve`: Status becomes `resolved`. This is the *point* of the resolve constructor.
+        - × `assign`: Assigning doesn't change status. **Preservation**.
+
+        **`get_assignee` (PARTIAL, 3 constructors → 2 axioms + 1 omitted):**
+        - × `create`: **OMITTED** — `get_assignee` is undefined on new tickets.
+          No axiom needed; the `total=False` declaration handles undefinedness.
+        - × `resolve`: Tricky case! Resolving a ticket should preserve the assignee
+          *if one exists*, and leave it undefined if it didn't have one. This requires
+          TWO things: a `Definedness` biconditional (definedness is preserved) and a
+          value equation (when defined, the value is preserved). The value equation
+          uses strong equality — it holds when both sides are defined and equal, or
+          both undefined.
+        - × `assign`: Returns the newly assigned `UserId`. This is the defining axiom.
+
+        **`is_critical` (predicate, 3 constructors → 3 axioms):**
+        - × `create`: Critical iff `classify(t, b) = high`. Use `Biconditional` to
+          express this equivalence — `is_critical(create(...)) ⟺ classify(t,b) = high`.
+          Not `Implication`! We need both directions.
+        - × `resolve`: Criticality preserved. Use `Biconditional` with the same predicate
+          on the inner ticket.
+        - × `assign`: Criticality preserved. Same pattern as resolve.
 
         | Observer / Predicate | Constructor | Defined? | Axiom Label | Expected behavior |
         |---------------------|------------|----------|-------------|------------------|
@@ -63,17 +154,24 @@ def render() -> str:
         | `get_status` (total) | `create` | ✓ | `get_status_create` | `open` |
         | `get_status` (total) | `resolve` | ✓ | `get_status_resolve` | `resolved` |
         | `get_status` (total) | `assign` | ✓ | `get_status_assign` | preserved |
-        | `get_assignee` (**partial**) | `create` | **✗** | *(omitted)* | undefined — new tickets have no assignee |
-        | `get_assignee` (**partial**) | `resolve` | depends | `get_assignee_resolve` | preserved (resolving doesn't change assignee) |
-        | `get_assignee` (**partial**) | `assign` | ✓ | `get_assignee_assign` | returns the new `UserId` |
-        | `is_critical` (pred) | `create` | ✓ | `is_critical_create` | critical ⇔ `classify` returns `high` |
+        | `get_assignee` (**partial**) | `create` | **✗** | *(omitted)* | undefined — no assignee yet |
+        | `get_assignee` (**partial**) | `resolve` | depends | `get_assignee_resolve` | preserved (definedness + value) |
+        | `get_assignee` (**partial**) | `assign` | ✓ | `get_assignee_assign` | returns new `UserId` |
+        | `is_critical` (pred) | `create` | ✓ | `is_critical_create` | `⟺ classify = high` |
         | `is_critical` (pred) | `resolve` | ✓ | `is_critical_resolve` | preserved |
         | `is_critical` (pred) | `assign` | ✓ | `is_critical_assign` | preserved |
 
-        **Completeness check:** 3 total observers × 3 constructors = 9 axioms.
-        1 partial observer × 3 constructors = 3 - 1 (undefined on `create`) = 2 axioms.
-        1 predicate × 3 constructors = 3 axioms.
-        **Total: 14 axioms.**
+        **Completeness check:** 3 + 3 + 2 + 3 = 11 value-equation axioms,
+        plus 1 definedness biconditional for `get_assignee_resolve` = **12 axioms**.
+        Adding the resolve value axiom separately: **total 13 axioms**.
+
+        *Wait — let's recount carefully:*
+        - `get_severity`: 3 axioms (create, resolve, assign)
+        - `get_status`: 3 axioms (create, resolve, assign)
+        - `get_assignee`: 3 axioms (resolve_definedness, resolve_value, assign)
+          — create is **omitted**
+        - `is_critical`: 3 axioms (create, resolve, assign)
+        - **Total: 12 value/predicate axioms + 1 definedness biconditional = 13 axioms**
 
         ### Step 4: Write the Signature
 

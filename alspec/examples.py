@@ -104,34 +104,46 @@ def nat_spec() -> Spec:
 def stack_spec() -> Spec:
     """Classic Stack specification.
 
-    axioms:
-        ∀ S : Stack, e : Elem
-        • pop(push(S, e)) = S
-        • top(push(S, e)) = e
-        • empty(new)
-        • ¬ empty(push(S, e))
+    Axiom Obligation Table Mapping:
+    Observer/Pred | Constructor | Status    | Axiom Label
+    --------------|-------------|-----------|------------
+    pop           | new         | Undefined | (omitted)
+    pop           | push        | Defined   | pop_push
+    top           | new         | Undefined | (omitted)
+    top           | push        | Defined   | top_push
+    empty         | new         | Defined   | empty_new
+    empty         | push        | Defined   | empty_push
     """
-    s = var("S", "Stack")
+    # Sorts
+    elem_sort = atomic("Elem")
+    stack_sort = atomic("Stack")
+
+    # Variables
+    s = var("s", "Stack")
     e = var("e", "Elem")
 
+    # Signature
     sig = Signature(
         sorts={
-            "Stack": atomic("Stack"),
-            "Elem": atomic("Elem"),
+            "Elem": elem_sort,
+            "Stack": stack_sort,
         },
         functions={
+            # Constructors
             "new": fn("new", [], "Stack"),
-            "push": fn("push", [("S", "Stack"), ("e", "Elem")], "Stack"),
-            "pop": fn("pop", [("S", "Stack")], "Stack", total=False),
-            "top": fn("top", [("S", "Stack")], "Elem", total=False),
+            "push": fn("push", [("s", "Stack"), ("e", "Elem")], "Stack"),
+            # Partial Observers
+            "pop": fn("pop", [("s", "Stack")], "Stack", total=False),
+            "top": fn("top", [("s", "Stack")], "Elem", total=False),
         },
         predicates={
-            "empty": pred("empty", [("S", "Stack")]),
+            # Total Predicate Observer
+            "empty": pred("empty", [("s", "Stack")]),
         },
     )
 
     axioms = (
-        # pop(push(S, e)) = S
+        # pop × push
         Axiom(
             label="pop_push",
             formula=forall(
@@ -142,7 +154,7 @@ def stack_spec() -> Spec:
                 ),
             ),
         ),
-        # top(push(S, e)) = e
+        # top × push
         Axiom(
             label="top_push",
             formula=forall(
@@ -153,14 +165,14 @@ def stack_spec() -> Spec:
                 ),
             ),
         ),
-        # empty(new)
+        # empty × new
         Axiom(
             label="empty_new",
             formula=PredApp("empty", (const("new"),)),
         ),
-        # ¬ empty(push(S, e))
+        # empty × push
         Axiom(
-            label="not_empty_push",
+            label="empty_push",
             formula=forall(
                 [s, e],
                 Negation(
