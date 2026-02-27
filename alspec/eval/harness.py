@@ -2,6 +2,9 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from langfuse import Langfuse
+from langfuse.types import TraceContext
+
 from alspec.eval.domains import DomainPrompt
 from alspec.llm import AsyncLLMClient
 from alspec.prompt import render
@@ -114,15 +117,51 @@ async def run_domain_eval(
     """Run extraction and evaluation for a single domain and model."""
     messages = build_prompt(domain)
     fn_name = domain.id.replace("-", "_") + "_spec"
+    model_short = model.split("/")[-1]
+    trace_name = f"eval/{domain.id}/{model_short}"
 
-    start_time = time.time()
-    result = await client.generate_messages(messages, model=model)
+    # The langfuse.openai wrapper is wrapt-based: passing trace_id into
+    # completions.create() is the correct way to parent the generation under
+    # a specific trace. The wrapper strips it before forwarding to OpenAI.
+    langfuse = Langfuse()
+    trace_id = langfuse.create_trace_id()
 
-    # Retry logic once
+    # Create the trace record with name, metadata, and tags up front.
+    # start_observation creates a root span under the trace; update_trace then
+    # sets the trace-level fields. We end it immediately — it's just a setup hook
+    # so the trace record exists with the right metadata before the generation lands.
+    from langfuse._client.get_client import get_client as _get_lf_client  # noqa: PLC0415
+    _root = _get_lf_client().start_observation(
+        as_type="span",
+        name=trace_name,
+        trace_context=TraceContext(trace_id=trace_id),
+    )
+    _root.update_trace(
+        name=trace_name,
+        metadata={
+            "domain_id": domain.id,
+            "complexity": domain.complexity,
+            "model": model,
+        },
+        tags=[
+            f"tier:{domain.complexity}",
+            *sorted(domain.expected_features),
+        ],
+    )
+    _root.end()
+
     raw_response = ""
     parse_error = None
     success = False
     score = None
+    start_time = time.time()
+
+    result = await client.generate_messages(
+        messages,
+        model=model,
+        trace_id=trace_id,
+        generation_name=f"generate_spec/{domain.id}",
+    )
 
     match result:
         case Err(e):
@@ -137,10 +176,47 @@ async def run_domain_eval(
                     parse_error = err
                 case Spec() as s:
                     success = True
-                    # Even on failed runs, we want a score during eval
                     score = score_spec(s, strict=False)
 
     latency_ms = int((time.time() - start_time) * 1000)
+
+    # Log quality scores. We always log, even on parse failures, so every trace
+    # appears in score-based dashboard filters (missing scores = invisible rows).
+    if score is not None:
+        langfuse.create_score(
+            trace_id=trace_id,
+            name="spec_health",
+            value=score.health,
+            comment=f"errors={score.error_count} warnings={score.warning_count}",
+        )
+        langfuse.create_score(
+            trace_id=trace_id,
+            name="obligation_coverage",
+            value=score.obligation_ratio,
+            comment=f"{score.obligation_covered}/{score.obligation_total} pairs covered",
+        )
+        langfuse.create_score(
+            trace_id=trace_id,
+            name="well_formed",
+            value=1.0 if score.well_formed else 0.0,
+        )
+    else:
+        # Hard zeros keep failed traces visible in the dashboard.
+        langfuse.create_score(
+            trace_id=trace_id,
+            name="spec_health",
+            value=0.0,
+            comment=parse_error or "parse failed",
+        )
+        langfuse.create_score(
+            trace_id=trace_id,
+            name="obligation_coverage",
+            value=0.0,
+            comment="spec not parsed",
+        )
+        langfuse.create_score(trace_id=trace_id, name="well_formed", value=0.0)
+
+    langfuse.flush()
 
     return EvalResult(
         domain_id=domain.id,

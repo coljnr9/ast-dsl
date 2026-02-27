@@ -65,13 +65,33 @@ class AsyncLLMClient:
         self,
         messages: list[dict[str, str]],
         model: str = "meta-llama/llama-3.1-8b-instruct",
+        *,
+        trace_id: str | None = None,
+        generation_name: str = "generate_messages",
     ) -> Result[str, Exception]:
-        """Generates text from a list of messages using the specified model."""
+        """Generates text from a list of messages using the specified model.
+
+        The Langfuse OpenAI wrapper recognises ``trace_id`` as a special kwarg
+        (see ``OpenAiArgsExtractor``) and strips it before forwarding the request
+        to OpenAI. When provided, the resulting generation is parented under the
+        trace with that ID in Langfuse.
+
+        Args:
+            messages: List of chat message dicts with 'role' and 'content' keys.
+            model: Model identifier string.
+            trace_id: Langfuse trace ID to attach this generation to.
+            generation_name: Name shown for this generation in the Langfuse UI.
+        """
+        extra: dict[str, object] = {}
+        if trace_id is not None:
+            extra["trace_id"] = trace_id
+
         try:
             response = await self._client.chat.completions.create(  # type: ignore[call-overload]
-                name="generate_messages",
+                name=generation_name,
                 model=model,
                 messages=messages,
+                **extra,
             )
 
             match response.choices:
