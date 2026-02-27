@@ -1,6 +1,7 @@
 import os
 
 from dotenv import load_dotenv
+from langfuse import get_client, observe
 from langfuse.openai import AsyncOpenAI  # type: ignore[attr-defined]
 
 from alspec.result import Err, Ok, Result
@@ -8,6 +9,8 @@ from alspec.result import Err, Ok, Result
 # -----------------
 # Client
 # -----------------
+
+langfuse = get_client()
 
 
 class AsyncLLMClient:
@@ -33,13 +36,13 @@ class AsyncLLMClient:
                     ValueError("OPENROUTER_API_KEY not found or empty in environment.")
                 )
 
+    @observe(as_type="generation")
     async def generate_text(
         self, prompt: str, model: str = "meta-llama/llama-3.1-8b-instruct"
     ) -> Result[str, Exception]:
         """Generates text from the given prompt using the specified model."""
         try:
-            response = await self._client.chat.completions.create(  # type: ignore[call-overload]
-                name="generate_text",
+            response = await self._client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -61,37 +64,23 @@ class AsyncLLMClient:
         except Exception as e:
             return Err(e)
 
+    @observe(as_type="generation")
     async def generate_messages(
         self,
         messages: list[dict[str, str]],
         model: str = "meta-llama/llama-3.1-8b-instruct",
-        *,
-        trace_id: str | None = None,
-        generation_name: str = "generate_messages",
     ) -> Result[str, Exception]:
         """Generates text from a list of messages using the specified model.
 
-        The Langfuse OpenAI wrapper recognises ``trace_id`` as a special kwarg
-        (see ``OpenAiArgsExtractor``) and strips it before forwarding the request
-        to OpenAI. When provided, the resulting generation is parented under the
-        trace with that ID in Langfuse.
-
-        Args:
-            messages: List of chat message dicts with 'role' and 'content' keys.
-            model: Model identifier string.
-            trace_id: Langfuse trace ID to attach this generation to.
-            generation_name: Name shown for this generation in the Langfuse UI.
+        The ``@observe(as_type="generation")`` decorator creates a proper child
+        span in the Langfuse trace hierarchy. When called from inside an
+        ``@observe()``-decorated function, the generation is automatically nested
+        under the parent trace — no manual ``trace_id`` threading required.
         """
-        extra: dict[str, object] = {}
-        if trace_id is not None:
-            extra["trace_id"] = trace_id
-
         try:
-            response = await self._client.chat.completions.create(  # type: ignore[call-overload]
-                name=generation_name,
+            response = await self._client.chat.completions.create(
                 model=model,
-                messages=messages,
-                **extra,
+                messages=messages,  # type: ignore[arg-type]
             )
 
             match response.choices:
