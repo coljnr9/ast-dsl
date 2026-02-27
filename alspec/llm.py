@@ -6,12 +6,9 @@ from dotenv import load_dotenv
 # are visible when the Langfuse client initializes.
 load_dotenv()
 
-from langfuse import get_client, observe
 from langfuse.openai import AsyncOpenAI  # type: ignore[attr-defined]
 
 from alspec.result import Err, Ok, Result
-
-langfuse = get_client()
 
 
 class AsyncLLMClient:
@@ -37,7 +34,6 @@ class AsyncLLMClient:
                     ValueError("OPENROUTER_API_KEY not found or empty in environment.")
                 )
 
-    @observe(as_type="generation")
     async def generate_text(
         self, prompt: str, model: str = "meta-llama/llama-3.1-8b-instruct"
     ) -> Result[str, Exception]:
@@ -65,7 +61,6 @@ class AsyncLLMClient:
         except Exception as e:
             return Err(e)
 
-    @observe(as_type="generation")
     async def generate_messages(
         self,
         messages: list[dict[str, str]],
