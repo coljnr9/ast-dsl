@@ -41,3 +41,24 @@ sig = Signature(
 
 spec = Spec(name="MySpec", signature=sig, axioms=())
 ```
+
+## Development
+
+This project uses `uv` for dependency management and tooling. Here are common commands to use during development:
+
+```bash
+# Auto-format code
+uv run ruff format .
+
+# Check for linting errors
+uv run ruff check .
+
+# Fix auto-fixable linting errors
+uv run ruff check --fix .
+
+# Run static type checking
+uv run mypy .
+
+# Run the test suite
+uv run pytest
+```
