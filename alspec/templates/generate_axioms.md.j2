@@ -1,0 +1,30 @@
+Write the complete algebraic specification for the following system:
+
+{{ domain_description }}
+
+## Previously Generated Signature
+
+A previous stage produced the following signature. Use it exactly as given — do not modify sorts, functions, or predicates.
+
+```python
+{{ signature_code }}
+```
+
+## Obligation Table
+
+The following obligation table was derived deterministically from the signature.
+Every cell represents an axiom you must write. Cover every cell.
+
+{{ obligation_table_md }}
+
+## Instructions
+
+Write a complete Python function named `{{ fn_name }}` that returns a `Spec`.
+- Reuse the exact signature from above (copy it into your function)
+- Write axioms covering **every obligation cell** in the table above
+- Write any additional axioms noted in the table (equality basis, definedness biconditionals)
+- For miss cells: write delegation/preservation axioms
+- For hit cells: write the domain-specific equation or predicate assertion
+- Follow the loose semantics rules from the reference: use explicit `¬def(...)` for undefinedness
+
+Call the submit_spec tool with your analysis and code.

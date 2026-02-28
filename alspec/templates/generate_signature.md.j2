@@ -1,0 +1,20 @@
+Write the **signature only** (no axioms) for an algebraic specification of the following system:
+
+{{ domain_description }}
+
+Follow the methodology from the reference to analyze the domain:
+1. Identify all sorts (state sort, parameter sorts, result sorts)
+2. Classify functions: constructors, observers, constants, uninterpreted
+3. Mark partial functions
+4. Identify equality predicates for key dispatch
+5. Determine the generated sort(s) and their constructors
+
+Output Python code that defines:
+- All variables used in axioms (using `var(...)`)
+- A `sig = Signature(...)` with all sorts, functions, and predicates
+- A `generated_sorts = { ... }` dict mapping each generated sort name to a tuple of its constructor names
+
+Do NOT write any axioms. A later stage will handle axiom generation using an obligation table derived from your signature.
+
+Call the submit_signature tool with your analysis and signature code.
+The eventual spec function will be named `{{ fn_name }}`.

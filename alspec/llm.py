@@ -93,10 +93,47 @@ SUBMIT_SPEC_TOOL: dict[str, object] = {
     },
 }
 
-_TOOL_CHOICE: dict[str, object] = {
+SUBMIT_SIGNATURE_TOOL: dict[str, object] = {
     "type": "function",
-    "function": {"name": "submit_spec"},
+    "function": {
+        "name": "submit_signature",
+        "description": (
+            "Submit the signature for an algebraic specification. "
+            "A later stage will generate axioms from this signature. "
+            "The analysis should show your reasoning: sort identification, "
+            "function classification, and generated sort identification."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "analysis": {
+                    "type": "string",
+                    "description": (
+                        "Your complete analysis: identify sorts, classify "
+                        "functions, determine generated sorts and their "
+                        "constructors, note design decisions."
+                    ),
+                },
+                "code": {
+                    "type": "string",
+                    "description": (
+                        "Python code defining: variable declarations, "
+                        "a `sig = Signature(...)` object, and a "
+                        "`generated_sorts = {...}` dict mapping each "
+                        "generated sort to its constructor tuple."
+                    ),
+                },
+            },
+            "required": ["analysis", "code"],
+        },
+    },
 }
+
+_TOOL_REGISTRY: dict[str, dict[str, object]] = {
+    "submit_spec": SUBMIT_SPEC_TOOL,
+    "submit_signature": SUBMIT_SIGNATURE_TOOL,
+}
+
 
 
 class AsyncLLMClient:
@@ -132,6 +169,7 @@ class AsyncLLMClient:
         self,
         messages: list[dict[str, str]],
         model: str = "meta-llama/llama-3.1-8b-instruct",
+        tool_name: str = "submit_spec",
     ) -> Result[tuple[str, str, UsageInfo | None], Exception]:
         """Call the model with the submit_spec tool and return (analysis, code, usage).
 
@@ -147,11 +185,16 @@ class AsyncLLMClient:
         """
         try:
             messages = self._prepare_messages(messages)
+            tool_schema = _TOOL_REGISTRY[tool_name]
+            tool_choice: dict[str, object] = {
+                "type": "function",
+                "function": {"name": tool_name},
+            }
             response = await self._client.chat.completions.create(  # type: ignore[call-overload]
                 model=model,
                 messages=messages,
-                tools=[SUBMIT_SPEC_TOOL],
-                tool_choice=_TOOL_CHOICE,
+                tools=[tool_schema],
+                tool_choice=tool_choice,
             )
 
             match response.choices:

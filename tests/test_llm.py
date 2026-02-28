@@ -38,7 +38,7 @@ async def test_llm_client_success() -> None:
 
     match result:
         case Ok(content):
-            assert content == "Hello, world!"
+            assert content == ("Hello, world!", None)
         case Err(e):
             pytest.fail(f"Expected Ok, got Err: {e}")
 
