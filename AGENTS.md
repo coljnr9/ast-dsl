@@ -42,7 +42,17 @@ Code that constructs specs — whether in `basis.py`, `examples.py`, tests, or L
 
 ### Axiom methodology
 
-Every observer/derived operation owes one axiom per constructor of its primary argument sort. Partial functions skip the constructor case where they're undefined (e.g., `top` on `new` for Stack). This is the core pattern from CASL and it's what the basis library demonstrates. Any new example or basis spec should follow this structure.
+This project uses **loose semantics**. Under loose semantics, omitting an axiom does not make a function undefined — it leaves the function **unconstrained** (any value is valid in some model). This distinction governs the entire axiom methodology.
+
+Every observer/derived operation owes one axiom per constructor of its primary argument sort. **Every cell in the obligation table must be explicitly filled:**
+
+- **Defined cases**: write the equation (e.g., `top(push(s, e)) = e`)
+- **Undefined cases**: write an explicit undefinedness axiom (e.g., `¬def(top(new))`)
+- **Delegation cases**: write the pass-through (e.g., `get_title(remove(L, id2), id) = get_title(L, id)` when `id ≠ id2`)
+
+Do not skip constructor cases for partial functions. The `total=False` declaration permits undefinedness but does not cause it — only an explicit `¬def(...)` axiom forces undefinedness in all models. Omitting a case creates a semantic gap that admits unintended implementations.
+
+Any new example or basis spec should follow this structure. See `golden/` for 20 verified reference specs demonstrating complete obligation tables.
 
 ### Serialization round-trips
 
