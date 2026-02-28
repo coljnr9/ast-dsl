@@ -40,7 +40,7 @@ For our single total observer (`get_value`), we must consider each of the 4 cons
 """
 
 from alspec import (
-    Axiom, Signature, Spec,
+    Axiom, GeneratedSortInfo, Signature, Spec,
     atomic, fn, var, app, const, eq, forall
 )
 
@@ -69,7 +69,13 @@ def counter_spec() -> Spec:
             "succ": fn("succ", [("n", "Int")], "Int"),
             "pred": fn("pred", [("n", "Int")], "Int"),
         },
-        predicates={}
+        predicates={},
+        generated_sorts={
+            "Counter": GeneratedSortInfo(
+                constructors=("new", "inc", "dec", "reset"),
+                selectors={},
+            )
+        },
     )
     
     # Axioms defining observable behavior

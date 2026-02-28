@@ -62,6 +62,7 @@ r"""
 from alspec import (
     Axiom,
     Conjunction,
+    GeneratedSortInfo,
     Implication,
     Negation,
     PredApp,
@@ -109,6 +110,12 @@ def door_lock_spec() -> Spec:
         },
         predicates={
             "eq_code": pred("eq_code", [("c1", "Code"), ("c2", "Code")]),
+        },
+        generated_sorts={
+            "Lock": GeneratedSortInfo(
+                constructors=("new", "lock", "unlock", "open_door", "close_door"),
+                selectors={"new": {"get_code": "Code"}},
+            )
         },
     )
 
@@ -288,4 +295,3 @@ def door_lock_spec() -> Spec:
     )
 
     return Spec(name="DoorLock", signature=sig, axioms=axioms)
-

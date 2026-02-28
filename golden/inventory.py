@@ -48,7 +48,7 @@
 
 def inventory_spec():
     from alspec import (
-        Axiom, Conjunction, Implication, Negation, PredApp,
+        Axiom, Conjunction, GeneratedSortInfo, Implication, Negation, PredApp,
         Signature, Spec, atomic, fn, pred, var, app, const, eq, forall, iff, Definedness
     )
 
@@ -88,7 +88,13 @@ def inventory_spec():
         predicates={
             "eq_id": pred("eq_id", [("k1", "ItemId"), ("k2", "ItemId")]),
             "leq": pred("leq", [("n1", "Nat"), ("n2", "Nat")]),
-        }
+        },
+        generated_sorts={
+            "Inventory": GeneratedSortInfo(
+                constructors=("empty", "add_stock", "remove_stock"),
+                selectors={},
+            )
+        },
     )
 
     axioms = (

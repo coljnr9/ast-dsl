@@ -37,16 +37,29 @@ Because `record` replaces whatever history the sensor had, we only need basic ax
 """
 
 from alspec import (
-    Axiom, Negation, PredApp,
-    Signature, Spec,
-    atomic, fn, pred, var, app, const, eq, forall
+    Axiom,
+    Definedness,
+    GeneratedSortInfo,
+    Negation,
+    PredApp,
+    Signature,
+    Spec,
+    atomic,
+    fn,
+    pred,
+    var,
+    app,
+    const,
+    eq,
+    forall,
 )
+
 
 def temperature_sensor_spec() -> Spec:
     # Variables for axioms
     s = var("s", "Sensor")
     t = var("t", "Temp")
-    
+
     # Define the domain signature
     sig = Signature(
         sorts={
@@ -61,36 +74,37 @@ def temperature_sensor_spec() -> Spec:
         predicates={
             "has_reading": pred("has_reading", [("s", "Sensor")]),
         },
+        generated_sorts={
+            "Sensor": GeneratedSortInfo(
+                constructors=("init", "record"),
+                selectors={"record": {"read": "Temp"}},
+            )
+        },
     )
-    
+
     # Fulfill the obligation table
     axioms = (
         # has_reading x init -> false
         Axiom(
             label="has_reading_init",
-            formula=Negation(
-                PredApp("has_reading", (const("init"),))
-            ),
+            formula=Negation(PredApp("has_reading", (const("init"),))),
         ),
-        
         # has_reading x record -> true
         Axiom(
             label="has_reading_record",
-            formula=forall([s, t], 
-                PredApp("has_reading", (app("record", s, t),))
-            ),
+            formula=forall([s, t], PredApp("has_reading", (app("record", s, t),))),
         ),
-        
-        # read x init -> omitted (read is undefined on init)
-        
+        # read x init -> explicitly undefined (partial observer on base constructor)
+        Axiom(
+            label="read_init_undef",
+            formula=Negation(Definedness(app("read", const("init")))),
+        ),
         # read x record -> returns the newly recorded reading (discards old state)
         Axiom(
             label="read_record",
-            formula=forall([s, t], eq(
-                app("read", app("record", s, t)),
-                t
-            )),
+            formula=forall([s, t], eq(app("read", app("record", s, t)), t)),
         ),
     )
-    
+
     return Spec(name="TemperatureSensor", signature=sig, axioms=axioms)
+

@@ -44,7 +44,7 @@ Dispatch: Because `lookup` searches by `Name`, and both `add` and `remove` take 
 """
 
 from alspec import (
-    Axiom, Conjunction, Definedness, Implication, Negation, PredApp,
+    Axiom, Conjunction, Definedness, GeneratedSortInfo, Implication, Negation, PredApp,
     Signature, Spec, atomic, fn, pred, var, app, const, eq, forall
 )
 
@@ -73,7 +73,13 @@ def phone_book_spec() -> Spec:
         predicates={
             # Helper predicate for key dispatch
             "eq_name": pred("eq_name", [("n1", "Name"), ("n2", "Name")]),
-        }
+        },
+        generated_sorts={
+            "PhoneBook": GeneratedSortInfo(
+                constructors=("empty", "add", "remove"),
+                selectors={},
+            )
+        },
     )
 
     axioms = (

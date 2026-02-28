@@ -59,7 +59,7 @@ Expected: 3 (eq_id basis) + 4 (has_item) + 3 (remove_item) + 3 (compute_total) =
 """
 
 from alspec import (
-    Axiom, Conjunction, Implication, Negation, PredApp,
+    Axiom, Conjunction, Definedness, GeneratedSortInfo, Implication, Negation, PredApp,
     Signature, Spec,
     atomic, fn, pred, var, app, const, eq, forall, iff,
 )
@@ -100,7 +100,13 @@ def shopping_cart_spec() -> Spec:
         predicates={
             "eq_id": pred("eq_id", [("i1", "ItemId"), ("i2", "ItemId")]),
             "has_item": pred("has_item", [("c", "Cart"), ("i", "ItemId")]),
-        }
+        },
+        generated_sorts={
+            "Cart": GeneratedSortInfo(
+                constructors=("empty", "add_item", "apply_discount"),
+                selectors={},
+            )
+        },
     )
 
     axioms = (
@@ -160,7 +166,12 @@ def shopping_cart_spec() -> Spec:
         ),
 
         # ━━ remove_item (partial modifier) ━━
-        # remove_item(empty, j) is OMITTED. Fails perfectly due to strict evaluation.
+        # remove_item × empty: partial observer on base constructor — explicit undefinedness required.
+        # Under loose semantics, omitting this was a bug: it leaves the value unconstrained.
+        Axiom(
+            label="remove_item_empty_undef",
+            formula=forall([j], Negation(Definedness(app("remove_item", const("empty"), j))))
+        ),
         
         # Multiset matching semantic: removes a single instance corresponding to match
         Axiom(

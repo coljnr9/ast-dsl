@@ -72,19 +72,22 @@ differ) via `eq_id`.
   biconditionals, so collapse to one axiom covering all keys.
 - × `assign_ticket`: same — one universal axiom.
 
-**`get_status` — partial (6 axioms):**
+**`get_status` — partial (7 axioms):**
+- × `empty`: `¬def(get_status(empty, k))` — partial on empty store.
 - × `create_ticket`: hit (`open`), miss (delegates).
 - × `resolve_ticket`: hit+has_ticket (`resolved`), hit+¬has_ticket (delegates),
   miss (delegates). Both guard polarities required.
 - × `assign_ticket`: universal preservation (one axiom, no key dispatch).
 
-**`get_severity` — partial (4 axioms):**
+**`get_severity` — partial (5 axioms):**
+- × `empty`: `¬def(get_severity(empty, k))` — partial on empty store.
 - × `create_ticket`: hit (`classify(t, b)`), miss (delegates).
 - × `resolve_ticket`: universal preservation — resolve doesn't change severity for
   ANY ticket regardless of key. One axiom covers all keys.
 - × `assign_ticket`: same.
 
-**`get_assignee` — doubly partial (6 axioms):**
+**`get_assignee` — doubly partial (7 axioms):**
+- × `empty`: `¬def(get_assignee(empty, k))` — partial on empty store.
 - × `create_ticket` hit: **explicit undefinedness** via `Negation(Definedness(...))`.
   New tickets have no assignee. Under loose semantics, omitting this would NOT make
   `get_assignee` undefined — it would leave it unconstrained (any user is valid in
@@ -99,7 +102,7 @@ differ) via `eq_id`.
 - × `create_ticket`: hit (⟺ `classify(t, b) = high`), miss (delegates).
 - × `resolve_ticket`, `assign_ticket`: universal preservation.
 
-**Total: 29 axioms.**
+**Total: 32 axioms.**
 
 ## Key Patterns Demonstrated
 
@@ -118,7 +121,7 @@ differ) via `eq_id`.
 """
 
 from alspec import (
-    Axiom, Conjunction, Definedness, Implication, Negation, PredApp,
+    Axiom, Conjunction, Definedness, GeneratedSortInfo, Implication, Negation, PredApp,
     Signature, Spec,
     atomic, fn, pred, var, app, const, eq, forall, iff,
 )
@@ -162,7 +165,13 @@ def bug_tracker_spec() -> Spec:
             "eq_id": pred("eq_id", [("k1", "TicketId"), ("k2", "TicketId")]),
             "has_ticket": pred("has_ticket", [("s", "Store"), ("k", "TicketId")]),
             "is_critical": pred("is_critical", [("s", "Store"), ("k", "TicketId")]),
-        }
+        },
+        generated_sorts={
+            "Store": GeneratedSortInfo(
+                constructors=("empty", "create_ticket", "resolve_ticket", "assign_ticket"),
+                selectors={},
+            )
+        },
     )
 
     axioms = (
@@ -224,6 +233,20 @@ def bug_tracker_spec() -> Spec:
                 PredApp("has_ticket", (app("assign_ticket", s, k, u), k2)),
                 PredApp("has_ticket", (s, k2))
             ))
+        ),
+
+        # get_status × empty (partial observer on nullary constructor — plain ¬def, no key dispatch)
+        Axiom(
+            label="get_status_empty_undef",
+            formula=forall([k], Negation(Definedness(app("get_status", const("empty"), k))))
+        ),
+        Axiom(
+            label="get_severity_empty_undef",
+            formula=forall([k], Negation(Definedness(app("get_severity", const("empty"), k))))
+        ),
+        Axiom(
+            label="get_assignee_empty_undef",
+            formula=forall([k], Negation(Definedness(app("get_assignee", const("empty"), k))))
         ),
 
         # get_status

@@ -40,7 +40,7 @@ Expected Total Axioms: 7 (1 definedness boundary + 6 observer obligations).
 """
 
 from alspec import (
-    Axiom, Definedness, Implication, Negation, PredApp,
+    Axiom, Definedness, GeneratedSortInfo, Implication, Negation, PredApp,
     Signature, Spec, atomic, fn, pred, var, app, const, eq, forall, iff
 )
 
@@ -70,7 +70,13 @@ def bounded_counter_spec() -> Spec:
         },
         predicates={
             "is_at_max": pred("is_at_max", [("c", "Counter")]),
-        }
+        },
+        generated_sorts={
+            "Counter": GeneratedSortInfo(
+                constructors=("new", "inc"),
+                selectors={},
+            )
+        },
     )
     
     # Axioms definition

@@ -62,7 +62,7 @@ To model the library lending system, we need to carefully define the sorts:
 """
 
 from alspec import (
-    Axiom, Conjunction, Definedness, Implication, Negation, PredApp,
+    Axiom, Conjunction, Definedness, GeneratedSortInfo, Implication, Negation, PredApp,
     Signature, Spec, atomic, fn, pred, var, app, const, eq, forall, iff
 )
 
@@ -98,7 +98,13 @@ def library_lending_spec() -> Spec:
         predicates={
             "eq_id": pred("eq_id", [("b1", "BookId"), ("b2", "BookId")]),
             "has_book": pred("has_book", [("L", "Library"), ("b", "BookId")]),
-        }
+        },
+        generated_sorts={
+            "Library": GeneratedSortInfo(
+                constructors=("empty", "register", "borrow", "return_book"),
+                selectors={},
+            )
+        },
     )
 
     axioms = (
@@ -137,7 +143,11 @@ def library_lending_spec() -> Spec:
             PredApp("has_book", (L, b2))
         ))),
 
-        # ━━ get_status (8 axioms) ━━
+        # ━━ get_status (8 + 1 = 9 axioms) ━━
+        # empty: partial observer undefined on base constructor (explicit required)
+        Axiom("get_status_empty_undef", forall([b], Negation(Definedness(
+            app("get_status", const("empty"), b)
+        )))),
         Axiom("get_status_register_hit", forall([L, b, b2], Implication(
             PredApp("eq_id", (b, b2)),
             eq(app("get_status", app("register", L, b), b2), const("available"))
@@ -185,7 +195,11 @@ def library_lending_spec() -> Spec:
             eq(app("get_status", app("return_book", L, b), b2), app("get_status", L, b2))
         ))),
 
-        # ━━ get_borrower (8 axioms) ━━
+        # ━━ get_borrower (8 + 1 = 9 axioms) ━━
+        # empty: partial observer undefined on base constructor (explicit required)
+        Axiom("get_borrower_empty_undef", forall([b], Negation(Definedness(
+            app("get_borrower", const("empty"), b)
+        )))),
         # Newly registered books have no borrower — explicitly undefined
         Axiom("get_borrower_register_hit", forall([L, b, b2], Implication(
             PredApp("eq_id", (b, b2)),

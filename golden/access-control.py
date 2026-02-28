@@ -50,7 +50,7 @@
 """
 
 from alspec import (
-    Axiom, Conjunction, Disjunction, Implication, Negation, PredApp,
+    Axiom, Conjunction, Disjunction, GeneratedSortInfo, Implication, Negation, PredApp,
     Signature, Spec,
     atomic, fn, pred, var, app, const, eq, forall, iff
 )
@@ -96,7 +96,13 @@ def access_control_spec() -> Spec:
             "eq_res": pred("eq_res", [("r1", "ResourceId"), ("r2", "ResourceId")]),
             "has_permission": pred("has_permission", [("s", "System"), ("u", "UserId"), ("r", "ResourceId")]),
             "can_access": pred("can_access", [("s", "System"), ("u", "UserId"), ("r", "ResourceId")]),
-        }
+        },
+        generated_sorts={
+            "System": GeneratedSortInfo(
+                constructors=("init", "set_role", "grant", "revoke"),
+                selectors={},
+            )
+        },
     )
 
     # Axioms

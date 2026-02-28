@@ -37,7 +37,7 @@ Following the rule that every observer must be defined against every constructor
 """
 
 from alspec import (
-    Axiom, Signature, Spec,
+    Axiom, GeneratedSortInfo, Signature, Spec,
     atomic, fn, var, app, const, eq, forall
 )
 
@@ -66,7 +66,17 @@ def traffic_light_spec() -> Spec:
             # Light observer
             "color": fn("color", [("l", "Light")], "Color"),
         },
-        predicates={}
+        predicates={},
+        generated_sorts={
+            "Color": GeneratedSortInfo(
+                constructors=("red", "yellow", "green"),
+                selectors={},
+            ),
+            "Light": GeneratedSortInfo(
+                constructors=("init", "cycle"),
+                selectors={},
+            ),
+        },
     )
     
     axioms = (

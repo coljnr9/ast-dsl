@@ -65,7 +65,7 @@
 """
 
 from alspec import (
-    Axiom, Conjunction, Implication, Negation, PredApp,
+    Axiom, Conjunction, GeneratedSortInfo, Implication, Negation, PredApp,
     Signature, Spec,
     atomic, fn, pred, var, app, const, eq, forall, iff, Definedness
 )
@@ -103,7 +103,13 @@ def auction_spec() -> Spec:
             # Predicate Observers 
             "is_open": pred("is_open", [("a", "Auction")]),
             "is_registered": pred("is_registered", [("a", "Auction"), ("b", "Bidder")]),
-        }
+        },
+        generated_sorts={
+            "Auction": GeneratedSortInfo(
+                constructors=("new", "register", "submit", "close"),
+                selectors={},
+            )
+        },
     )
 
     axioms = (
@@ -160,6 +166,8 @@ def auction_spec() -> Spec:
         ))),
 
         # --- highest_bid (Partial Observer) ---
+        # highest_bid × new: partial observer on base constructor — explicit undefinedness required
+        Axiom("highest_bid_new_undef", Negation(Definedness(app("highest_bid", const("new"))))),
         Axiom("highest_bid_register", forall([a, b], eq(
             app("highest_bid", app("register", a, b)), 
             app("highest_bid", a)
@@ -182,6 +190,8 @@ def auction_spec() -> Spec:
         ))),
 
         # --- winner (Partial Observer) ---
+        # winner × new: partial observer on base constructor — explicit undefinedness required
+        Axiom("winner_new_undef", Negation(Definedness(app("winner", const("new"))))),
         Axiom("winner_register", forall([a, b], eq(
             app("winner", app("register", a, b)), 
             app("winner", a)

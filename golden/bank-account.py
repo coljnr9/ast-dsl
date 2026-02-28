@@ -35,7 +35,7 @@ Additionally, because `withdraw` is a partial constructor, we need a definedness
 """
 
 from alspec import (
-    Axiom, Implication, PredApp, Definedness,
+    Axiom, GeneratedSortInfo, Implication, PredApp, Definedness,
     Signature, Spec, atomic, fn, pred, var, app, const, eq, forall, iff
 )
 
@@ -64,6 +64,12 @@ def bank_account_spec() -> Spec:
         },
         predicates={
             "geq": pred("geq", [("m1", "Amount"), ("m2", "Amount")]),
+        },
+        generated_sorts={
+            "Account": GeneratedSortInfo(
+                constructors=("empty", "deposit", "withdraw"),
+                selectors={},
+            )
         },
     )
 

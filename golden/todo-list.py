@@ -64,7 +64,7 @@ We owe axioms for every (Observer × Constructor) pair. For constructors that ta
 """
 
 from alspec import (
-    Axiom, Conjunction, Definedness, Implication, Negation, PredApp,
+    Axiom, Conjunction, Definedness, GeneratedSortInfo, Implication, Negation, PredApp,
     Signature, Spec,
     atomic, fn, pred, var, app, const, eq, forall, iff,
 )
@@ -102,6 +102,12 @@ def todo_list_spec() -> Spec:
         predicates={
             "eq_id": pred("eq_id", [("k1", "ItemId"), ("k2", "ItemId")]),
             "has_item": pred("has_item", [("l", "TodoList"), ("k", "ItemId")]),
+        },
+        generated_sorts={
+            "TodoList": GeneratedSortInfo(
+                constructors=("empty", "add_item", "complete_item", "remove_item"),
+                selectors={},
+            )
         },
     )
 
@@ -179,7 +185,12 @@ def todo_list_spec() -> Spec:
             ))
         ),
 
-        # ━━ get_title (partial observer) (4) ━━
+        # ━━ get_title (partial observer) (4 + 1 = 5) ━━
+        # get_title × empty: partial observer on base constructor — explicit undefinedness required
+        Axiom(
+            label="get_title_empty_undef",
+            formula=forall([k], Negation(Definedness(app("get_title", const("empty"), k))))
+        ),
         Axiom(
             label="get_title_add_hit",
             formula=forall([l, k, k2, t], Implication(
@@ -224,7 +235,12 @@ def todo_list_spec() -> Spec:
             ))
         ),
 
-        # ━━ get_status (partial observer) (5) ━━
+        # ━━ get_status (partial observer) (5 + 1 = 6) ━━
+        # get_status × empty: partial observer on base constructor — explicit undefinedness required
+        Axiom(
+            label="get_status_empty_undef",
+            formula=forall([k], Negation(Definedness(app("get_status", const("empty"), k))))
+        ),
         Axiom(
             label="get_status_add_hit",
             formula=forall([l, k, k2, t], Implication(

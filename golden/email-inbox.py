@@ -38,7 +38,7 @@
 """
 
 from alspec import (
-    Axiom, Conjunction, Disjunction, Implication, Negation, PredApp,
+    Axiom, Conjunction, Disjunction, GeneratedSortInfo, Implication, Negation, PredApp,
     Signature, Spec,
     atomic, fn, pred, var, app, const, eq, forall, iff,
 )
@@ -79,7 +79,13 @@ def email_inbox_spec() -> Spec:
             "has_msg": pred("has_msg", [("i", "Inbox"), ("m", "MsgId")]),
             "is_read": pred("is_read", [("i", "Inbox"), ("m", "MsgId")]),
             "is_starred": pred("is_starred", [("i", "Inbox"), ("m", "MsgId")]),
-        }
+        },
+        generated_sorts={
+            "Inbox": GeneratedSortInfo(
+                constructors=("empty", "receive", "mark_read", "mark_unread", "delete", "star"),
+                selectors={},
+            )
+        },
     )
 
     axioms = (

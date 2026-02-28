@@ -66,7 +66,7 @@ Axioms must be split based on the combination of `v1` and `v2`.
 """
 
 from alspec import (
-    Axiom, Conjunction, Definedness, Disjunction, Implication, Negation, PredApp,
+    Axiom, Conjunction, Definedness, Disjunction, GeneratedSortInfo, Implication, Negation, PredApp,
     Signature, Spec, atomic, fn, pred, var, app, const, eq, forall, iff
 )
 
@@ -104,7 +104,13 @@ def version_history_spec() -> Spec:
         predicates={
             "eq_id": pred("eq_id", [("v1", "VersionId"), ("v2", "VersionId")]),
             "has_version": pred("has_version", [("r", "Repo"), ("v", "VersionId")]),
-        }
+        },
+        generated_sorts={
+            "Repo": GeneratedSortInfo(
+                constructors=("init", "commit", "revert"),
+                selectors={},
+            )
+        },
     )
 
     axioms = (

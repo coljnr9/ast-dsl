@@ -86,6 +86,7 @@ Implementation follows the obligation table row-by-row with universal quantifica
 
 from alspec import (
     Axiom,
+    GeneratedSortInfo,
     PredApp,
     Signature,
     Spec,
@@ -131,6 +132,15 @@ def thermostat_spec() -> Spec:
         predicates={
             "lt": pred("lt", [("x", "Temp"), ("y", "Temp")]),
             "heater_on": pred("heater_on", [("th", "Thermostat")]),
+        },
+        generated_sorts={
+            "Thermostat": GeneratedSortInfo(
+                constructors=("new", "set_target", "read_temp"),
+                selectors={
+                    "set_target": {"get_target": "Temp"},
+                    "read_temp": {"get_current": "Temp"},
+                },
+            )
         },
     )
 

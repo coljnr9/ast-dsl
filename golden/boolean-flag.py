@@ -34,7 +34,7 @@ For our single observer `is_enabled`, we generate obligations against every cons
 """
 
 from alspec import (
-    Axiom, Negation, PredApp,
+    Axiom, GeneratedSortInfo, Negation, PredApp,
     Signature, Spec, atomic, fn, pred, var, app, const, forall
 )
 
@@ -54,7 +54,13 @@ def boolean_flag_spec() -> Spec:
         predicates={
             # Observer
             "is_enabled": pred("is_enabled", [("f", "Flag")]),
-        }
+        },
+        generated_sorts={
+            "Flag": GeneratedSortInfo(
+                constructors=("init", "enable", "disable"),
+                selectors={},
+            )
+        },
     )
     
     axioms = (
