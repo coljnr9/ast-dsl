@@ -27,7 +27,7 @@ from .reference import (
 )
 from .result import Err, Ok, Result
 from .score import SpecScore, score_spec
-from .signature import Signature
+from .signature import GeneratedSortInfo, Signature
 from .spec import Spec
 
 
@@ -161,12 +161,31 @@ def _execute_signature_code(code: str) -> Signature | str:
     if not isinstance(gen_sorts, dict):
         return f"generated_sorts should be a dict, got {type(gen_sorts).__name__}"
 
+    # Normalize: accept both GeneratedSortInfo values and raw tuple/list values
+    # (legacy format: {"Stack": ("new", "push")} → wrap into GeneratedSortInfo)
+    normalized: dict[str, GeneratedSortInfo] = {}
+    for sort_name, value in gen_sorts.items():
+        match value:
+            case GeneratedSortInfo():
+                normalized[sort_name] = value
+            case tuple() | list():
+                # Legacy: just constructor names, no selectors
+                normalized[sort_name] = GeneratedSortInfo(
+                    constructors=tuple(value),
+                    selectors={},
+                )
+            case _:
+                return (
+                    f"generated_sorts['{sort_name}'] must be a GeneratedSortInfo "
+                    f"or tuple of constructor names, got {type(value).__name__}"
+                )
+
     # Patch generated_sorts onto the signature
     patched = Signature(
         sorts=sig.sorts,
         functions=sig.functions,
         predicates=sig.predicates,
-        generated_sorts=gen_sorts,
+        generated_sorts=normalized,
     )
 
     return patched

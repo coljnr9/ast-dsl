@@ -1,5 +1,15 @@
 """alspec: Building blocks for many-sorted algebraic specifications."""
 
+from .axiom_match import (
+    AxiomCellMatch,
+    CellCoverage,
+    CoverageStatus,
+    MatchKind,
+    MatchReport,
+    match_spec,
+    match_spec_sync,
+)
+
 from .helpers import (
     S,
     app,
@@ -19,6 +29,7 @@ from .serialization import dumps, loads
 from .signature import (
     FnParam,
     FnSymbol,
+    GeneratedSortInfo,
     PredSymbol,
     Signature,
     Totality,
@@ -54,6 +65,14 @@ from .terms import (
 )
 
 __all__ = [
+    # Axiom matching
+    "AxiomCellMatch",
+    "CellCoverage",
+    "CoverageStatus",
+    "MatchKind",
+    "MatchReport",
+    "match_spec",
+    "match_spec_sync",
     # Sorts
     "AtomicSort",
     "CoproductAlt",
@@ -66,6 +85,7 @@ __all__ = [
     # Signature
     "FnParam",
     "FnSymbol",
+    "GeneratedSortInfo",
     "PredSymbol",
     "Signature",
     "Totality",
