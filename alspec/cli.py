@@ -3,7 +3,6 @@ import asyncio
 import sys
 from collections.abc import Sequence
 
-from alspec.examples import main as run_examples
 from alspec.gen_reference import generate_reference
 from alspec.load import load_spec_from_file
 from alspec.llm import AsyncLLMClient
@@ -56,6 +55,9 @@ def handle_score(
     results: list[ScoreResult] = []
 
     for path in files:
+        if not path.endswith(".py"):
+            continue
+
         spec_or_err = load_spec_from_file(path)
         match spec_or_err:
             case str(err):
@@ -102,12 +104,6 @@ async def async_main() -> int:
         help="Generate and print the complete language reference (Markdown).",
     )
 
-    # Command: examples
-    subparsers.add_parser(
-        "examples",
-        help="Run textbook algebraic specification examples and print them as JSON.",
-    )
-
     # Command: score
     score_parser = subparsers.add_parser(
         "score",
@@ -152,9 +148,6 @@ async def async_main() -> int:
     match args.command:
         case "reference":
             print(generate_reference())
-            return 0
-        case "examples":
-            run_examples()
             return 0
         case "score":
             return handle_score(

@@ -7,6 +7,9 @@ expected decomposition from the task specification.
 
 from __future__ import annotations
 
+import importlib.util
+import pathlib
+
 import pytest
 
 from alspec.analysis import (
@@ -24,7 +27,6 @@ from alspec.basis import (
     partial_order_spec,
     stack_spec,
 )
-from alspec.examples import bug_tracker_spec
 from alspec.helpers import app, const, eq, forall, iff, var
 from alspec.spec import Axiom
 from alspec.terms import (
@@ -38,6 +40,27 @@ from alspec.terms import (
     PredApp,
     Var,
 )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Golden file loader (used at module level and in individual tests)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _load_golden(filename: str):  # type: ignore[no-untyped-def]
+    """Load a module from the golden/ directory and return it."""
+    path = pathlib.Path(__file__).parent.parent / "golden" / filename
+    spec = importlib.util.spec_from_file_location(
+        filename.replace("-", "_").removesuffix(".py"), path
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    return module
+
+
+_bt_mod = _load_golden("bug-tracker.py")
+bug_tracker_spec = _bt_mod.bug_tracker_spec
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2029,18 +2052,6 @@ class TestLibraryLendingPhase4:
 # ──────────────────────────────────────────────────────────────────────────────
 # Phase 4: Partial-constructor case split suppression
 # ──────────────────────────────────────────────────────────────────────────────
-
-
-def _load_golden(filename: str):  # type: ignore[no-untyped-def]
-    """Load a spec factory function from the golden directory."""
-    import pathlib
-
-    path = pathlib.Path(__file__).parent.parent / "golden" / filename
-    spec = importlib.util.spec_from_file_location(filename.replace("-", "_").removesuffix(".py"), path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)  # type: ignore[union-attr]
-    return module
 
 
 class TestPartialConstructorSuppressesWarning:
