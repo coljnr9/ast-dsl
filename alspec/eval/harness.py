@@ -1,6 +1,4 @@
-import time
 from dataclasses import dataclass
-from typing import Any
 
 from dotenv import load_dotenv
 
@@ -11,19 +9,9 @@ load_dotenv()
 from langfuse import get_client, observe, propagate_attributes
 
 from alspec.eval.domains import DomainPrompt
-from alspec.llm import AsyncLLMClient, UsageInfo
-from alspec.prompt import render
-from alspec.reference import (
-    api_reference,
-    basis_catalog,
-    formal_frame,
-    methodology,
-    type_grammar,
-    worked_example,
-)
-from alspec.result import Err, Ok
-from alspec.score import SpecScore, score_spec
-from alspec.spec import Spec
+from alspec.llm import AsyncLLMClient
+from alspec.pipeline import PipelineResult, run_pipeline
+from alspec.score import SpecScore
 
 langfuse = get_client()
 
@@ -53,72 +41,140 @@ class EvalRun:
     results: tuple[EvalResult, ...]
 
 
-def build_prompt(domain: DomainPrompt, use_tool_call: bool) -> list[dict[str, str]]:
-    """Build chat messages from templates. No hardcoded prompt content."""
-    system = render(
-        "system.md.j2",
-        formal_frame=formal_frame.render(),
-        type_grammar=type_grammar.render(),
-        api_reference=api_reference.render(),
-        basis_catalog=basis_catalog.render(),
-        methodology=methodology.render(),
-        worked_example=worked_example.render(),
+def _pipeline_to_eval(domain_id: str, model: str, pr: PipelineResult) -> EvalResult:
+    """Map a PipelineResult to an EvalResult, aggregating token usage across stages."""
+    prompt_tokens = 0
+    completion_tokens = 0
+    cached_tokens = 0
+    cache_write_tokens = 0
+    for su in pr.stage_usages:
+        if su.usage:
+            prompt_tokens += su.usage.prompt_tokens
+            completion_tokens += su.usage.completion_tokens
+            cached_tokens += su.usage.cached_tokens
+            cache_write_tokens += su.usage.cache_write_tokens
+
+    # Map error_stage to parse_error vs checker_error
+    parse_error: str | None = None
+    checker_error: str | None = None
+    if pr.error:
+        if pr.error_stage in ("stage1", "obligation"):
+            parse_error = pr.error
+        else:  # "stage2", "validation"
+            checker_error = pr.error
+
+    return EvalResult(
+        domain_id=domain_id,
+        model=model,
+        success=pr.success,
+        parse_error=parse_error,
+        checker_error=checker_error,
+        score=pr.score,
+        analysis=pr.spec_analysis,
+        code=pr.spec_code,
+        latency_ms=pr.total_latency_ms,
+        prompt_tokens=prompt_tokens or None,
+        completion_tokens=completion_tokens or None,
+        cached_tokens=cached_tokens or None,
+        cache_write_tokens=cache_write_tokens or None,
     )
-    user = render(
-        "generate_spec.md.j2",
-        domain=domain,
-        fn_name=domain.id.replace("-", "_") + "_spec",
-        use_tool_call=use_tool_call,
-    )
-    return [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user},
-    ]
 
 
-def extract_code(response: str) -> str | None:
-    """Extract Python code from a markdown block. Fallback for non-tool-call runs."""
-    if "```python" in response:
-        parts = response.split("```python")
-        match parts:
-            case [_, code_part, *_]:
-                return code_part.split("```")[0].strip()
-            case _:
-                return None
-    elif "```" in response:
-        parts = response.split("```")
-        match parts:
-            case [_, code_part, *_]:
-                return code_part.split("```")[0].strip()
-            case _:
-                return None
-    return response.strip()
+def _emit_langfuse_scores(eval_result: EvalResult) -> None:
+    """Emit Langfuse trace output and scores for a completed eval result."""
+    score = eval_result.score
 
+    if score is not None:
+        diag_dicts: list[dict[str, str | None]] = [
+            {
+                "check": d.check,
+                "severity": d.severity.value,
+                "axiom": d.axiom,
+                "message": d.message,
+                "path": d.path,
+            }
+            for d in score.diagnostics
+        ]
 
-def execute_spec_code(code: str, fn_name: str) -> Spec | str:
-    """Execute LLM-generated code and call the spec function."""
-    namespace: dict[str, Any] = {}
-    exec("from alspec import *", namespace)
-    exec("from alspec.helpers import *", namespace)
+        unconstrained_count = sum(
+            1
+            for d in score.diagnostics
+            if d.check in ("unconstrained_fn", "unconstrained_pred", "orphan_sort")
+        )
 
-    try:
-        exec(code, namespace)
-    except Exception as e:
-        return f"Code execution failed: {e}"
+        # Compute cache hit rate from eval_result fields for the trace output
+        cache_hit_rate: float | None = None
+        if eval_result.prompt_tokens and eval_result.prompt_tokens > 0:
+            cached = eval_result.cached_tokens or 0
+            cache_hit_rate = round(cached / eval_result.prompt_tokens, 3)
 
-    if fn_name not in namespace:
-        return f"Function '{fn_name}' not found in generated code"
+        langfuse.update_current_trace(
+            output={
+                "success": True,
+                "health": round(score.health, 3),
+                "well_formed": score.well_formed,
+                "unconstrained_symbols": unconstrained_count,
+                "error_count": score.error_count,
+                "warning_count": score.warning_count,
+                "diagnostics": diag_dicts,
+                "analysis": eval_result.analysis,
+                "code": eval_result.code,
+                "prompt_tokens": eval_result.prompt_tokens,
+                "completion_tokens": eval_result.completion_tokens,
+                "cached_tokens": eval_result.cached_tokens,
+                "cache_hit_rate": cache_hit_rate,
+            }
+        )
 
-    try:
-        spec = namespace[fn_name]()
-    except Exception as e:
-        return f"Spec function raised: {e}"
+        langfuse.score_current_trace(
+            name="spec_health",
+            value=score.health,
+            comment=f"errors={score.error_count} warnings={score.warning_count}",
+        )
+        langfuse.score_current_trace(
+            name="well_formed",
+            value=1.0 if score.well_formed else 0.0,
+        )
+        langfuse.score_current_trace(
+            name="unconstrained_symbols",
+            value=unconstrained_count,
+            comment="dead symbols detected by audit_spec",
+        )
 
-    match spec:
-        case Spec():
-            return spec
-        case _:
-            return f"Function returned {type(spec).__name__}, expected Spec"
+        if eval_result.prompt_tokens and eval_result.prompt_tokens > 0:
+            cached = eval_result.cached_tokens or 0
+            langfuse.score_current_trace(
+                name="cache_hit_rate",
+                value=cached / eval_result.prompt_tokens,
+                comment=f"cached={cached}/{eval_result.prompt_tokens}",
+            )
+    else:
+        error_msg = eval_result.parse_error or eval_result.checker_error or "unknown failure"
+
+        cache_hit_rate_failed: float | None = None
+        if eval_result.prompt_tokens and eval_result.prompt_tokens > 0:
+            cached = eval_result.cached_tokens or 0
+            cache_hit_rate_failed = round(cached / eval_result.prompt_tokens, 3)
+
+        langfuse.update_current_trace(
+            output={
+                "success": False,
+                "error": error_msg,
+                "parse_error": eval_result.parse_error,
+                "checker_error": eval_result.checker_error,
+                "analysis": eval_result.analysis,
+                "code": eval_result.code,
+                "prompt_tokens": eval_result.prompt_tokens,
+                "completion_tokens": eval_result.completion_tokens,
+                "cached_tokens": eval_result.cached_tokens,
+                "cache_hit_rate": cache_hit_rate_failed,
+            }
+        )
+        # Log hard zeros so failed traces are visible in score-based filters.
+        langfuse.score_current_trace(
+            name="spec_health", value=0.0, comment=error_msg
+        )
+        langfuse.score_current_trace(name="well_formed", value=0.0)
 
 
 @observe(capture_input=False, capture_output=False)
@@ -128,9 +184,8 @@ async def run_domain_eval(
     model: str,
     *,
     session_id: str | None = None,
-    use_tool_call: bool = True,
 ) -> EvalResult:
-    """Run extraction and evaluation for a single domain and model.
+    """Run the two-stage pipeline for a single domain and model.
 
     Langfuse trace structure:
       Trace: eval/{domain.id}/{model_short}
@@ -143,19 +198,8 @@ async def run_domain_eval(
     Pass a shared ``session_id`` (e.g. ``f"eval-{timestamp}"`` generated once
     per batch) to group all runs in a single eval session in Langfuse.
     """
-    messages = build_prompt(domain, use_tool_call=use_tool_call)
-    fn_name = domain.id.replace("-", "_") + "_spec"
     model_short = model.split("/")[-1]
     trace_name = f"eval/{domain.id}/{model_short}"
-
-    parse_error: str | None = None
-    checker_error: str | None = None
-    analysis: str | None = None
-    extracted_code: str | None = None
-    success = False
-    score = None
-    usage_info: UsageInfo | None = None
-    start_time = time.time()
 
     with propagate_attributes(
         trace_name=trace_name,
@@ -164,159 +208,22 @@ async def run_domain_eval(
             "domain_id": domain.id,
             "complexity": str(domain.complexity),
             "model": model,
-            "use_tool_call": str(use_tool_call),
+            "pipeline": "two-stage",
         },
-        tags=[
-            f"tier:{domain.complexity}",
-            *sorted(domain.expected_features),
-        ],
+        tags=[f"tier:{domain.complexity}", *sorted(domain.expected_features)],
     ):
-        # Set trace Input to the human-readable domain description so the
-        # Langfuse UI shows what task this eval run was solving.
         langfuse.update_current_trace(input=domain.description)
 
-        if use_tool_call:
-            result = await client.generate_with_tool_call(messages, model=model)
+        result = await run_pipeline(
+            client=client,
+            domain_id=domain.id,
+            domain_description=domain.description,
+            model=model,
+        )
 
-            match result:
-                case Err(e):
-                    parse_error = str(e)
-                case Ok((a, c, usage)):
-                    analysis = a
-                    extracted_code = c
-                    usage_info = usage
-        else:
-            text_result = await client.generate_messages(messages, model=model)
+        eval_result = _pipeline_to_eval(domain.id, model, result)
 
-            match text_result:
-                case Err(e):
-                    parse_error = f"API Error: {e}"
-                case Ok((content, usage)):
-                    usage_info = usage
-                    extracted_code = extract_code(content)
-                    match extracted_code:
-                        case None:
-                            parse_error = "Could not extract code from response"
-                        case _:
-                            pass
-
-        if extracted_code is not None and parse_error is None:
-            spec_or_err = execute_spec_code(extracted_code, fn_name)
-
-            match spec_or_err:
-                case str(err):
-                    checker_error = err
-                case Spec() as s:
-                    success = True
-                    score = score_spec(s, strict=False, audit=True)
-
-        # ----- Langfuse: full eval output -----
-        # Build a diagnostics list serialisable to JSON for the trace output.
-        diag_dicts: list[dict[str, str | None]] = []
-        if score is not None:
-            diag_dicts = [
-                {
-                    "check": d.check,
-                    "severity": d.severity.value,
-                    "axiom": d.axiom,
-                    "message": d.message,
-                    "path": d.path,
-                }
-                for d in score.diagnostics
-            ]
-
-        if score is not None:
-            unconstrained_count = sum(
-                1
-                for d in score.diagnostics
-                if d.check in ("unconstrained_fn", "unconstrained_pred", "orphan_sort")
-            )
-            langfuse.update_current_trace(
-                output={
-                    "success": True,
-                    "health": round(score.health, 3),
-                    "well_formed": score.well_formed,
-                    "unconstrained_symbols": unconstrained_count,
-                    "error_count": score.error_count,
-                    "warning_count": score.warning_count,
-                    "diagnostics": diag_dicts,
-                    "analysis": analysis,
-                    "code": extracted_code,
-                    "prompt_tokens": usage_info.prompt_tokens if usage_info else None,
-                    "completion_tokens": (
-                        usage_info.completion_tokens if usage_info else None
-                    ),
-                    "cached_tokens": usage_info.cached_tokens if usage_info else None,
-                    "cache_hit_rate": (
-                        round(usage_info.cache_hit_rate, 3) if usage_info else None
-                    ),
-                }
-            )
-
-            # Aggregate scores for dashboard filtering.
-            langfuse.score_current_trace(
-                name="spec_health",
-                value=score.health,
-                comment=f"errors={score.error_count} warnings={score.warning_count}",
-            )
-            langfuse.score_current_trace(
-                name="well_formed",
-                value=1.0 if score.well_formed else 0.0,
-            )
-            langfuse.score_current_trace(
-                name="unconstrained_symbols",
-                value=unconstrained_count,
-                comment="dead symbols detected by audit_spec",
-            )
-
-            if usage_info is not None and usage_info.prompt_tokens > 0:
-                langfuse.score_current_trace(
-                    name="cache_hit_rate",
-                    value=usage_info.cache_hit_rate,
-                    comment=f"cached={usage_info.cached_tokens}/{usage_info.prompt_tokens}",
-                )
-        else:
-            error_msg = parse_error or checker_error or "unknown failure"
-            langfuse.update_current_trace(
-                output={
-                    "success": False,
-                    "error": error_msg,
-                    "parse_error": parse_error,
-                    "checker_error": checker_error,
-                    "analysis": analysis,
-                    "code": extracted_code,
-                    "prompt_tokens": usage_info.prompt_tokens if usage_info else None,
-                    "completion_tokens": (
-                        usage_info.completion_tokens if usage_info else None
-                    ),
-                    "cached_tokens": usage_info.cached_tokens if usage_info else None,
-                    "cache_hit_rate": (
-                        round(usage_info.cache_hit_rate, 3) if usage_info else None
-                    ),
-                }
-            )
-            # Log hard zeros so failed traces are visible in score-based filters.
-            langfuse.score_current_trace(
-                name="spec_health", value=0.0, comment=error_msg
-            )
-            langfuse.score_current_trace(name="well_formed", value=0.0)
+        _emit_langfuse_scores(eval_result)
 
     langfuse.flush()
-
-    latency_ms = int((time.time() - start_time) * 1000)
-
-    return EvalResult(
-        domain_id=domain.id,
-        model=model,
-        success=success,
-        parse_error=parse_error,
-        checker_error=checker_error,
-        score=score,
-        analysis=analysis,
-        code=extracted_code,
-        latency_ms=latency_ms,
-        prompt_tokens=usage_info.prompt_tokens if usage_info else None,
-        completion_tokens=usage_info.completion_tokens if usage_info else None,
-        cached_tokens=usage_info.cached_tokens if usage_info else None,
-        cache_write_tokens=usage_info.cache_write_tokens if usage_info else None,
-    )
+    return eval_result

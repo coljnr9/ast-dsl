@@ -1,7 +1,10 @@
 import argparse
 import asyncio
+import hashlib
 import sys
 from collections.abc import Sequence
+from datetime import datetime
+from pathlib import Path
 
 from alspec.gen_reference import generate_reference
 from alspec.load import load_spec_from_file
@@ -91,6 +94,125 @@ def handle_score(
     return 1 if any_failure else 0
 
 
+def save_specs(results: list, directory: str) -> None:
+    """Write each result's generated code to <directory>/<domain_id>.py."""
+    out_dir = Path(directory)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    saved = 0
+    for result in results:
+        if result.code is None:
+            continue
+        parts: list[str] = []
+        if result.analysis:
+            parts.append(f'"""\n{result.analysis}\n"""\n')
+        parts.append(result.code)
+        path = out_dir / f"{result.domain_id}.py"
+        path.write_text("\n".join(parts))
+        saved += 1
+    print(f"Saved {saved} spec(s) to {out_dir}/")
+
+
+async def handle_eval(
+    domain_ids: list[str] | None,
+    models: list[str],
+    tier: int | None,
+    csv_out: str | None,
+    verbose: bool,
+    save_specs_dir: str | None,
+) -> int:
+    from alspec.eval.domains import DOMAINS
+    from alspec.eval.harness import EvalResult, EvalRun, run_domain_eval
+    from alspec.eval.report import (
+        export_csv,
+        print_detailed_diagnostics,
+        print_feature_coverage,
+        print_multi_model_comparison,
+        print_summary_table,
+    )
+
+    client_res = AsyncLLMClient.from_env()
+    match client_res:
+        case Err(e):
+            print(f"Failed to initialize LLM client: {e}")
+            return 1
+        case Ok(client):
+            pass
+
+    domains = list(DOMAINS)
+    if domain_ids:
+        domains = [d for d in domains if d.id in domain_ids]
+    if tier is not None:
+        domains = [d for d in domains if d.complexity == tier]
+
+    if not domains:
+        print("No domains matched the criteria.")
+        return 1
+
+    ref_text = generate_reference()
+    prompt_version = f"v3 (sha256: {hashlib.sha256(ref_text.encode()).hexdigest()[:8]})"
+
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    session_id = f"eval-{timestamp}"
+    print(f"Langfuse Session ID: {session_id}\n", flush=True)
+
+    results: list[EvalResult] = []
+
+    for model in models:
+        for domain in domains:
+            print(f"Evaluating {domain.id} on {model}...", flush=True)
+            res = await run_domain_eval(
+                client, domain, model,
+                session_id=session_id,
+            )
+            results.append(res)
+
+    run = EvalRun(
+        timestamp=timestamp,
+        models=tuple(models),
+        prompt_version=prompt_version,
+        results=tuple(results),
+    )
+
+    for model in models:
+        print_summary_table(run, model, sys.stdout)
+
+    if len(models) > 1:
+        print_multi_model_comparison(run, sys.stdout)
+
+    print_feature_coverage(run, sys.stdout)
+
+    # Cache metrics summary
+    total_prompt = sum(r.prompt_tokens or 0 for r in results)
+    total_cached = sum(r.cached_tokens or 0 for r in results)
+    total_cache_write = sum(r.cache_write_tokens or 0 for r in results)
+    if total_prompt > 0:
+        hit_rate = total_cached / total_prompt
+        print(f"\n  Cache Summary")
+        print(f"  Total prompt tokens:  {total_prompt:,}")
+        print(f"  Cached tokens:        {total_cached:,} ({hit_rate:.1%})")
+        print(f"  Cache write tokens:   {total_cache_write:,}")
+        if verbose:
+            print(f"\n  {'Domain':<25} {'Prompt':>8} {'Cached':>8} {'Hit%':>6}")
+            print(f"  {'─'*25} {'─'*8} {'─'*8} {'─'*6}")
+            for r in results:
+                pt = r.prompt_tokens or 0
+                ct = r.cached_tokens or 0
+                rate = f"{ct/pt:.0%}" if pt > 0 else "—"
+                print(f"  {r.domain_id:<25} {pt:>8} {ct:>8} {rate:>6}")
+
+    if verbose:
+        print_detailed_diagnostics(run, sys.stdout)
+
+    if csv_out:
+        export_csv(run, csv_out)
+        print(f"Exported results to {csv_out}")
+
+    if save_specs_dir:
+        save_specs(list(results), save_specs_dir)
+
+    return 0
+
+
 async def async_main() -> int:
     parser = argparse.ArgumentParser(
         prog="alspec",
@@ -143,6 +265,45 @@ async def async_main() -> int:
         "--prompt", required=True, help="The desired specification description."
     )
 
+    # Command: eval
+    eval_parser = subparsers.add_parser(
+        "eval",
+        help="Run the evaluation pipeline across domains and models.",
+    )
+    eval_parser.add_argument(
+        "--models",
+        type=str,
+        default="google/gemini-3-flash-preview",
+        help="Comma-separated list of OpenRouter model identifiers.",
+    )
+    eval_parser.add_argument(
+        "--domains",
+        type=str,
+        help="Comma-separated list of domain IDs. Default: all.",
+    )
+    eval_parser.add_argument(
+        "--tier",
+        type=int,
+        choices=[1, 2, 3],
+        help="Run only domains of a specific complexity tier.",
+    )
+    eval_parser.add_argument(
+        "--csv",
+        type=str,
+        help="Export results to CSV file.",
+    )
+    eval_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Print detailed diagnostics and per-domain cache stats.",
+    )
+    eval_parser.add_argument(
+        "--save-specs",
+        type=str,
+        metavar="DIR",
+        help="Save generated spec code to DIR/<domain-id>.py.",
+    )
+
     args = parser.parse_args()
 
     match args.command:
@@ -158,6 +319,15 @@ async def async_main() -> int:
             )
         case "generate":
             return await handle_generate(args.prompt)
+        case "eval":
+            return await handle_eval(
+                domain_ids=[d.strip() for d in args.domains.split(",")] if args.domains else None,
+                models=[m.strip() for m in args.models.split(",")],
+                tier=args.tier,
+                csv_out=args.csv,
+                verbose=args.verbose,
+                save_specs_dir=args.save_specs,
+            )
         case None:
             parser.print_help()
             return 1
