@@ -893,42 +893,47 @@ class TestAuditFlagInScoreSpec:
             ),
         )
 
-    def test_audit_false_produces_no_audit_warnings(self) -> None:
+    @pytest.mark.asyncio
+    async def test_audit_false_produces_no_audit_warnings(self) -> None:
         from alspec.score import score_spec
 
         spec = self._make_unconstrained_spec()
-        score = score_spec(spec, audit=False)
+        score = await score_spec(spec, audit=False)
         assert score.warning_count == 0
 
-    def test_audit_true_produces_audit_warnings(self) -> None:
+    @pytest.mark.asyncio
+    async def test_audit_true_produces_audit_warnings(self) -> None:
         from alspec.score import score_spec
 
         spec = self._make_unconstrained_spec()
-        score = score_spec(spec, audit=True)
+        score = await score_spec(spec, audit=True)
         assert score.warning_count > 0
 
-    def test_audit_does_not_affect_well_formed(self) -> None:
+    @pytest.mark.asyncio
+    async def test_audit_does_not_affect_well_formed(self) -> None:
         from alspec.score import score_spec
 
         spec = self._make_unconstrained_spec()
-        score_without = score_spec(spec, audit=False)
-        score_with = score_spec(spec, audit=True)
+        score_without = await score_spec(spec, audit=False)
+        score_with = await score_spec(spec, audit=True)
         assert score_without.well_formed == score_with.well_formed
 
-    def test_audit_does_not_affect_health(self) -> None:
+    @pytest.mark.asyncio
+    async def test_audit_does_not_affect_health(self) -> None:
         from alspec.score import score_spec
 
         spec = self._make_unconstrained_spec()
-        score_without = score_spec(spec, audit=False)
-        score_with = score_spec(spec, audit=True)
+        score_without = await score_spec(spec, audit=False)
+        score_with = await score_spec(spec, audit=True)
         assert score_without.health == score_with.health
 
-    def test_audit_diagnostics_have_correct_checks(self) -> None:
+    @pytest.mark.asyncio
+    async def test_audit_diagnostics_have_correct_checks(self) -> None:
         from alspec.check import Severity
         from alspec.score import score_spec
 
         spec = self._make_unconstrained_spec()
-        score = score_spec(spec, audit=True)
+        score = await score_spec(spec, audit=True)
         audit_diags = [
             d for d in score.diagnostics
             if d.check in ("unconstrained_fn", "unconstrained_pred", "orphan_sort")
@@ -1621,7 +1626,8 @@ def test_basis_specs_no_incomplete_splits(spec_fn) -> None:  # type: ignore[no-u
 class TestCaseSplitInfoNotCountedAsWarning:
     """INFO-level coverage diagnostics must not inflate the warning count."""
 
-    def test_info_not_in_warning_count(self) -> None:
+    @pytest.mark.asyncio
+    async def test_info_not_in_warning_count(self) -> None:
         from alspec.helpers import atomic, fn
         from alspec.signature import Signature
         from alspec.spec import Spec
@@ -1640,7 +1646,7 @@ class TestCaseSplitInfoNotCountedAsWarning:
 
         from alspec.score import score_spec
 
-        score = score_spec(spec, audit=True)
+        score = await score_spec(spec, audit=True)
         # The only audit diagnostic should be the INFO coverage report,
         # which should not be counted as a warning.
         assert score.warning_count == 0

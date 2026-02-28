@@ -17,14 +17,7 @@ from .llm import AsyncLLMClient, UsageInfo
 from .obligation import build_obligation_table, ObligationTable
 from .obligation_render import render_obligation_table
 from .prompt import render
-from .reference import (
-    api_reference,
-    basis_catalog,
-    formal_frame,
-    methodology,
-    type_grammar,
-    worked_example,
-)
+from .prompt_chunks import Stage, build_default_prompt
 from .result import Err, Ok, Result
 from .score import SpecScore, score_spec
 from .signature import GeneratedSortInfo, Signature
@@ -81,17 +74,14 @@ class PipelineResult:
 # ---------------------------------------------------------------------------
 
 
-def _build_system_prompt() -> str:
-    """Build the full system prompt (shared across both stages for Phase 1)."""
-    return render(
-        "system.md.j2",
-        formal_frame=formal_frame.render(),
-        type_grammar=type_grammar.render(),
-        api_reference=api_reference.render(),
-        basis_catalog=basis_catalog.render(),
-        methodology=methodology.render(),
-        worked_example=worked_example.render(),
-    )
+def _build_stage1_system_prompt() -> str:
+    """Build the system prompt for Stage 1 (signature generation)."""
+    return build_default_prompt(Stage.STAGE1)
+
+
+def _build_stage2_system_prompt() -> str:
+    """Build the system prompt for Stage 2 (axiom generation)."""
+    return build_default_prompt(Stage.STAGE2)
 
 
 def _build_stage1_user_prompt(domain_description: str, fn_name: str) -> str:
@@ -153,7 +143,13 @@ def _execute_signature_code(code: str) -> Signature | str:
     if not isinstance(sig, Signature):
         return "Stage 1 code did not produce a Signature object (expected `sig = Signature(...))`"
 
-    # Look for generated_sorts
+    # Look for generated_sorts — two accepted patterns:
+    #   Pattern A: separate `generated_sorts = {...}` variable (legacy, explicit)
+    #   Pattern B: `generated_sorts` baked into the Signature constructor itself
+    # If the signature already has a non-empty generated_sorts, use it directly.
+    if sig.generated_sorts:
+        return sig
+
     gen_sorts = namespace.get("generated_sorts")
     if gen_sorts is None:
         return "Stage 1 code did not define `generated_sorts` dict"
@@ -180,7 +176,7 @@ def _execute_signature_code(code: str) -> Signature | str:
                     f"or tuple of constructor names, got {type(value).__name__}"
                 )
 
-    # Patch generated_sorts onto the signature
+    # Patch normalized generated_sorts onto the signature
     patched = Signature(
         sorts=sig.sorts,
         functions=sig.functions,
@@ -235,14 +231,14 @@ async def run_pipeline(
     Validation: Score the spec
     """
     fn_name = domain_id.replace("-", "_") + "_spec"
-    system_prompt = _build_system_prompt()
     start_time = time.time()
     stage_usages: list[StageUsage] = []
 
     # ---- Stage 1: Signature generation ----
+    system1 = _build_stage1_system_prompt()
     stage1_user = _build_stage1_user_prompt(domain_description, fn_name)
     stage1_messages = [
-        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": system1},
         {"role": "user", "content": stage1_user},
     ]
 
@@ -304,8 +300,9 @@ async def run_pipeline(
         signature_code=code1,
         obligation_table_md=table_md,
     )
+    system2 = _build_stage2_system_prompt()
     stage2_messages = [
-        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": system2},
         {"role": "user", "content": stage2_user},
     ]
 
