@@ -1,0 +1,68 @@
+[experiment]
+name = "stage1-chunk-ablation-v1"
+description = "Which Stage 1 chunks affect signature quality?"
+# Relative to project root. Results directory will be created automatically.
+output_dir = "results/stage1-chunk-ablation-v1"
+
+[design]
+# Resolution level for the fractional factorial design.
+#   "full"         = 2^k full factorial (all combinations; expensive for k > 5)
+#   "resolution_v" = 2^(k-p) Resolution V (no 2FI aliased with another 2FI)
+#   "resolution_iv"= 2^(k-p) Resolution IV (no ME aliased with any 2FI; default)
+#   "resolution_iii"= 2^(k-p) Resolution III / Plackett-Burman (screening only)
+resolution = "resolution_iv"
+
+# Number of independent LLM calls per design point.
+# More replicates → better variance estimates but more cost.
+replicates = 3
+
+[pipeline]
+# Restricted to "stage1" for now; "full" pipeline support planned later.
+stage = "stage1"
+
+# Any OpenRouter model string.
+model = "google/gemini-3-flash-preview"
+
+# Sampling temperature for LLM calls.
+temperature = 0.7
+
+# Maximum number of concurrent LLM API calls. Semaphore-limited.
+max_concurrent = 4
+
+[domains]
+# Which golden specs to evaluate against.
+#   "all" = all domains discovered in golden/*.py  (currently 20)
+#   or list specific domain IDs: ["counter", "stack", "bug-tracker"]
+include = "all"
+
+# ---------------------------------------------------------------------------
+# Chunk configuration
+# ---------------------------------------------------------------------------
+# "mandatory" chunks are ALWAYS included (the LLM cannot function without them).
+# Every mandatory chunk must be a valid ChunkId name.
+[chunks]
+mandatory = [
+    "ROLE_PREAMBLE",
+    "TYPE_GRAMMAR",
+    "API_HELPERS",
+]
+
+# Each factor is one binary on/off variable in the design matrix.
+# The key ("A", "B", ...) is the factor label used in analysis output.
+# The value is a list of ChunkId names that are toggled together.
+# Most factors are single chunks; group related chunks when they always
+# come as a pair (e.g., a worked example + its analysis scaffold).
+#
+# Factor ordering matters: factor A is the first listed, B second, etc.
+# Analysis output references factors by these labels.
+[chunks.factors]
+A = ["FORMAL_FRAME"]
+B = ["BASIS_CATALOG"]
+C = ["WF_CHECKLIST"]
+D = ["OBLIGATION_PATTERN"]
+E = ["LOOSE_SEMANTICS_RULE"]
+F = ["GENERATED_SORTS_ROLES"]
+G = ["DISPATCH_RULES"]
+H = ["EXAMPLE_STACK"]
+J = ["EXAMPLE_BUG_TRACKER_ANALYSIS"]
+# K = ["CELL_TIERS"]

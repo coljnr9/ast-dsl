@@ -8,6 +8,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "langfuse>=3.14.5",
     "openai>=2.24.0",
+    "pydoe3>=1.6.2",
     "python-dotenv>=1.2.1",
 ]
 
@@ -15,7 +16,7 @@ dependencies = [
 alspec = "alspec.cli:main"
 
 [tool.setuptools]
-packages = ["alspec"]
+packages = ["alspec", "alspec.eval", "alspec.reference", "alspec.reference.chunks"]
 
 [dependency-groups]
 dev = [
@@ -48,3 +49,10 @@ select = [
     "ASYNC", # flake8-async
 ]
 ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "integration: marks tests that make real LLM calls (deselect with -k 'not integration')",
+]
+

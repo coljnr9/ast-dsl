@@ -213,6 +213,130 @@ async def handle_eval(
     return 0
 
 
+# ---------------------------------------------------------------------------
+# DoE subcommands
+# ---------------------------------------------------------------------------
+
+
+async def handle_doe_run(config_path: Path, *, dry_run: bool) -> int:
+    """Execute a DoE experiment from a TOML config file."""
+    from alspec.eval.doe_config import load_doe_config
+    from alspec.eval.doe_design import generate_design_matrix, generate_trials
+    from alspec.eval.doe_runner import run_experiment, write_results
+
+    # Resolve project root (alspec/ is inside project root)
+    project_root = Path(__file__).parent.parent
+
+    try:
+        config = load_doe_config(config_path, project_root=project_root)
+    except (ValueError, FileNotFoundError) as e:
+        print(f"Config error: {e}", file=sys.stderr)
+        return 1
+
+    trials = generate_trials(config)
+    n_design_points = len(trials) // config.replicates if config.replicates else len(trials)
+    n_trials_total = len(trials) * len(config.domains)
+
+    print(f"Experiment: {config.name}")
+    print(f"  Description: {config.description}")
+    print(f"  Stage:       {config.stage}")
+    print(f"  Model:       {config.model}")
+    print(f"  Resolution:  {config.resolution}")
+    print(f"  Factors:     {len(config.factors)}  ({', '.join(lbl for lbl, _ in config.factors)})")
+    print(f"  Design points (rows): {n_design_points}")
+    print(f"  Replicates:  {config.replicates}")
+    print(f"  Domains:     {len(config.domains)}")
+    print(f"  Total LLM calls: {n_trials_total}  (= {n_design_points} × {config.replicates} × {len(config.domains)})")
+
+    if dry_run:
+        print("\n[DRY RUN] Design matrix preview:")
+        matrix = generate_design_matrix(config)
+        factor_labels = [lbl for lbl, _ in config.factors]
+        header = "  trial | " + " | ".join(f" {lbl:>2}" for lbl in factor_labels)
+        print(header)
+        print("  " + "─" * (len(header) - 2))
+        for i in range(min(5, matrix.shape[0])):
+            row_str = " | ".join(
+                (" -1" if v == -1 else " +1") for v in matrix[i]
+            )
+            print(f"  {i:>5} | {row_str}")
+        if matrix.shape[0] > 5:
+            print(f"  ... ({matrix.shape[0] - 5} more rows)")
+
+        print("\n[DRY RUN] First 3 trial configs:")
+        for t in trials[:3]:
+            chunk_names = [c.name for c in t.chunk_ids]
+            print(f"  trial={t.trial_id} rep={t.replicate} chunks={chunk_names}")
+            print(f"    hash={t.config_hash[:12]}...")
+
+        print("\n[DRY RUN] No LLM calls made.")
+        return 0
+
+    # Real run
+    client_res = AsyncLLMClient.from_env()
+    match client_res:
+        case Err(e):
+            print(f"Failed to initialize LLM client: {e}", file=sys.stderr)
+            return 1
+        case Ok(client):
+            pass
+
+    golden_dir = project_root / "golden"
+    completed_count = 0
+
+    def progress(done: int, total: int, score: object, elapsed: float = 0.0) -> None:
+        nonlocal completed_count
+        completed_count = done
+        if hasattr(score, "domain") and hasattr(score, "trial_id"):
+            print(
+                f"  Trial {done:>4}/{total} "
+                f"[domain={score.domain:<20} trial={score.trial_id} "  # type: ignore[union-attr]
+                f"rep={score.replicate}] "  # type: ignore[union-attr]
+                f"health={score.health:.3f}  {elapsed:.1f}s",  # type: ignore[union-attr]
+                flush=True,
+            )
+
+    print(f"\nRunning {n_trials_total} total LLM calls (max_concurrent={config.max_concurrent})...")
+    scores = await run_experiment(
+        config, client, golden_dir=golden_dir, progress_cb=progress
+    )
+
+    write_results(config, scores, config_path=config_path)
+
+    # Print summary effects
+    try:
+        from alspec.eval.doe_analyze import analyze_results, print_all_effects_tables
+
+        result = analyze_results(config.output_dir)
+        print_all_effects_tables(list(result.main_effects), list(result.interactions))
+    except Exception as e:
+        print(f"Warning: could not compute effects: {e}", file=sys.stderr)
+
+    print(f"\nDone! Results written to {config.output_dir}")
+    return 0
+
+
+async def handle_doe_analyze(results_dir: Path) -> int:
+    """Re-analyze an existing results directory."""
+    from alspec.eval.doe_analyze import analyze_results, print_all_effects_tables
+
+    if not results_dir.exists():
+        print(f"Results directory not found: {results_dir}", file=sys.stderr)
+        return 1
+
+    try:
+        result = analyze_results(results_dir)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Analysis error: {e}", file=sys.stderr)
+        return 1
+
+    print_all_effects_tables(list(result.main_effects), list(result.interactions))
+
+    effects_path = results_dir / "effects.csv"
+    print(f"\nFull effects written to {effects_path}")
+    return 0
+
+
 async def async_main() -> int:
     parser = argparse.ArgumentParser(
         prog="alspec",
@@ -304,6 +428,41 @@ async def async_main() -> int:
         help="Save generated spec code to DIR/<domain-id>.py.",
     )
 
+    # Command group: doe
+    doe_parser = subparsers.add_parser(
+        "doe",
+        help="Design-of-Experiments commands for prompt chunk ablation.",
+    )
+    doe_sub = doe_parser.add_subparsers(dest="doe_command", help="DoE sub-commands")
+
+    # doe run
+    doe_run_parser = doe_sub.add_parser(
+        "run",
+        help="Execute a DoE experiment from a TOML config file.",
+    )
+    doe_run_parser.add_argument(
+        "config",
+        metavar="CONFIG.TOML",
+        help="Path to the experiment TOML config file.",
+    )
+    doe_run_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Print design matrix and trial count without making LLM calls.",
+    )
+
+    # doe analyze
+    doe_analyze_parser = doe_sub.add_parser(
+        "analyze",
+        help="Re-analyze an existing results directory (reads scores.jsonl).",
+    )
+    doe_analyze_parser.add_argument(
+        "results_dir",
+        metavar="RESULTS_DIR",
+        help="Path to the results directory produced by 'doe run'.",
+    )
+
     args = parser.parse_args()
 
     match args.command:
@@ -328,6 +487,23 @@ async def async_main() -> int:
                 verbose=args.verbose,
                 save_specs_dir=args.save_specs,
             )
+        case "doe":
+            match args.doe_command:
+                case "run":
+                    return await handle_doe_run(
+                        Path(args.config).resolve(),
+                        dry_run=args.dry_run,
+                    )
+                case "analyze":
+                    return await handle_doe_analyze(
+                        Path(args.results_dir).resolve()
+                    )
+                case None:
+                    doe_parser.print_help()
+                    return 1
+                case other:
+                    print(f"Unknown doe subcommand: {other}", file=sys.stderr)
+                    return 1
         case None:
             parser.print_help()
             return 1
