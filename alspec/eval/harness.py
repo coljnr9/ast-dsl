@@ -37,7 +37,7 @@ class EvalResult:
     checker_error: str | None
     score: SpecScore | None
     analysis: str | None  # The model's chain-of-thought (from submit_spec tool)
-    code: str | None      # Extracted / tool-provided code
+    code: str | None  # Extracted / tool-provided code
     latency_ms: int
     prompt_tokens: int | None
     completion_tokens: int | None
@@ -227,7 +227,8 @@ async def run_domain_eval(
 
         if score is not None:
             unconstrained_count = sum(
-                1 for d in score.diagnostics
+                1
+                for d in score.diagnostics
                 if d.check in ("unconstrained_fn", "unconstrained_pred", "orphan_sort")
             )
             langfuse.update_current_trace(
@@ -242,9 +243,13 @@ async def run_domain_eval(
                     "analysis": analysis,
                     "code": extracted_code,
                     "prompt_tokens": usage_info.prompt_tokens if usage_info else None,
-                    "completion_tokens": usage_info.completion_tokens if usage_info else None,
+                    "completion_tokens": (
+                        usage_info.completion_tokens if usage_info else None
+                    ),
                     "cached_tokens": usage_info.cached_tokens if usage_info else None,
-                    "cache_hit_rate": round(usage_info.cache_hit_rate, 3) if usage_info else None,
+                    "cache_hit_rate": (
+                        round(usage_info.cache_hit_rate, 3) if usage_info else None
+                    ),
                 }
             )
 
@@ -270,14 +275,6 @@ async def run_domain_eval(
                     value=usage_info.cache_hit_rate,
                     comment=f"cached={usage_info.cached_tokens}/{usage_info.prompt_tokens}",
                 )
-
-            # Individual diagnostic scores — one per finding, filterable by name.
-            for i, d in enumerate(score.diagnostics):
-                langfuse.score_current_trace(
-                    name=f"diag:{d.check}",
-                    value=1.0 if d.severity.value == "error" else 0.5,
-                    comment=f"[{i}] {d.message}",
-                )
         else:
             error_msg = parse_error or checker_error or "unknown failure"
             langfuse.update_current_trace(
@@ -289,9 +286,13 @@ async def run_domain_eval(
                     "analysis": analysis,
                     "code": extracted_code,
                     "prompt_tokens": usage_info.prompt_tokens if usage_info else None,
-                    "completion_tokens": usage_info.completion_tokens if usage_info else None,
+                    "completion_tokens": (
+                        usage_info.completion_tokens if usage_info else None
+                    ),
                     "cached_tokens": usage_info.cached_tokens if usage_info else None,
-                    "cache_hit_rate": round(usage_info.cache_hit_rate, 3) if usage_info else None,
+                    "cache_hit_rate": (
+                        round(usage_info.cache_hit_rate, 3) if usage_info else None
+                    ),
                 }
             )
             # Log hard zeros so failed traces are visible in score-based filters.

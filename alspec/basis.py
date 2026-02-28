@@ -583,11 +583,14 @@ def finite_map_spec() -> Spec:
             update : Map × Key × Val → Map
             lookup : Map × Key →? Val
     preds:  eq_key : Key × Key
-    axioms: lookup(empty, k) is undefined  (via partiality)
+    axioms: ¬def(lookup(empty, k))          (explicit undefinedness)
             eq_key(k1, k2) ⇒ lookup(update(M, k1, v), k2) = v
             ¬ eq_key(k1, k2) ⇒ lookup(update(M, k1, v), k2) = lookup(M, k2)
             eq_key(k, k)                              (reflexivity)
             eq_key(k1, k2) ⇒ eq_key(k2, k1)          (symmetry)
+
+    This spec uses loose semantics: undefinedness is stated explicitly with
+    Negation(Definedness(...)) rather than left implicit by omission.
 
     This is the pattern that any "indexed collection" spec needs:
     a state built by update, queried by lookup, dispatched on key equality.
