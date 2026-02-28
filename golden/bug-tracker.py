@@ -1,77 +1,120 @@
 """
-# Analysis: Bug Tracker Algebraic Specification
+# Worked Example: Bug Tracker with Ticket Store
+
+This is the reference specification for the Bug Tracker domain. It demonstrates
+the complete methodology: sort identification, function classification, obligation
+table construction, and axiom writing. This file scores 1.00 health with 0 warnings.
 
 ## Step 1: Identify Sorts
-The system describes a "Ticket Store" collection object that manages bug tracker tickets.
-- `TicketId`, `Title`, `Body`, `UserId`: Opaque atomic identifiers.
-- `SeverityLevel`: Atomic sort (with an uninterpreted constant `high`).
-- `Status`: Atomic sort representing a finite enumeration (with constants `open` and `resolved`).
-- `Store`: Atomic sort representing the core state of the collection (FiniteMap pattern).
+
+- `TicketId`, `Title`, `Body`, `UserId` — Opaque identifiers with no internal
+  structure we need to reason about. → **atomic**
+- `SeverityLevel` — Atomic sort. `high` is a named constant for `is_critical`;
+  other values exist but don't need naming. `classify` determines severity.
+- `Status` — Finite enumeration: `open`, `resolved`. Modeled as an atomic sort
+  with nullary constructors (not a CoproductSort — no carried data).
+- `Store` — The central domain object. A **collection** of tickets indexed by
+  `TicketId`, following the FiniteMap pattern. Individual tickets are NOT a
+  separate sort — all properties are accessed through store observers with a key.
+
+  *Why not have a `Ticket` sort?* Because the FiniteMap pattern is the standard
+  algebraic approach for collections. The Store is indexed by TicketId and all
+  observations go through the Store. A separate Ticket sort would require
+  modeling insertion/lookup separately, adding complexity without benefit.
 
 ## Step 2: Classify Functions and Predicates
-### Constructors (building Store values)
-- `empty : → Store`
-- `create_ticket : Store × TicketId × Title × Body → Store`
-- `resolve_ticket : Store × TicketId → Store`
-- `assign_ticket : Store × TicketId × UserId → Store`
 
-### Constants (nullary functions)
-- `open : → Status`
-- `resolved : → Status`
-- `high : → SeverityLevel`
+**Constructors** build values of a sort. **Observers** query or decompose them.
+Every observer owes axioms against every constructor of its primary sort.
+
+### Store Constructors
+- `empty : → Store` — Empty store, no tickets.
+- `create_ticket : Store × TicketId × Title × Body → Store` — Adds a ticket. Total.
+- `resolve_ticket : Store × TicketId → Store` — Transitions status. Total (no-op
+  on nonexistent ticket).
+- `assign_ticket : Store × TicketId × UserId → Store` — Sets assignee. Total
+  (no-op on nonexistent ticket).
+
+### Constants
+- `open : → Status`, `resolved : → Status` — Enumeration values.
+- `high : → SeverityLevel` — Needed for `is_critical` definition.
 
 ### Uninterpreted Function
-- `classify : Title × Body → SeverityLevel`: External determination of severity used within axioms.
+- `classify : Title × Body → SeverityLevel` — Not defined by axioms. Appears
+  only inside other axioms (e.g., `get_severity = classify(t, b)`). At
+  implementation time, could be an LLM call, rules engine, or lookup table.
 
-### Observers (partial operations on Tickets)
+### Observers (partial — undefined if ticket doesn't exist)
 - `get_status : Store × TicketId →? Status`
 - `get_severity : Store × TicketId →? SeverityLevel`
-- `get_assignee : Store × TicketId →? UserId` (Doubly partial: needs both ticket existence and assignee assignment).
+- `get_assignee : Store × TicketId →? UserId` — **Doubly partial**: undefined if
+  ticket doesn't exist AND if ticket exists but has no assignee yet.
 
 ### Predicates
-- `eq_id : TicketId × TicketId` (equality observer for keys).
-- `has_ticket : Store × TicketId` (ticket existence query).
-- `is_critical : Store × TicketId` (query combining ticket existence and high severity).
+- `eq_id : TicketId × TicketId` — Key equality for dispatch. A PREDICATE, not a
+  function returning Bool — use `PredApp("eq_id", ...)` everywhere.
+- `has_ticket : Store × TicketId` — True iff ticket exists. Total over store.
+- `is_critical : Store × TicketId` — True iff ticket exists and severity is high.
 
-## Step 3: Axiom Obligation Table & Check
-Using key-dispatch (`eq_id(k, k2)`) across observers and Store constructors:
+## Step 3: Axiom Obligation Table
 
-1. **`eq_id`** (basis)
-   - Reflexivity, symmetry, transitivity (3 axioms).
-2. **`has_ticket`** (total predicate)
-   - `empty`: false.
-   - `create_ticket`: hit (true), miss (delegates).
-   - `resolve_ticket`, `assign_ticket`: Both universally preserve ticket existence across all keys.
-   - (5 axioms total).
-3. **`get_status`** (partial)
-   - `empty`: omitted (undefined).
-   - `create_ticket`: hit (`open`), miss (delegates).
-   - `resolve_ticket`: hit+has_ticket (`resolved`), hit+no_ticket (delegates), miss (delegates).
-   - `assign_ticket`: universal preservation (assigning doesn't change status).
-   - (6 axioms total).
-4. **`get_severity`** (partial)
-   - `empty`: omitted.
-   - `create_ticket`: hit (`classify`), miss (delegates).
-   - `resolve_ticket`, `assign_ticket`: Both universally preserve severity across all keys.
-   - (4 axioms total).
-5. **`get_assignee`** (doubly partial)
-   - `empty`: omitted.
-   - `create_ticket`: hit (explicit undefinedness — no assignee initially), miss (delegates).
-   - `assign_ticket`: hit+has_ticket (assigned user `u`), hit+no_ticket (delegates), miss (delegates).
-   - `resolve_ticket`: universally preserves assignee.
-   - (6 axioms total).
-6. **`is_critical`** (predicate)
-   - `empty`: false.
-   - `create_ticket`: hit (iff `classify = high`), miss (delegates).
-   - `resolve_ticket`, `assign_ticket`: universally preserved.
-   - (5 axioms total).
+Store constructors: `empty`, `create_ticket`, `resolve_ticket`, `assign_ticket`.
+Every observer takes a `TicketId` key, and constructors also take keys, so each
+(observer, constructor) pair splits into **hit** (keys match) and **miss** (keys
+differ) via `eq_id`.
 
-**Completeness Count:** Expected 29 total axioms covering key dispatch scenarios and universal preservation shortcuts.
+**`eq_id` basis (3 axioms):** Reflexivity, symmetry, transitivity.
 
-## Design Decisions & Tricky Cases
-- **Key Dispatching:** For FiniteMap-like specs, observer updates branch on key equality (`eq_id`). A match guarantees the value interacts with the current constructor. 
-- **Partial Function Bounds:** Omitted axioms specifically document when function observation is undefined, such as querying empty stores, or querying `get_assignee` immediately on `create_ticket`.
-- **Double Guards:** Certain updates like `get_assignee` hitting on `assign_ticket` require nesting `PredApp("has_ticket", ...)` inside the hit branch `Implication`. This ensures missing items are handled robustly (assigning nonexistent tickets is a no-op).
+**`has_ticket` — total predicate (5 axioms):**
+- × `empty`: false.
+- × `create_ticket`: hit (true), miss (delegates).
+- × `resolve_ticket`: universal preservation — both hit and miss produce identical
+  biconditionals, so collapse to one axiom covering all keys.
+- × `assign_ticket`: same — one universal axiom.
+
+**`get_status` — partial (6 axioms):**
+- × `create_ticket`: hit (`open`), miss (delegates).
+- × `resolve_ticket`: hit+has_ticket (`resolved`), hit+¬has_ticket (delegates),
+  miss (delegates). Both guard polarities required.
+- × `assign_ticket`: universal preservation (one axiom, no key dispatch).
+
+**`get_severity` — partial (4 axioms):**
+- × `create_ticket`: hit (`classify(t, b)`), miss (delegates).
+- × `resolve_ticket`: universal preservation — resolve doesn't change severity for
+  ANY ticket regardless of key. One axiom covers all keys.
+- × `assign_ticket`: same.
+
+**`get_assignee` — doubly partial (6 axioms):**
+- × `create_ticket` hit: **explicit undefinedness** via `Negation(Definedness(...))`.
+  New tickets have no assignee. Under loose semantics, omitting this would NOT make
+  `get_assignee` undefined — it would leave it unconstrained (any user is valid in
+  some model). The `¬def(...)` axiom is required.
+- × `create_ticket` miss: delegates.
+- × `assign_ticket`: hit+has_ticket (returns new UserId), hit+¬has_ticket
+  (delegates — assigning nonexistent ticket is no-op), miss (delegates).
+- × `resolve_ticket`: universal preservation.
+
+**`is_critical` — predicate (5 axioms):**
+- × `empty`: false.
+- × `create_ticket`: hit (⟺ `classify(t, b) = high`), miss (delegates).
+- × `resolve_ticket`, `assign_ticket`: universal preservation.
+
+**Total: 29 axioms.**
+
+## Key Patterns Demonstrated
+
+- **Hit/miss key dispatch**: `Implication(PredApp("eq_id", ...), ...)` vs
+  `Implication(Negation(PredApp("eq_id", ...)), ...)`
+- **Universal preservation**: When a constructor doesn't affect an observer at ANY
+  key, collapse hit/miss into one unguarded equation.
+- **Explicit undefinedness**: `Negation(Definedness(...))` — required under loose
+  semantics. Omission leaves values unconstrained, not undefined.
+- **Both guard polarities**: When guarded by `has_ticket`, write axioms for both
+  positive and negative cases.
+- **Nested Implication**: Key dispatch guard wrapping a `has_ticket` guard.
+- **Conjunction in antecedent**: `eq_id_trans` uses `Conjunction((PredApp, PredApp))`.
+- **iff(PredApp, Equation)**: `is_critical_create_hit` — critical iff severity = high.
+- **Uninterpreted function**: `classify` appears in axioms but not defined by them.
 """
 
 from alspec import (

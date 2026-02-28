@@ -1,4 +1,4 @@
-"""
+r"""
 # Domain Analysis: Door Lock System
 
 ## 1. Sort Classification
@@ -60,9 +60,23 @@
 """
 
 from alspec import (
-    Axiom, Conjunction, Implication, Negation, PredApp,
-    Signature, Spec, atomic, fn, pred, var, app, const, eq, forall
+    Axiom,
+    Conjunction,
+    Implication,
+    Negation,
+    PredApp,
+    Signature,
+    Spec,
+    atomic,
+    fn,
+    pred,
+    var,
+    app,
+    const,
+    eq,
+    forall,
 )
+
 
 def door_lock_spec() -> Spec:
     # Variables
@@ -83,21 +97,19 @@ def door_lock_spec() -> Spec:
             "locked": fn("locked", [], "State"),
             "unlocked": fn("unlocked", [], "State"),
             "open_state": fn("open_state", [], "State"),
-            
             # Constructors for Lock
             "new": fn("new", [("c", "Code")], "Lock"),
             "lock": fn("lock", [("l", "Lock"), ("c", "Code")], "Lock"),
             "unlock": fn("unlock", [("l", "Lock"), ("c", "Code")], "Lock"),
             "open_door": fn("open_door", [("l", "Lock")], "Lock"),
             "close_door": fn("close_door", [("l", "Lock")], "Lock"),
-            
             # Observers for Lock
             "get_state": fn("get_state", [("l", "Lock")], "State"),
             "get_code": fn("get_code", [("l", "Lock")], "Code"),
         },
         predicates={
             "eq_code": pred("eq_code", [("c1", "Code"), ("c2", "Code")]),
-        }
+        },
     )
 
     axioms = (
@@ -108,143 +120,172 @@ def door_lock_spec() -> Spec:
         ),
         Axiom(
             label="eq_code_sym",
-            formula=forall([c1, c2], Implication(
-                PredApp("eq_code", (c1, c2)),
-                PredApp("eq_code", (c2, c1)),
-            )),
+            formula=forall(
+                [c1, c2],
+                Implication(
+                    PredApp("eq_code", (c1, c2)),
+                    PredApp("eq_code", (c2, c1)),
+                ),
+            ),
         ),
         Axiom(
             label="eq_code_trans",
-            formula=forall([c1, c2, c3], Implication(
-                Conjunction((
-                    PredApp("eq_code", (c1, c2)),
-                    PredApp("eq_code", (c2, c3)),
-                )),
-                PredApp("eq_code", (c1, c3)),
-            )),
+            formula=forall(
+                [c1, c2, c3],
+                Implication(
+                    Conjunction(
+                        (
+                            PredApp("eq_code", (c1, c2)),
+                            PredApp("eq_code", (c2, c3)),
+                        )
+                    ),
+                    PredApp("eq_code", (c1, c3)),
+                ),
+            ),
         ),
-
         # ━━ get_code (Total observer) ━━
         Axiom(
             label="get_code_new",
-            formula=forall([c], eq(
-                app("get_code", app("new", c)),
-                c
-            )),
+            formula=forall([c], eq(app("get_code", app("new", c)), c)),
         ),
         Axiom(
             label="get_code_lock",
-            formula=forall([l, c], eq(
-                app("get_code", app("lock", l, c)),
-                app("get_code", l)
-            )),
+            formula=forall(
+                [l, c], eq(app("get_code", app("lock", l, c)), app("get_code", l))
+            ),
         ),
         Axiom(
             label="get_code_unlock",
-            formula=forall([l, c], eq(
-                app("get_code", app("unlock", l, c)),
-                app("get_code", l)
-            )),
+            formula=forall(
+                [l, c], eq(app("get_code", app("unlock", l, c)), app("get_code", l))
+            ),
         ),
         Axiom(
             label="get_code_open_door",
-            formula=forall([l], eq(
-                app("get_code", app("open_door", l)),
-                app("get_code", l)
-            )),
+            formula=forall(
+                [l], eq(app("get_code", app("open_door", l)), app("get_code", l))
+            ),
         ),
         Axiom(
             label="get_code_close_door",
-            formula=forall([l], eq(
-                app("get_code", app("close_door", l)),
-                app("get_code", l)
-            )),
+            formula=forall(
+                [l], eq(app("get_code", app("close_door", l)), app("get_code", l))
+            ),
         ),
-
         # ━━ get_state (Total observer) ━━
         Axiom(
             label="get_state_new",
-            formula=forall([c], eq(
-                app("get_state", app("new", c)),
-                const("locked")
-            )),
+            formula=forall([c], eq(app("get_state", app("new", c)), const("locked"))),
         ),
-
         # lock transitions
         Axiom(
             label="get_state_lock_hit",
-            formula=forall([l, c], Implication(
-                Conjunction((
-                    PredApp("eq_code", (c, app("get_code", l))),
-                    eq(app("get_state", l), const("unlocked")),
-                )),
-                eq(app("get_state", app("lock", l, c)), const("locked")),
-            )),
+            formula=forall(
+                [l, c],
+                Implication(
+                    Conjunction(
+                        (
+                            PredApp("eq_code", (c, app("get_code", l))),
+                            eq(app("get_state", l), const("unlocked")),
+                        )
+                    ),
+                    eq(app("get_state", app("lock", l, c)), const("locked")),
+                ),
+            ),
         ),
         Axiom(
             label="get_state_lock_miss",
-            formula=forall([l, c], Implication(
-                Negation(Conjunction((
-                    PredApp("eq_code", (c, app("get_code", l))),
-                    eq(app("get_state", l), const("unlocked")),
-                ))),
-                eq(app("get_state", app("lock", l, c)), app("get_state", l)),
-            )),
+            formula=forall(
+                [l, c],
+                Implication(
+                    Negation(
+                        Conjunction(
+                            (
+                                PredApp("eq_code", (c, app("get_code", l))),
+                                eq(app("get_state", l), const("unlocked")),
+                            )
+                        )
+                    ),
+                    eq(app("get_state", app("lock", l, c)), app("get_state", l)),
+                ),
+            ),
         ),
-
         # unlock transitions
         Axiom(
             label="get_state_unlock_hit",
-            formula=forall([l, c], Implication(
-                Conjunction((
-                    PredApp("eq_code", (c, app("get_code", l))),
-                    eq(app("get_state", l), const("locked")),
-                )),
-                eq(app("get_state", app("unlock", l, c)), const("unlocked")),
-            )),
+            formula=forall(
+                [l, c],
+                Implication(
+                    Conjunction(
+                        (
+                            PredApp("eq_code", (c, app("get_code", l))),
+                            eq(app("get_state", l), const("locked")),
+                        )
+                    ),
+                    eq(app("get_state", app("unlock", l, c)), const("unlocked")),
+                ),
+            ),
         ),
         Axiom(
             label="get_state_unlock_miss",
-            formula=forall([l, c], Implication(
-                Negation(Conjunction((
-                    PredApp("eq_code", (c, app("get_code", l))),
-                    eq(app("get_state", l), const("locked")),
-                ))),
-                eq(app("get_state", app("unlock", l, c)), app("get_state", l)),
-            )),
+            formula=forall(
+                [l, c],
+                Implication(
+                    Negation(
+                        Conjunction(
+                            (
+                                PredApp("eq_code", (c, app("get_code", l))),
+                                eq(app("get_state", l), const("locked")),
+                            )
+                        )
+                    ),
+                    eq(app("get_state", app("unlock", l, c)), app("get_state", l)),
+                ),
+            ),
         ),
-
         # open_door transitions
         Axiom(
             label="get_state_open_door_hit",
-            formula=forall([l], Implication(
-                eq(app("get_state", l), const("unlocked")),
-                eq(app("get_state", app("open_door", l)), const("open_state")),
-            )),
+            formula=forall(
+                [l],
+                Implication(
+                    eq(app("get_state", l), const("unlocked")),
+                    eq(app("get_state", app("open_door", l)), const("open_state")),
+                ),
+            ),
         ),
         Axiom(
             label="get_state_open_door_miss",
-            formula=forall([l], Implication(
-                Negation(eq(app("get_state", l), const("unlocked"))),
-                eq(app("get_state", app("open_door", l)), app("get_state", l)),
-            )),
+            formula=forall(
+                [l],
+                Implication(
+                    Negation(eq(app("get_state", l), const("unlocked"))),
+                    eq(app("get_state", app("open_door", l)), app("get_state", l)),
+                ),
+            ),
         ),
-
         # close_door transitions
         Axiom(
             label="get_state_close_door_hit",
-            formula=forall([l], Implication(
-                eq(app("get_state", l), const("open_state")),
-                eq(app("get_state", app("close_door", l)), const("unlocked")),
-            )),
+            formula=forall(
+                [l],
+                Implication(
+                    eq(app("get_state", l), const("open_state")),
+                    eq(app("get_state", app("close_door", l)), const("unlocked")),
+                ),
+            ),
         ),
         Axiom(
             label="get_state_close_door_miss",
-            formula=forall([l], Implication(
-                Negation(eq(app("get_state", l), const("open_state"))),
-                eq(app("get_state", app("close_door", l)), app("get_state", l)),
-            )),
+            formula=forall(
+                [l],
+                Implication(
+                    Negation(eq(app("get_state", l), const("open_state"))),
+                    eq(app("get_state", app("close_door", l)), app("get_state", l)),
+                ),
+            ),
         ),
     )
 
     return Spec(name="DoorLock", signature=sig, axioms=axioms)
+
