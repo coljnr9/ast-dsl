@@ -77,7 +77,7 @@ def _record_by_label(index: AxiomIndex, label: str) -> AxiomRecord:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# stack_spec — 4 axioms
+# stack_spec — 6 axioms (pop_new_undef, pop_push, top_new_undef, top_push, empty_new, not_empty_push)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -87,12 +87,27 @@ class TestStackSpec:
         self.index = AxiomIndex.from_spec(stack_spec())
 
     def test_record_count(self) -> None:
-        assert len(self.index.records) == 4
+        assert len(self.index.records) == 6
+
+    def test_pop_new_undef(self) -> None:
+        rec = _record_by_label(self.index, "pop_new_undef")
+        # Bare Negation(Definedness(app(pop, const(new)))) — no quantifier
+        assert rec.variables == ()
+        assert rec.guards == ()
+        assert rec.constrained == ConstrainedSymbol("pop", "function")
+        assert rec.referenced_fns == {"pop", "new"}
+
+    def test_top_new_undef(self) -> None:
+        rec = _record_by_label(self.index, "top_new_undef")
+        assert rec.variables == ()
+        assert rec.guards == ()
+        assert rec.constrained == ConstrainedSymbol("top", "function")
+        assert rec.referenced_fns == {"top", "new"}
 
     def test_pop_push(self) -> None:
         rec = _record_by_label(self.index, "pop_push")
 
-        # variables: (S:Stack, e:Elem) — SortRef is a str NewType
+        # variables: (S:Stack, e:Elem) — basis.py uses uppercase S
         assert len(rec.variables) == 2
         assert rec.variables[0].name == "S"
         assert rec.variables[0].sort == "Stack"
@@ -132,7 +147,7 @@ class TestStackSpec:
     def test_empty_new(self) -> None:
         rec = _record_by_label(self.index, "empty_new")
 
-        # No quantifier — empty_new is a bare PredApp in basis.py
+        # No quantifier — empty_new is a bare PredApp in golden/stack.py
         assert rec.variables == ()
         assert rec.guards == ()
         assert rec.constrained == ConstrainedSymbol("empty", "predicate")
