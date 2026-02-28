@@ -42,19 +42,23 @@ def render_steps() -> str:
         1. List the constructors of the observer's primary argument sort.
         2. For each constructor, write an axiom specifying the observer applied to that constructor.
         3. For **partial** observers, you still need axioms for ALL constructors — some will
-           be equations, some will be `Negation(Definedness(...))` assertions. The only
-           exception is base constructors with no prior state (see below).
+           be equations (where the observer is defined), some will be `Negation(Definedness(...))`
+           assertions (where the observer is undefined). No exceptions — every cell must be filled.
 
-        **Axiom obligation table format (Stack — base constructor omission is safe):**
+        **Axiom obligation table format (Stack — selectors have mechanically derivable axioms):**
 
         | Observer | Constructor | Axiom |
         |----------|------------|-------|
-        | `pop : Stack →? Stack` | `new` | *(omitted — base constructor, no prior state)* |
+        | `pop : Stack →? Stack` | `new` | `¬def(pop(new))` — explicit undefinedness |
         | `pop : Stack →? Stack` | `push(S, e)` | `pop(push(S, e)) = S` |
-        | `top : Stack →? Elem` | `new` | *(omitted — base constructor, no prior state)* |
+        | `top : Stack →? Elem` | `new` | `¬def(top(new))` — explicit undefinedness |
         | `top : Stack →? Elem` | `push(S, e)` | `top(push(S, e)) = e` |
         | `empty : Stack` | `new` | `empty(new)` |
         | `empty : Stack` | `push(S, e)` | `¬ empty(push(S, e))` |
+
+        Note: `top` and `pop` are *selectors* of `push` — their axioms on `push` are mechanical
+        extraction (`top(push(S,e)) = e`, `pop(push(S,e)) = S`). Their axioms on `new` must be
+        explicit undefinedness: `¬def(top(new))` and `¬def(pop(new))`.
 
         **Axiom obligation table format (FiniteMap — destructive constructor needs explicit undefinedness):**
 
@@ -66,10 +70,17 @@ def render_steps() -> str:
         | `lookup : Map × Key →? Val` | `remove` hit | `¬def(lookup(remove(m,k), k2))` — explicit undefinedness |
         | `lookup : Map × Key →? Val` | `remove` miss | delegates to `lookup(m, k2)` |
 
-        **Completeness check:** If an observer has `k` constructors for its primary sort
-        and is total, it needs `k` axioms. If partial, it still needs axioms for ALL
-        constructors — some will be equations, some will be `Negation(Definedness(...))`
-        assertions. The only exception is base constructors with no prior state.
+        **Completeness check:** If an observer has `k` constructors for its primary sort,
+        it needs `k` axioms — no exceptions. Total observers produce equations.
+        Partial observers produce either equations (where defined) or
+        `Negation(Definedness(...))` assertions (where undefined). Every cell must
+        be filled.
+
+        **Stack completeness count:**
+        - `pop`: 2 constructors = 2 axioms (1 undefinedness + 1 equation)
+        - `top`: 2 constructors = 2 axioms (1 undefinedness + 1 equation)
+        - `empty`: 2 constructors = 2 axioms
+        Total expected axioms: 6.
 
         """
     )
@@ -83,6 +94,19 @@ def render_partial_functions() -> str:
         **Critical: Under loose semantics, omitting an axiom does NOT make a function
         undefined — it leaves the interpretation unconstrained.** Any value is valid
         in some model. To force undefinedness, you must write an explicit axiom.
+
+        **No omissions — every cell must be filled:**
+        Under loose semantics, omitting an axiom for a partial observer on a base
+        constructor does NOT make it undefined — it leaves the value unconstrained.
+        Always write explicit `Negation(Definedness(...))` axioms. For example:
+        `¬def(top(new))` and `¬def(pop(new))` are required axioms for the Stack,
+        not optional annotations.
+
+        Formal basis: CASL `free type` declarations mechanically generate
+        `¬def(selector(foreign_constructor))` for every selector/constructor pair
+        where the selector is not declared as a component of that constructor
+        (CASL Reference Manual §2.3.4). Under Alspec's loose semantics, these must
+        be stated explicitly since they are not automatic.
 
         **Three patterns for handling partiality:**
 
@@ -105,11 +129,12 @@ def render_partial_functions() -> str:
         ```
 
         **Pattern 2: Partial observers becoming undefined (e.g., `lookup` after `remove`,
-        `get_assignee` after `create_ticket`).**
+        `get_assignee` after `create_ticket`, selectors on foreign constructors).**
         Write an explicit `Negation(Definedness(...))` axiom. This is required whenever
         an observer should be undefined on a specific constructor — either because the
-        constructor destroys the relevant entry, or because the constructor creates an
-        entry without initializing this observer's value.
+        constructor destroys the relevant entry, because the constructor creates an
+        entry without initializing this observer's value, or because a selector is
+        applied to a constructor it doesn't belong to.
 
         ```python
         # Removing a key makes lookup explicitly undefined
@@ -124,6 +149,9 @@ def render_partial_functions() -> str:
                 app("get_assignee", app("create_ticket", s, k, t, b), k2)
             ))
         )))
+        # Stack selectors undefined on the base constructor
+        Axiom("pop_new_undef", Negation(Definedness(app("pop", const("new")))))
+        Axiom("top_new_undef", Negation(Definedness(app("top", const("new")))))
         ```
 
         **Pattern 3: Total constructors with existence guards — both polarities needed.**
@@ -150,18 +178,13 @@ def render_partial_functions() -> str:
         )))
         ```
 
-        **The safe omission (base constructors only):**
-        For partial observers over **base constructors** with no prior state (like
-        `top(new)`, `pop(new)`), omission is acceptable. No constructor path ever
-        makes these defined and then reverts to the base state, so the unconstrained
-        interpretation is harmless. But when in doubt, write the explicit
-        `Negation(Definedness(...))` — it's never wrong to be explicit.
-
         - Declare partial functions with `total=False`.
         - Use `Definedness(term)` and `Negation(Definedness(term))` to control
           where functions are defined or undefined.
         - For partial constructors, always add a `Definedness` biconditional.
         - For partial observers on destructive or non-initializing constructors,
+          always add `Negation(Definedness(...))`.
+        - For selectors on foreign constructors (constructors they don't belong to),
           always add `Negation(Definedness(...))`.
 
         ---
