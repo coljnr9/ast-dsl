@@ -114,6 +114,7 @@ class Signature:
     sorts: Mapping[str, SortDecl]
     functions: Mapping[str, FnSymbol]
     predicates: Mapping[str, PredSymbol]
+    generated_sorts: frozenset[str] = frozenset()
 
     def get_sort(self, name: str) -> SortDecl | None:
         return self.sorts.get(name)
