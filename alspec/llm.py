@@ -1,5 +1,6 @@
 import json
 import os
+from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
@@ -10,6 +11,46 @@ load_dotenv()
 from langfuse.openai import AsyncOpenAI  # type: ignore[attr-defined]
 
 from alspec.result import Err, Ok, Result
+
+# ---------------------------------------------------------------------------
+# Token usage metrics
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class UsageInfo:
+    """Token usage metrics extracted from an OpenRouter response."""
+
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    cached_tokens: int
+    cache_write_tokens: int
+
+    @property
+    def cache_hit_rate(self) -> float:
+        """Fraction of prompt tokens served from cache."""
+        if self.prompt_tokens == 0:
+            return 0.0
+        return self.cached_tokens / self.prompt_tokens
+
+
+def _extract_usage(response: object) -> UsageInfo | None:
+    """Extract token usage from an OpenAI-style response."""
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return None
+    details = getattr(usage, "prompt_tokens_details", None)
+    cached = getattr(details, "cached_tokens", 0) or 0
+    cache_write = getattr(details, "cache_write_tokens", 0) or 0
+    return UsageInfo(
+        prompt_tokens=usage.prompt_tokens or 0,
+        completion_tokens=usage.completion_tokens or 0,
+        total_tokens=usage.total_tokens or 0,
+        cached_tokens=cached,
+        cache_write_tokens=cache_write,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Tool schema — forces the model to emit structured analysis + code
@@ -52,7 +93,10 @@ SUBMIT_SPEC_TOOL: dict[str, object] = {
     },
 }
 
-_TOOL_CHOICE: dict[str, object] = {"type": "function", "function": {"name": "submit_spec"}}
+_TOOL_CHOICE: dict[str, object] = {
+    "type": "function",
+    "function": {"name": "submit_spec"},
+}
 
 
 class AsyncLLMClient:
@@ -88,8 +132,8 @@ class AsyncLLMClient:
         self,
         messages: list[dict[str, str]],
         model: str = "meta-llama/llama-3.1-8b-instruct",
-    ) -> Result[tuple[str, str], Exception]:
-        """Call the model with the submit_spec tool and return (analysis, code).
+    ) -> Result[tuple[str, str, UsageInfo | None], Exception]:
+        """Call the model with the submit_spec tool and return (analysis, code, usage).
 
         Forces the model to call ``submit_spec`` via ``tool_choice``, which
         eliminates brittle code-fence extraction and requires the model to show
@@ -99,9 +143,10 @@ class AsyncLLMClient:
         generation span (input messages + tool response output) nested under
         whatever trace is active in the caller.
 
-        Returns ``Ok((analysis, code))`` on success or ``Err(...)`` on failure.
+        Returns ``Ok((analysis, code, usage))`` on success or ``Err(...)`` on failure.
         """
         try:
+            messages = self._prepare_messages(messages)
             response = await self._client.chat.completions.create(  # type: ignore[call-overload]
                 model=model,
                 messages=messages,
@@ -120,6 +165,8 @@ class AsyncLLMClient:
         except Exception as e:
             return Err(e)
 
+        usage = _extract_usage(response)
+
         tool_calls = choice.message.tool_calls
         match tool_calls:
             case None | []:
@@ -137,7 +184,7 @@ class AsyncLLMClient:
 
         match (analysis, code):
             case (str(a), str(c)):
-                return Ok((a, c))
+                return Ok((a, c, usage))
             case _:
                 return Err(
                     RuntimeError(
@@ -149,7 +196,7 @@ class AsyncLLMClient:
         self,
         messages: list[dict[str, str]],
         model: str = "meta-llama/llama-3.1-8b-instruct",
-    ) -> Result[str, Exception]:
+    ) -> Result[tuple[str, UsageInfo | None], Exception]:
         """Fallback: plain chat completion without tool forcing.
 
         Used only when ``use_tool_call=False`` is passed to ``run_domain_eval``.
@@ -160,6 +207,7 @@ class AsyncLLMClient:
         generation span nested under the active trace.
         """
         try:
+            messages = self._prepare_messages(messages)
             response = await self._client.chat.completions.create(
                 model=model,
                 messages=messages,  # type: ignore[arg-type]
@@ -169,7 +217,7 @@ class AsyncLLMClient:
                 case [choice, *_]:
                     match choice.message.content:
                         case str(content):
-                            return Ok(content)
+                            return Ok((content, _extract_usage(response)))
                         case _:
                             return Err(
                                 RuntimeError("Model response content was not a string.")
@@ -181,3 +229,24 @@ class AsyncLLMClient:
 
         except Exception as e:
             return Err(e)
+
+    def _prepare_messages(self, messages: list[dict[str, str]]) -> list[dict]:
+        """Convert messages to multipart format with cache_control on system messages."""
+        prepared = []
+        for msg in messages:
+            if msg["role"] == "system":
+                prepared.append(
+                    {
+                        "role": "system",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": msg["content"],
+                                "cache_control": {"type": "ephemeral"},
+                            }
+                        ],
+                    }
+                )
+            else:
+                prepared.append(msg)
+        return prepared

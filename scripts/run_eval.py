@@ -104,6 +104,25 @@ async def run_evals(
 
     print_feature_coverage(run, sys.stdout)
 
+    # Cache metrics summary
+    total_prompt = sum(r.prompt_tokens or 0 for r in results)
+    total_cached = sum(r.cached_tokens or 0 for r in results)
+    total_cache_write = sum(r.cache_write_tokens or 0 for r in results)
+    if total_prompt > 0:
+        hit_rate = total_cached / total_prompt
+        print(f"\n  Cache Summary")
+        print(f"  Total prompt tokens:  {total_prompt:,}")
+        print(f"  Cached tokens:        {total_cached:,} ({hit_rate:.1%})")
+        print(f"  Cache write tokens:   {total_cache_write:,}")
+        if verbose:
+            print(f"\n  {'Domain':<25} {'Prompt':>8} {'Cached':>8} {'Hit%':>6}")
+            print(f"  {'─'*25} {'─'*8} {'─'*8} {'─'*6}")
+            for r in results:
+                pt = r.prompt_tokens or 0
+                ct = r.cached_tokens or 0
+                rate = f"{ct/pt:.0%}" if pt > 0 else "—"
+                print(f"  {r.domain_id:<25} {pt:>8} {ct:>8} {rate:>6}")
+
     if verbose:
         print_detailed_diagnostics(run, sys.stdout)
 

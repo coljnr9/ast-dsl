@@ -11,7 +11,7 @@ load_dotenv()
 from langfuse import get_client, observe, propagate_attributes
 
 from alspec.eval.domains import DomainPrompt
-from alspec.llm import AsyncLLMClient
+from alspec.llm import AsyncLLMClient, UsageInfo
 from alspec.prompt import render
 from alspec.reference import (
     api_reference,
@@ -39,7 +39,10 @@ class EvalResult:
     analysis: str | None  # The model's chain-of-thought (from submit_spec tool)
     code: str | None      # Extracted / tool-provided code
     latency_ms: int
-    token_count: int | None
+    prompt_tokens: int | None
+    completion_tokens: int | None
+    cached_tokens: int | None
+    cache_write_tokens: int | None
 
 
 @dataclass(frozen=True)
@@ -151,6 +154,7 @@ async def run_domain_eval(
     extracted_code: str | None = None
     success = False
     score = None
+    usage_info: UsageInfo | None = None
     start_time = time.time()
 
     with propagate_attributes(
@@ -177,16 +181,18 @@ async def run_domain_eval(
             match result:
                 case Err(e):
                     parse_error = str(e)
-                case Ok((a, c)):
+                case Ok((a, c, usage)):
                     analysis = a
                     extracted_code = c
+                    usage_info = usage
         else:
             text_result = await client.generate_messages(messages, model=model)
 
             match text_result:
                 case Err(e):
                     parse_error = f"API Error: {e}"
-                case Ok(content):
+                case Ok((content, usage)):
+                    usage_info = usage
                     extracted_code = extract_code(content)
                     match extracted_code:
                         case None:
@@ -235,6 +241,10 @@ async def run_domain_eval(
                     "diagnostics": diag_dicts,
                     "analysis": analysis,
                     "code": extracted_code,
+                    "prompt_tokens": usage_info.prompt_tokens if usage_info else None,
+                    "completion_tokens": usage_info.completion_tokens if usage_info else None,
+                    "cached_tokens": usage_info.cached_tokens if usage_info else None,
+                    "cache_hit_rate": round(usage_info.cache_hit_rate, 3) if usage_info else None,
                 }
             )
 
@@ -254,6 +264,13 @@ async def run_domain_eval(
                 comment="dead symbols detected by audit_spec",
             )
 
+            if usage_info is not None and usage_info.prompt_tokens > 0:
+                langfuse.score_current_trace(
+                    name="cache_hit_rate",
+                    value=usage_info.cache_hit_rate,
+                    comment=f"cached={usage_info.cached_tokens}/{usage_info.prompt_tokens}",
+                )
+
             # Individual diagnostic scores — one per finding, filterable by name.
             for i, d in enumerate(score.diagnostics):
                 langfuse.score_current_trace(
@@ -271,6 +288,10 @@ async def run_domain_eval(
                     "checker_error": checker_error,
                     "analysis": analysis,
                     "code": extracted_code,
+                    "prompt_tokens": usage_info.prompt_tokens if usage_info else None,
+                    "completion_tokens": usage_info.completion_tokens if usage_info else None,
+                    "cached_tokens": usage_info.cached_tokens if usage_info else None,
+                    "cache_hit_rate": round(usage_info.cache_hit_rate, 3) if usage_info else None,
                 }
             )
             # Log hard zeros so failed traces are visible in score-based filters.
@@ -293,5 +314,8 @@ async def run_domain_eval(
         analysis=analysis,
         code=extracted_code,
         latency_ms=latency_ms,
-        token_count=None,
+        prompt_tokens=usage_info.prompt_tokens if usage_info else None,
+        completion_tokens=usage_info.completion_tokens if usage_info else None,
+        cached_tokens=usage_info.cached_tokens if usage_info else None,
+        cache_write_tokens=usage_info.cache_write_tokens if usage_info else None,
     )
