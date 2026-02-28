@@ -19,6 +19,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
+from types import MappingProxyType
 
 from .sorts import SortDecl, SortRef
 
@@ -96,8 +97,43 @@ class PredSymbol:
 
 
 # ---------------------------------------------------------------------------
+# Generated sort info (CASL free type declaration semantics)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class GeneratedSortInfo:
+    """Declaration of a generated sort with its constructors and selectors.
+
+    Follows CASL's datatype declaration semantics:
+    - constructors: the operations that build values of this sort
+    - selectors: for each constructor, which observers extract its components
+
+    Example (Stack):
+        GeneratedSortInfo(
+            constructors=("new", "push"),
+            selectors={"push": {"top": "Elem", "pop": "Stack"}}
+        )
+    Meaning: push has two components — top extracts the Elem, pop extracts the Stack.
+    new has no selectors (it's a nullary base constructor).
+
+    Example (FiniteMap):
+        GeneratedSortInfo(
+            constructors=("empty", "update", "remove"),
+            selectors={}
+        )
+    Meaning: no selectors. lookup is a general observer, not a component extractor.
+    """
+
+    constructors: tuple[str, ...]
+    selectors: Mapping[str, Mapping[str, str]]  # ctor_name → {selector_name: result_sort}
+
+
+# ---------------------------------------------------------------------------
 # Signature
 # ---------------------------------------------------------------------------
+
+_EMPTY_GENERATED_SORTS: Mapping[str, GeneratedSortInfo] = MappingProxyType({})
 
 
 @dataclass(frozen=True)
@@ -114,7 +150,7 @@ class Signature:
     sorts: Mapping[str, SortDecl]
     functions: Mapping[str, FnSymbol]
     predicates: Mapping[str, PredSymbol]
-    generated_sorts: frozenset[str] = frozenset()
+    generated_sorts: Mapping[str, GeneratedSortInfo] = _EMPTY_GENERATED_SORTS
 
     def get_sort(self, name: str) -> SortDecl | None:
         return self.sorts.get(name)
