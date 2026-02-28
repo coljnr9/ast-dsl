@@ -14,10 +14,10 @@ def print_summary_table(run: EvalRun, model: str, out: TextIO) -> None:
     out.write(f"{'=' * 62}\n\n")
 
     out.write(
-        "  Domain                  │ Parse │ WF  │ Health │ Axioms │ Errors │ Warnings\n"
+        "  Domain                  │ Parse │ WF  │ Health │ Axioms │ Errors │ Warnings │ Cov\n"
     )
     out.write(
-        "  ────────────────────────┼───────┼─────┼────────┼────────┼────────┼─────────\n"
+        "  ────────────────────────┼───────┼─────┼────────┼────────┼────────┼──────────┼────────\n"
     )
 
     results = [r for r in run.results if r.model == model]
@@ -28,6 +28,8 @@ def print_summary_table(run: EvalRun, model: str, out: TextIO) -> None:
     total_axioms = 0
     total_errors = 0
     total_warnings = 0
+    total_covered = 0
+    total_cells = 0
 
     for domain in DOMAINS:
         for result in results:
@@ -36,7 +38,7 @@ def print_summary_table(run: EvalRun, model: str, out: TextIO) -> None:
         else:
             continue
 
-        parse_mark = " ✓  " if result.success else " ✗  "
+        parse_mark = " ✓ " if result.success else " ✗ "
         if result.success:
             total_parse += 1
 
@@ -45,6 +47,7 @@ def print_summary_table(run: EvalRun, model: str, out: TextIO) -> None:
         ax_str = " —  "
         err_str = " — "
         warn_str = " — "
+        cov_str = "  —   "
 
         match result.score:
             case None:
@@ -58,17 +61,22 @@ def print_summary_table(run: EvalRun, model: str, out: TextIO) -> None:
                 err_str = f" {score.error_count:>2} "
                 warn_str = f" {score.warning_count:>2} "
 
+                if score.obligation_cell_count > 0:
+                    cov_str = f" {score.covered_cell_count:>2}/{score.obligation_cell_count:<2} "
+                    total_covered += score.covered_cell_count
+                    total_cells += score.obligation_cell_count
+
                 total_health += score.health
                 total_axioms += score.axiom_count
                 total_errors += score.error_count
                 total_warnings += score.warning_count
 
         out.write(
-            f"  {domain.id:<24}│ {parse_mark}│ {wf_mark} │  {health_str}  │   {ax_str} │  {err_str}  │  {warn_str}\n"
+            f"  {domain.id:<24}│  {parse_mark}  │ {wf_mark} │  {health_str}  │   {ax_str} │  {err_str}  │   {warn_str}   │ {cov_str}\n"
         )
 
     out.write(
-        "  ────────────────────────┼───────┼─────┼────────┼────────┼────────┼─────────\n"
+        "  ────────────────────────┼───────┼─────┼────────┼────────┼────────┼──────────┼────────\n"
     )
 
     success_count = sum(1 for r in results if r.success)
@@ -76,13 +84,21 @@ def print_summary_table(run: EvalRun, model: str, out: TextIO) -> None:
     wf_pct = (total_wf / success_count) * 100 if success_count else 0.0
     mean_health = total_health / len(results) if results else 0.0
 
+    total_cov_str = "—"
+    if total_cells > 0:
+        total_cov_str = f"{total_covered}/{total_cells}"
+
     out.write(
-        f"  TOTALS                  │ {total_parse:>2}/{len(results):<2} │{total_wf:>2}/{success_count:<2}│  {mean_health:4.2f}  │  {total_axioms:>3}   │  {total_errors:>2}   │  {total_warnings:>2}\n\n"
+        f"  TOTALS                  │ {total_parse:>2}/{len(results):<2} │{total_wf:>2}/{success_count:<2}│  {mean_health:4.2f}  │  {total_axioms:>3}   │  {total_errors:>2}   │  {total_warnings:>2}  │ {total_cov_str}\n\n"
     )
 
     out.write(f"  Parse rate:        {parse_pct:5.1f}%\n")
     out.write(f"  Well-formed rate:  {wf_pct:5.1f}%\n")
-    out.write(f"  Mean health:       {mean_health:4.2f}\n\n")
+    out.write(f"  Mean health:       {mean_health:4.2f}\n")
+    if total_cells > 0:
+        mean_cov = (total_covered / total_cells) * 100
+        out.write(f"  Mean coverage:     {mean_cov:5.1f}%  ({total_covered}/{total_cells} cells across {total_parse} parsed specs)\n")
+    out.write("\n")
 
 
 def print_multi_model_comparison(run: EvalRun, out: TextIO) -> None:

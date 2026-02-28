@@ -42,14 +42,14 @@ def _short_path(path: str, max_len: int = 26) -> str:
 def print_score_table(results: list[ScoreResult], out: TextIO) -> None:
     """Print a summary table of scored spec files.
 
-    Columns: File | WF | Health | Sorts | Fns | Preds | Axioms | Errors | Warnings
+    Columns: File | WF | Health | Sorts | Fns | Preds | Axioms | Errs | Warns | Cov
     """
     out.write("\n")
     out.write(
-        "  File                       │ WF  │ Health │ Sorts │ Fns │ Preds │ Axioms │ Errs │ Warns\n"
+        "  File                       │ WF  │ Health │ Sorts │ Fns │ Preds │ Axioms │ Errs │ Warns │ Cov\n"
     )
     out.write(
-        "  ─────────────────────────────┼─────┼────────┼───────┼─────┼───────┼────────┼──────┼──────\n"
+        "  ─────────────────────────────┼─────┼────────┼───────┼─────┼───────┼────────┼──────┼───────┼────────\n"
     )
 
     total_success = 0
@@ -61,18 +61,22 @@ def print_score_table(results: list[ScoreResult], out: TextIO) -> None:
     total_axioms = 0
     total_errors = 0
     total_warnings = 0
+    total_covered = 0
+    total_cells = 0
 
     for r in results:
         label = _short_path(r.file_path)
         if not r.success:
-            out.write(f"  {label:<27}  │ ✗   │  FAIL  │   —   │  —  │   —   │   —    │   —  │   —\n")
+            out.write(
+                f"  {label:<27}  │ ✗   │  FAIL  │   —   │  —  │   —   │   —    │   —  │   —   │ —\n"
+            )
             continue
 
         total_success += 1
         match r.score:
             case None:
                 out.write(
-                    f"  {label:<27}  │ ✓   │  —     │   —   │  —  │   —   │   —    │   —  │   —\n"
+                    f"  {label:<27}  │ ✓   │  —     │   —   │  —  │   —   │   —    │   —  │   —   │ —\n"
                 )
             case score:
                 wf = "✓" if score.well_formed else "✗"
@@ -85,30 +89,45 @@ def print_score_table(results: list[ScoreResult], out: TextIO) -> None:
                 total_axioms += score.axiom_count
                 total_errors += score.error_count
                 total_warnings += score.warning_count
+
+                cov_str = "—"
+                if score.obligation_cell_count > 0:
+                    cov_str = f"{score.covered_cell_count}/{score.obligation_cell_count}"
+                    total_covered += score.covered_cell_count
+                    total_cells += score.obligation_cell_count
+
                 out.write(
                     f"  {label:<27}  │ {wf}   │ {score.health:4.2f}   │ {score.sort_count:>4}  "
                     f"│{score.function_count:>3}  │  {score.predicate_count:>3}  │   {score.axiom_count:>3}  "
-                    f"│  {score.error_count:>2}  │  {score.warning_count:>2}\n"
+                    f"│  {score.error_count:>2}  │  {score.warning_count:>2}   │ {cov_str}\n"
                 )
 
     out.write(
-        "  ─────────────────────────────┼─────┼────────┼───────┼─────┼───────┼────────┼──────┼──────\n"
+        "  ─────────────────────────────┼─────┼────────┼───────┼─────┼───────┼────────┼──────┼───────┼────────\n"
     )
 
     n = len(results)
     mean_health = total_health / total_success if total_success else 0.0
+    total_cov_str = "—"
+    if total_cells > 0:
+        total_cov_str = f"{total_covered}/{total_cells}"
+
     out.write(
         f"  TOTALS ({total_success}/{n} loaded, {total_wf}/{total_success or 1} WF)  "
         f"│     │ {mean_health:4.2f}   │ {total_sorts:>4}  "
         f"│{total_fns:>3}  │  {total_preds:>3}  │   {total_axioms:>3}  "
-        f"│  {total_errors:>2}  │  {total_warnings:>2}\n"
+        f"│  {total_errors:>2}  │  {total_warnings:>2}   │ {total_cov_str}\n"
     )
 
     parse_pct = (total_success / n) * 100 if n else 0.0
     wf_pct = (total_wf / total_success) * 100 if total_success else 0.0
     out.write(f"\n  Load rate:         {parse_pct:5.1f}%\n")
     out.write(f"  Well-formed rate:  {wf_pct:5.1f}%\n")
-    out.write(f"  Mean health:       {mean_health:4.2f}\n\n")
+    out.write(f"  Mean health:       {mean_health:4.2f}\n")
+    if total_cells > 0:
+        mean_cov = (total_covered / total_cells) * 100
+        out.write(f"  Mean coverage:     {mean_cov:5.1f}%\n")
+    out.write("\n")
 
 
 def print_score_diagnostics(results: list[ScoreResult], out: TextIO) -> None:

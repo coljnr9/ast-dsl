@@ -345,7 +345,7 @@ async def run_pipeline(
         case Spec() as spec:
             pass
 
-    score = score_spec(spec, strict=False, audit=True)
+    score = await score_spec(spec, strict=False, audit=True)
 
     return PipelineResult(
         success=True,

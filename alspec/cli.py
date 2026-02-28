@@ -47,7 +47,7 @@ async def handle_generate(prompt: str) -> int:
             return 1
 
 
-def handle_score(
+async def handle_score(
     files: Sequence[str],
     *,
     verbose: bool,
@@ -74,7 +74,7 @@ def handle_score(
                     )
                 )
             case Spec() as spec:
-                score = score_spec(spec, strict=strict, audit=audit)
+                score = await score_spec(spec, strict=strict, audit=audit)
                 results.append(
                     ScoreResult(
                         file_path=path,
@@ -311,7 +311,7 @@ async def async_main() -> int:
             print(generate_reference())
             return 0
         case "score":
-            return handle_score(
+            return await handle_score(
                 args.files,
                 verbose=args.verbose,
                 audit=args.audit,

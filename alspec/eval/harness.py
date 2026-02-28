@@ -31,6 +31,10 @@ class EvalResult:
     completion_tokens: int | None
     cached_tokens: int | None
     cache_write_tokens: int | None
+    # NEW: coverage from obligation table matching
+    obligation_cell_count: int = 0
+    covered_cell_count: int = 0
+    coverage_ratio: float | None = None
 
 
 @dataclass(frozen=True)
@@ -63,6 +67,15 @@ def _pipeline_to_eval(domain_id: str, model: str, pr: PipelineResult) -> EvalRes
         else:  # "stage2", "validation"
             checker_error = pr.error
 
+    # Extract coverage from score if available
+    obligation_cell_count = 0
+    covered_cell_count = 0
+    coverage_ratio = None
+    if pr.score is not None:
+        obligation_cell_count = pr.score.obligation_cell_count
+        covered_cell_count = pr.score.covered_cell_count
+        coverage_ratio = pr.score.coverage_ratio
+
     return EvalResult(
         domain_id=domain_id,
         model=model,
@@ -77,6 +90,9 @@ def _pipeline_to_eval(domain_id: str, model: str, pr: PipelineResult) -> EvalRes
         completion_tokens=completion_tokens or None,
         cached_tokens=cached_tokens or None,
         cache_write_tokens=cache_write_tokens or None,
+        obligation_cell_count=obligation_cell_count,
+        covered_cell_count=covered_cell_count,
+        coverage_ratio=coverage_ratio,
     )
 
 
@@ -102,29 +118,42 @@ def _emit_langfuse_scores(eval_result: EvalResult) -> None:
             if d.check in ("unconstrained_fn", "unconstrained_pred", "orphan_sort")
         )
 
+        uncovered_count = sum(
+            1
+            for d in score.diagnostics
+            if d.check == "coverage" and d.severity.value == "warning"
+            and "Uncovered obligation cell" in d.message
+        )
+
         # Compute cache hit rate from eval_result fields for the trace output
         cache_hit_rate: float | None = None
         if eval_result.prompt_tokens and eval_result.prompt_tokens > 0:
             cached = eval_result.cached_tokens or 0
             cache_hit_rate = round(cached / eval_result.prompt_tokens, 3)
 
-        langfuse.update_current_trace(
-            output={
-                "success": True,
-                "health": round(score.health, 3),
-                "well_formed": score.well_formed,
-                "unconstrained_symbols": unconstrained_count,
-                "error_count": score.error_count,
-                "warning_count": score.warning_count,
-                "diagnostics": diag_dicts,
-                "analysis": eval_result.analysis,
-                "code": eval_result.code,
-                "prompt_tokens": eval_result.prompt_tokens,
-                "completion_tokens": eval_result.completion_tokens,
-                "cached_tokens": eval_result.cached_tokens,
-                "cache_hit_rate": cache_hit_rate,
-            }
-        )
+        trace_output = {
+            "success": True,
+            "health": round(score.health, 3),
+            "well_formed": score.well_formed,
+            "unconstrained_symbols": unconstrained_count,
+            "error_count": score.error_count,
+            "warning_count": score.warning_count,
+            "diagnostics": diag_dicts,
+            "analysis": eval_result.analysis,
+            "code": eval_result.code,
+            "prompt_tokens": eval_result.prompt_tokens,
+            "completion_tokens": eval_result.completion_tokens,
+            "cached_tokens": eval_result.cached_tokens,
+            "cache_hit_rate": cache_hit_rate,
+        }
+
+        if score.obligation_cell_count > 0:
+            trace_output["obligation_cell_count"] = score.obligation_cell_count
+            trace_output["covered_cell_count"] = score.covered_cell_count
+            trace_output["coverage_ratio"] = round(score.coverage_ratio, 3) if score.coverage_ratio is not None else None
+            trace_output["uncovered_cell_count"] = uncovered_count
+
+        langfuse.update_current_trace(output=trace_output)
 
         langfuse.score_current_trace(
             name="spec_health",
@@ -140,6 +169,13 @@ def _emit_langfuse_scores(eval_result: EvalResult) -> None:
             value=unconstrained_count,
             comment="dead symbols detected by audit_spec",
         )
+
+        if score.obligation_cell_count > 0 and score.coverage_ratio is not None:
+            langfuse.score_current_trace(
+                name="cell_coverage",
+                value=score.coverage_ratio,
+                comment=f"{score.covered_cell_count}/{score.obligation_cell_count}",
+            )
 
         if eval_result.prompt_tokens and eval_result.prompt_tokens > 0:
             cached = eval_result.cached_tokens or 0
