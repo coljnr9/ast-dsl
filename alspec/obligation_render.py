@@ -1,13 +1,15 @@
 """Render an ObligationTable as markdown for inclusion in LLM prompts.
 
 The rendered table tells the LLM exactly which (observer, constructor) pairs
-need axioms, whether key dispatch applies, and what kind of fill is expected.
+need axioms, whether key dispatch applies, what kind of fill is expected,
+and the CellTier annotation that indicates how deterministic the fill is.
 """
 
 from __future__ import annotations
 
 from .obligation import (
     CellDispatch,
+    CellTier,
     FnKind,
     ObligationCell,
     ObligationTable,
@@ -20,8 +22,8 @@ def render_obligation_table(sig: Signature, table: ObligationTable) -> str:
     """Render the obligation table as a markdown string.
 
     Produces one section per generated sort, with:
-      - Role summary (constructors, observers, constants, uninterpreted)
-      - The obligation grid as a markdown table
+      - Role summary (constructors, observers, selectors, constants, uninterpreted)
+      - The obligation grid as a markdown table with Cell Type and Hint columns
       - Notes on equality basis axioms needed
       - Notes on partial constructor definedness axioms needed
     """
@@ -34,12 +36,17 @@ def render_obligation_table(sig: Signature, table: ObligationTable) -> str:
 
     for gen_sort in sorted(sig.generated_sorts.keys()):
         cells = sort_cells.get(gen_sort, [])
-        ctor_names = list(sig.generated_sorts[gen_sort])
+        info = sig.generated_sorts[gen_sort]
+        ctor_names = list(info.constructors)
 
         # Gather role info
         fn_observers = sorted(
             n for n, r in table.fn_roles.items()
             if r.kind == FnKind.OBSERVER and r.sort == gen_sort
+        )
+        fn_selectors = sorted(
+            n for n, r in table.fn_roles.items()
+            if r.kind == FnKind.SELECTOR and r.sort == gen_sort
         )
         pred_observers = sorted(
             n for n, r in table.pred_roles.items()
@@ -73,6 +80,8 @@ def render_obligation_table(sig: Signature, table: ObligationTable) -> str:
         parts.append(f"- Constructors: {_fn_list(ctor_names, partial_fns, sig)}")
         if fn_observers:
             parts.append(f"- Function observers: {_fn_list(fn_observers, partial_fns, sig)}")
+        if fn_selectors:
+            parts.append(f"- Selectors (component extractors): {_fn_list(fn_selectors, partial_fns, sig)}")
         if pred_observers:
             parts.append(f"- Predicate observers: {', '.join(f'`{p}`' for p in pred_observers)}")
         if constants:
@@ -96,9 +105,9 @@ def render_obligation_table(sig: Signature, table: ObligationTable) -> str:
             ep = ", ".join(f"`{e}`" for e in sorted(eq_preds_used))
             parts.append(f"**Key dispatch:** {ep} over {ks}\n")
 
-        # The obligation grid
-        parts.append("| # | Observer | Constructor | Dispatch | Fill guidance |")
-        parts.append("|---|----------|------------|----------|---------------|")
+        # The obligation grid with Cell Type and Hint columns
+        parts.append("| # | Observer | Constructor | Dispatch | Cell Type | Hint |")
+        parts.append("|---|----------|------------|----------|-----------|------|")
 
         for i, cell in enumerate(cells, 1):
             obs_name = cell.observer_name
@@ -124,10 +133,19 @@ def render_obligation_table(sig: Signature, table: ObligationTable) -> str:
                 case CellDispatch.MISS:
                     dispatch_str = f"miss (`¬{cell.eq_pred}`)"
 
-            # Fill guidance
-            guidance = _cell_guidance(cell, sig, partial_fns, ctor_names)
+            # Cell type label
+            match cell.tier:
+                case CellTier.SELECTOR_EXTRACT:
+                    tier_str = "`SELECTOR_EXTRACT`"
+                case CellTier.SELECTOR_FOREIGN:
+                    tier_str = "`SELECTOR_FOREIGN`"
+                case CellTier.DOMAIN:
+                    tier_str = "`DOMAIN`"
 
-            parts.append(f"| {i} | {obs_label} | {ctor_label} | {dispatch_str} | {guidance} |")
+            # Hint
+            hint = _cell_hint(cell, sig, partial_fns, ctor_names)
+
+            parts.append(f"| {i} | {obs_label} | {ctor_label} | {dispatch_str} | {tier_str} | {hint} |")
 
         parts.append("")
 
@@ -180,35 +198,57 @@ def _fn_list(names: list[str], partial_fns: set[str], sig: Signature) -> str:
     return ", ".join(items)
 
 
-def _cell_guidance(
+def _cell_hint(
     cell: ObligationCell,
     sig: Signature,
     partial_fns: set[str],
     constructors: list[str],
 ) -> str:
-    """Generate fill guidance for a single cell."""
+    """Generate a hint for a single cell based on its CellTier and context."""
     obs_is_partial = cell.observer_name in partial_fns and not cell.observer_is_predicate
-    ctor = sig.functions[cell.constructor_name]
-    ctor_is_base = ctor.is_constant
 
-    match cell.dispatch:
-        case CellDispatch.PLAIN:
-            if ctor_is_base and obs_is_partial:
-                return "Base ctor + partial obs: omit (safe) or write `¬def(...)`"
-            elif ctor_is_base and cell.observer_is_predicate:
-                return "Base ctor: typically false/negated"
-            elif ctor_is_base:
-                return "Base ctor: define initial value"
-            else:
-                return "Write equation or biconditional"
+    match cell.tier:
+        case CellTier.SELECTOR_EXTRACT:
+            ext = cell.extracts_sort or "component"
+            return (
+                f"`{cell.observer_name}({cell.constructor_name}(...)) = <{ext}_var>` "
+                f"— selector extracts component"
+            )
 
-        case CellDispatch.HIT:
+        case CellTier.SELECTOR_FOREIGN:
             if obs_is_partial:
-                return "Key match: write equation, `¬def(...)`, or guarded equation"
-            elif cell.observer_is_predicate:
-                return "Key match: write predicate assertion or biconditional"
+                return (
+                    f"Likely `¬def({cell.observer_name}({cell.constructor_name}(...)))` "
+                    f"— selector undefined on foreign constructor"
+                )
             else:
-                return "Key match: write equation for the new/updated value"
+                return (
+                    f"Must define `{cell.observer_name}({cell.constructor_name}(...))` "
+                    f"— total selector on foreign constructor"
+                )
 
-        case CellDispatch.MISS:
-            return "Key miss: delegate to inner state (preservation)"
+        case CellTier.DOMAIN:
+            ctor = sig.functions[cell.constructor_name]
+            ctor_is_base = ctor.is_constant
+
+            match cell.dispatch:
+                case CellDispatch.PLAIN:
+                    if obs_is_partial and ctor_is_base:
+                        return "Write `¬def(...)` — partial observer undefined on base constructor"
+                    elif cell.observer_is_predicate and ctor_is_base:
+                        return "Base case for predicate"
+                    elif ctor_is_base:
+                        return "Base case: define initial value"
+                    else:
+                        return "Domain-specific — determine from domain description"
+
+                case CellDispatch.HIT:
+                    if obs_is_partial:
+                        return "Key match: write equation, `¬def(...)`, or guarded equation"
+                    elif cell.observer_is_predicate:
+                        return "Key match: write predicate assertion or biconditional"
+                    else:
+                        return "Key match: define value for matching key"
+
+                case CellDispatch.MISS:
+                    return "Key miss: typically delegates to recursive argument (preservation)"

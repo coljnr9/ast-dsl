@@ -254,7 +254,9 @@ def stack_spec() -> Spec:
             pop : Stack →? Stack
             top : Stack →? Elem
     preds:  empty : Stack
-    axioms: pop(push(S, e)) = S
+    axioms: ¬def(pop(new))
+            pop(push(S, e)) = S
+            ¬def(top(new))
             top(push(S, e)) = e
             empty(new)
             ¬ empty(push(S, e))
@@ -279,7 +281,11 @@ def stack_spec() -> Spec:
     )
 
     axioms = (
-        # pop: partial, skip new (undefined), push → 1 axiom
+        # pop: 2 constructors → 2 axioms (undefined on new, projection on push)
+        Axiom(
+            "pop_new_undef",
+            Negation(Definedness(app("pop", const("new")))),
+        ),
         Axiom(
             "pop_push",
             forall(
@@ -290,7 +296,11 @@ def stack_spec() -> Spec:
                 ),
             ),
         ),
-        # top: partial, skip new (undefined), push → 1 axiom
+        # top: 2 constructors → 2 axioms (undefined on new, projection on push)
+        Axiom(
+            "top_new_undef",
+            Negation(Definedness(app("top", const("new")))),
+        ),
         Axiom(
             "top_push",
             forall(
@@ -372,9 +382,17 @@ def list_spec() -> Spec:
     )
 
     axioms = (
-        # hd: partial, skip nil, cons → 1 axiom
+        # hd: partial, 2 constructors → 2 axioms (undefined on nil, projection on cons)
+        Axiom(
+            "hd_nil_undef",
+            Negation(Definedness(app("hd", const("nil")))),
+        ),
         Axiom("hd_cons", forall([x, L], eq(app("hd", app("cons", x, L)), x))),
-        # tl: partial, skip nil, cons → 1 axiom
+        # tl: partial, 2 constructors → 2 axioms (undefined on nil, projection on cons)
+        Axiom(
+            "tl_nil_undef",
+            Negation(Definedness(app("tl", const("nil")))),
+        ),
         Axiom("tl_cons", forall([x, L], eq(app("tl", app("cons", x, L)), L))),
         # append: 2 constructors (nil, cons) on first arg → 2 axioms
         Axiom("append_nil", forall([M], eq(app("append", const("nil"), M), M))),
