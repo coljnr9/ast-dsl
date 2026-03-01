@@ -17,7 +17,7 @@ from .llm import AsyncLLMClient, UsageInfo
 from .obligation import build_obligation_table, ObligationTable
 from .obligation_render import render_obligation_table
 from .prompt import render
-from .prompt_chunks import Stage, build_default_prompt
+from .prompt_chunks import ChunkId, Stage, assemble_prompt, build_default_prompt
 from .result import Err, Ok, Result
 from .score import SpecScore, score_spec
 from .signature import GeneratedSortInfo, Signature
@@ -117,10 +117,9 @@ def _build_stage2_user_prompt(
 def _execute_signature_code(code: str) -> Signature | str:
     """Execute Stage 1 code and extract a Signature.
 
-    The code should define variables that we can use to construct a Signature,
-    or define a function that returns one. We look for:
-      1. A `sig` or `signature` variable of type Signature
-      2. A `generated_sorts` variable (dict)
+    The LLM must produce a Signature with GeneratedSortInfo objects
+    baked into the constructor. No legacy normalization — fail loud
+    if the format is wrong.
     """
     namespace: dict[str, Any] = {}
     exec("from alspec import *", namespace)
@@ -131,10 +130,10 @@ def _execute_signature_code(code: str) -> Signature | str:
     except Exception as e:
         return f"Stage 1 code execution failed: {e}"
 
-    # Look for signature
+    # Look for signature — accept `sig` or `signature` variable names,
+    # or any Signature instance in the namespace
     sig = namespace.get("sig") or namespace.get("signature")
     if sig is None:
-        # Maybe they defined it inside a function
         for name, val in namespace.items():
             if isinstance(val, Signature):
                 sig = val
@@ -143,48 +142,18 @@ def _execute_signature_code(code: str) -> Signature | str:
     if not isinstance(sig, Signature):
         return "Stage 1 code did not produce a Signature object (expected `sig = Signature(...))`"
 
-    # Look for generated_sorts — two accepted patterns:
-    #   Pattern A: separate `generated_sorts = {...}` variable (legacy, explicit)
-    #   Pattern B: `generated_sorts` baked into the Signature constructor itself
-    # If the signature already has a non-empty generated_sorts, use it directly.
-    if sig.generated_sorts:
-        return sig
+    # Validate generated_sorts contains proper GeneratedSortInfo objects
+    if not sig.generated_sorts:
+        return "Stage 1 Signature has empty generated_sorts — must define at least one generated sort"
 
-    gen_sorts = namespace.get("generated_sorts")
-    if gen_sorts is None:
-        return "Stage 1 code did not define `generated_sorts` dict"
+    for sort_name, info in sig.generated_sorts.items():
+        if not isinstance(info, GeneratedSortInfo):
+            return (
+                f"generated_sorts['{sort_name}'] is {type(info).__name__}, "
+                f"expected GeneratedSortInfo. Raw tuples/dicts are not accepted."
+            )
 
-    if not isinstance(gen_sorts, dict):
-        return f"generated_sorts should be a dict, got {type(gen_sorts).__name__}"
-
-    # Normalize: accept both GeneratedSortInfo values and raw tuple/list values
-    # (legacy format: {"Stack": ("new", "push")} → wrap into GeneratedSortInfo)
-    normalized: dict[str, GeneratedSortInfo] = {}
-    for sort_name, value in gen_sorts.items():
-        match value:
-            case GeneratedSortInfo():
-                normalized[sort_name] = value
-            case tuple() | list():
-                # Legacy: just constructor names, no selectors
-                normalized[sort_name] = GeneratedSortInfo(
-                    constructors=tuple(value),
-                    selectors={},
-                )
-            case _:
-                return (
-                    f"generated_sorts['{sort_name}'] must be a GeneratedSortInfo "
-                    f"or tuple of constructor names, got {type(value).__name__}"
-                )
-
-    # Patch normalized generated_sorts onto the signature
-    patched = Signature(
-        sorts=sig.sorts,
-        functions=sig.functions,
-        predicates=sig.predicates,
-        generated_sorts=normalized,
-    )
-
-    return patched
+    return sig
 
 
 def _execute_spec_code(code: str, fn_name: str) -> Spec | str:
@@ -222,6 +191,8 @@ async def run_pipeline(
     domain_id: str,
     domain_description: str,
     model: str,
+    *,
+    stage1_chunks: list[ChunkId] | None = None,
 ) -> PipelineResult:
     """Run the full two-stage pipeline for a domain.
 
@@ -235,7 +206,12 @@ async def run_pipeline(
     stage_usages: list[StageUsage] = []
 
     # ---- Stage 1: Signature generation ----
-    system1 = _build_stage1_system_prompt()
+    if stage1_chunks is not None:
+        system1 = assemble_prompt(
+            stage1_chunks, Stage.STAGE1, validate_deps=False, validate_stage=False
+        )
+    else:
+        system1 = _build_stage1_system_prompt()
     stage1_user = _build_stage1_user_prompt(domain_description, fn_name)
     stage1_messages = [
         {"role": "system", "content": system1},
