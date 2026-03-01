@@ -622,7 +622,9 @@ def _save_results(
     per_domain_raw_path = output_dir / "per_domain_raw.csv"
     with per_domain_raw_path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
-        writer.writerow(["domain", "replicate"] + [r["name"] + "_health" for r in rungs])
+        writer.writerow(
+            ["domain", "replicate"] + [r["name"] + "_health" for r in rungs]
+        )
         for domain_id in domain_ids:
             for rep in range(replicates):
                 row: list = [domain_id, rep]
@@ -696,7 +698,7 @@ async def main() -> int:
     parser.add_argument(
         "--concurrency",
         type=int,
-        default=8,
+        default=20,
         help="Max concurrent domain calls per rung (default: 8)",
     )
     parser.add_argument(
