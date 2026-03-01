@@ -14,8 +14,10 @@ And computes a composite ``health`` score in [0, 1].
 
 from __future__ import annotations
 
+import ast
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,59 @@ from alspec.pipeline import _execute_signature_code
 from alspec.signature import GeneratedSortInfo, Signature
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Failure Classification
+# ---------------------------------------------------------------------------
+
+
+class FailureCategory(Enum):
+    """Classifies why a Stage 1 output failed."""
+
+    OK = "ok"  # Parsed successfully, has a Signature
+    SYNTAX_ERROR = "syntax"  # ast.parse() fails — invalid Python
+    IMPORT_ERROR = "import"  # NameError on alspec symbols
+    API_MISUSE = "api_misuse"  # TypeError/ValueError in alspec constructors
+    WRONG_TYPE = "wrong_type"  # Code executed but no Signature produced
+    EXEC_ERROR = "exec_error"  # Other execution error
+
+
+def classify_failure(
+    code: str,
+) -> tuple[Signature | None, FailureCategory, str | None]:
+    """Try to execute code and classify the result."""
+    # Step 1: syntax check
+    try:
+        ast.parse(code)
+    except SyntaxError as e:
+        return None, FailureCategory.SYNTAX_ERROR, f"line {e.lineno}: {e.msg}"
+
+    # Step 2: execute
+    namespace: dict[str, Any] = {}
+    try:
+        exec("from alspec import *", namespace)  # noqa: S102
+        exec("from alspec.helpers import *", namespace)  # noqa: S102
+        exec(code, namespace)  # noqa: S102
+    except NameError as e:
+        return None, FailureCategory.IMPORT_ERROR, str(e)
+    except (TypeError, ValueError) as e:
+        return None, FailureCategory.API_MISUSE, str(e)
+    except Exception as e:
+        return None, FailureCategory.EXEC_ERROR, f"{type(e).__name__}: {e}"
+
+    # Step 3: find Signature
+    sig = namespace.get("sig") or namespace.get("signature")
+    if sig is None:
+        for val in namespace.values():
+            if isinstance(val, Signature):
+                sig = val
+                break
+
+    if not isinstance(sig, Signature):
+        return None, FailureCategory.WRONG_TYPE, "No Signature object produced"
+
+    return sig, FailureCategory.OK, None
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +125,7 @@ class Stage1Score:
 
     # --- Metadata ---
     error_message: str | None  # set when parse_success=False
+    failure_category: FailureCategory = FailureCategory.OK
     partial_parse_credit: float = 0.0  # non-zero only when parse_success=False
 
 
@@ -84,6 +140,7 @@ def _make_zero_score(
     replicate: int,
     model: str,
     error_message: str,
+    failure_category: FailureCategory = FailureCategory.EXEC_ERROR,
     factor_levels: dict[str, int] | None = None,
     raw_output: str = "",
 ) -> Stage1Score:
@@ -96,6 +153,7 @@ def _make_zero_score(
         factor_levels=factor_levels or {},
         parse_success=False,
         well_formed=False,
+        failure_category=failure_category,
         sort_count=0,
         function_count=0,
         predicate_count=0,
@@ -316,10 +374,10 @@ def _observer_count(sig: Signature) -> int:
 def score_stage1_output(
     code: str,
     domain: str,
-    trial_id: int,
-    replicate: int,
-    model: str,
-    golden_dir: Path,
+    trial_id: int = 0,
+    replicate: int = 0,
+    model: str = "unknown",
+    golden_dir: Path = Path("golden/"),
     factor_levels: dict[str, int] | None = None,
 ) -> Stage1Score:
     """Score a raw Stage 1 code string.
@@ -341,15 +399,22 @@ def score_stage1_output(
         Path to the ``golden/`` directory for reference signatures.
     """
     # ---- Parse ----
-    sig_or_err = _execute_signature_code(code)
-    match sig_or_err:
-        case str(err):
+    sig, failure_category, err = classify_failure(code)
+    match failure_category:
+        case FailureCategory.OK:
+            # Since failure_category is OK, sig is not None.
+            assert sig is not None
+        case _:
             return _make_zero_score(
-                domain, trial_id, replicate, model, err, factor_levels,
+                domain,
+                trial_id,
+                replicate,
+                model,
+                err or "Unknown error",
+                failure_category=failure_category,
+                factor_levels=factor_levels,
                 raw_output=code,
             )
-        case Signature() as sig:
-            pass
 
     parse_success = True
 
@@ -437,5 +502,6 @@ def score_stage1_output(
         cell_count_delta=cell_count_delta,
         health=health,
         error_message=None,
+        failure_category=FailureCategory.OK,
         partial_parse_credit=0.0,
     )

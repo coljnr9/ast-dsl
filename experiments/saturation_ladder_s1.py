@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""Saturation ladder experiment: measure how spec quality scales with example count.
+"""Saturation ladder experiment (Stage 1 only).
 
-Each rung adds one more worked example to the Stage 1 prompt.
-Stage 2 prompt is held constant (default config).
-All 20 eval domains are tested at each rung.
+Measure how signature quality scales with example count, skipping Stage 2.
+This is faster and cheaper than the full pipeline.
 
 Usage:
-    python experiments/saturation_ladder.py [--model MODEL] [--output-dir DIR] [--dry-run]
-    python experiments/saturation_ladder.py --replicates 3 --dry-run
+    python experiments/saturation_ladder_s1.py [--model MODEL] [--output-dir DIR] [--dry-run]
+    python experiments/saturation_ladder_s1.py --replicates 3 --dry-run
 """
 
 from __future__ import annotations
@@ -24,6 +23,10 @@ import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
+from alspec.eval.stage1_score import FailureCategory, score_stage1_output
+from alspec.pipeline import run_pipeline_stage1_only
+from alspec.prompt_chunks import ChunkId, Stage, assemble_prompt
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)-5s %(message)s",
@@ -34,8 +37,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Rung definitions
 # ---------------------------------------------------------------------------
-
-from alspec.prompt_chunks import ChunkId, Stage, assemble_prompt
 
 FOUNDATION = [
     ChunkId.ROLE_PREAMBLE,
@@ -137,7 +138,7 @@ def _dry_run(rungs: list[dict], domains: list, replicates: int) -> None:
     total_calls = len(RUNGS) * len(DOMAINS) * replicates
 
     print("\n" + "═" * 70)
-    print("  Saturation Ladder — DRY RUN")
+    print("  Saturation Ladder S1 — DRY RUN")
     print("═" * 70)
     print(f"  Domains ({len(DOMAINS)}):")
     for d in DOMAINS:
@@ -168,30 +169,40 @@ def _dry_run(rungs: list[dict], domains: list, replicates: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_record(
+def _make_s1_record(
     rung_name: str,
     domain_id: str,
     replicate: int,
     *,
     parse_ok: bool,
-    wf: bool,
+    well_formed: bool,
+    failure_category: str,
     health: float,
-    coverage_ratio: float | None,
-    error_stage: str | None,
+    sort_overlap: float,
+    function_overlap: float,
+    predicate_overlap: float,
+    constructor_overlap: float,
+    cell_count_delta: int,
     error: str | None,
     latency_ms: int,
+    tokens_est: int = 0,
 ) -> dict:
     return {
         "rung": rung_name,
         "domain_id": domain_id,
         "replicate": replicate,
         "parse_ok": parse_ok,
-        "wf": wf,
+        "well_formed": well_formed,
+        "failure_category": failure_category,
         "health": health,
-        "coverage_ratio": coverage_ratio,
-        "error_stage": error_stage,
+        "sort_overlap": sort_overlap,
+        "function_overlap": function_overlap,
+        "predicate_overlap": predicate_overlap,
+        "constructor_overlap": constructor_overlap,
+        "cell_count_delta": cell_count_delta,
         "error": error,
         "latency_ms": latency_ms,
+        "tokens_est": tokens_est,
     }
 
 
@@ -207,12 +218,11 @@ async def _run_domain(
     model: str,
     replicate: int,
 ) -> dict:
-    """Run the full pipeline for a single domain. Never raises."""
-    from alspec.pipeline import run_pipeline
-
+    """Run Stage 1 only for a single domain. Never raises."""
     t0 = time.monotonic()
+    tokens_est = _estimate_tokens(rung["chunks"])
     try:
-        result = await run_pipeline(
+        result = await run_pipeline_stage1_only(
             client,
             domain.id,
             domain.description,
@@ -221,45 +231,51 @@ async def _run_domain(
         )
     except Exception as exc:
         latency_ms = int((time.monotonic() - t0) * 1000)
-        return _make_record(
+        return _make_s1_record(
             rung["name"],
             domain.id,
             replicate,
             parse_ok=False,
-            wf=False,
+            well_formed=False,
+            failure_category=FailureCategory.EXEC_ERROR.value,
             health=0.0,
-            coverage_ratio=None,
-            error_stage="runner",
+            sort_overlap=0.0,
+            function_overlap=0.0,
+            predicate_overlap=0.0,
+            constructor_overlap=0.0,
+            cell_count_delta=0,
             error=str(exc),
             latency_ms=latency_ms,
+            tokens_est=tokens_est,
         )
 
     latency_ms = int((time.monotonic() - t0) * 1000)
 
-    parse_ok = result.spec is not None
-    wf = False
-    health = 0.0
-    coverage_ratio = None
+    # Score the output
+    score = score_stage1_output(
+        code=result.signature_code or "",
+        domain=domain.id,
+        replicate=replicate,
+        model=model,
+        golden_dir=Path("golden/"),
+    )
 
-    if result.score is not None:
-        wf = result.score.well_formed
-        health = result.score.health
-        coverage_ratio = result.score.coverage_ratio
-
-    if not parse_ok:
-        health = 0.0
-
-    return _make_record(
+    return _make_s1_record(
         rung["name"],
         domain.id,
         replicate,
-        parse_ok=parse_ok,
-        wf=wf,
-        health=health,
-        coverage_ratio=coverage_ratio,
-        error_stage=result.error_stage,
-        error=result.error,
+        parse_ok=score.parse_success,
+        well_formed=score.well_formed,
+        failure_category=score.failure_category.value,
+        health=score.health,
+        sort_overlap=score.sort_overlap,
+        function_overlap=score.function_overlap,
+        predicate_overlap=score.predicate_overlap,
+        constructor_overlap=score.constructor_overlap,
+        cell_count_delta=score.cell_count_delta,
+        error=score.error_message or result.error,
         latency_ms=latency_ms,
+        tokens_est=tokens_est,
     )
 
 
@@ -281,18 +297,13 @@ async def _run_rung_replicate(
     completed_before: int,
     total_calls: int,
 ) -> list[dict]:
-    """Run all domains for a single (rung, replicate) pair with bounded concurrency.
-
-    Returns the list of result records (one per domain).
-    Prints per-domain one-liners as results arrive, then a rung summary.
-    Errors are printed loudly on first occurrence; repeats are counted.
-    """
+    """Run all domains for a single (rung, replicate) pair with bounded concurrency."""
     rung_name = rung["name"]
     semaphore = asyncio.Semaphore(max_concurrent)
     lock = asyncio.Lock()
     rung_records: list[dict] = []
     completed_in_batch = 0
-    seen_errors: dict[str, int] = {}  # error message → count
+    seen_errors: dict[str, int] = {}
     batch_start = time.monotonic()
 
     async def _run_one(domain) -> dict:
@@ -309,19 +320,18 @@ async def _run_rung_replicate(
             health_str = f"{record['health']:.2f}"
             latency_s = record["latency_ms"] / 1000
 
-            if record["error"] is not None:
-                err_msg = record["error"]
-                err_key = f"{record['error_stage']}:{err_msg[:80]}"
+            if record["failure_category"] != "ok":
+                err_msg = record["error"] or "Unknown error"
+                err_key = f"{record['failure_category']}:{err_msg[:80]}"
 
                 if err_key not in seen_errors:
-                    # First occurrence: print loud
                     seen_errors[err_key] = 1
                     logger.error(
                         "  ✗ %-22s health=%s  (%.1fs)  [%s] %s",
                         domain.id,
                         health_str,
                         latency_s,
-                        record["error_stage"],
+                        record["failure_category"],
                         err_msg[:120],
                     )
                 else:
@@ -331,11 +341,11 @@ async def _run_rung_replicate(
                         domain.id,
                         health_str,
                         latency_s,
-                        record["error_stage"],
+                        record["failure_category"],
                         seen_errors[err_key],
                     )
             else:
-                wf_flag = "WF" if record["wf"] else "--"
+                wf_flag = "WF" if record["well_formed"] else "--"
                 logger.info(
                     "  ✓ %-22s health=%s %s  (%.1fs)",
                     domain.id,
@@ -344,7 +354,7 @@ async def _run_rung_replicate(
                     latency_s,
                 )
 
-            # Running ETA (across entire experiment)
+            # Running ETA
             global_completed = completed_before + completed_in_batch
             elapsed_total = time.monotonic() - experiment_start
             if elapsed_total > 0 and global_completed > 0:
@@ -366,7 +376,6 @@ async def _run_rung_replicate(
     tasks = [_run_one(domain) for domain in domains]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # Handle any unexpected exceptions from gather
     final_records: list[dict] = []
     for i, r in enumerate(results):
         match r:
@@ -378,27 +387,29 @@ async def _run_rung_replicate(
                     domains[i].id,
                     "".join(traceback.format_exception_only(type(exc), exc)).strip(),
                 )
-                record = _make_record(
+                record = _make_s1_record(
                     rung_name,
                     domains[i].id,
                     replicate,
                     parse_ok=False,
-                    wf=False,
+                    well_formed=False,
+                    failure_category="exec_error",
                     health=0.0,
-                    coverage_ratio=None,
-                    error_stage="gather",
+                    sort_overlap=0.0,
+                    function_overlap=0.0,
+                    predicate_overlap=0.0,
+                    constructor_overlap=0.0,
+                    cell_count_delta=0,
                     error=str(exc),
                     latency_ms=0,
                 )
                 final_records.append(record)
 
-    # Rung-replicate summary
     batch_elapsed = time.monotonic() - batch_start
     summary = _rung_summary(final_records)
     _print_rung_summary(rung_name, summary, replicate=replicate, replicates=replicates)
     logger.info("  Batch completed in %.1fs", batch_elapsed)
 
-    # Report deduplicated error counts
     if seen_errors:
         logger.warning("  Error summary for %s rep %d:", rung_name, replicate)
         for err_key, count in seen_errors.items():
@@ -412,18 +423,7 @@ async def _run_rung_replicate(
 # ---------------------------------------------------------------------------
 
 
-def _median(vals: list[float]) -> float:
-    """Return median of a non-empty list."""
-    sorted_vals = sorted(vals)
-    n = len(sorted_vals)
-    mid = n // 2
-    if n % 2 == 1:
-        return sorted_vals[mid]
-    return (sorted_vals[mid - 1] + sorted_vals[mid]) / 2.0
-
-
 def _stddev(vals: list[float]) -> float:
-    """Population standard deviation."""
     if len(vals) < 2:
         return 0.0
     mean = sum(vals) / len(vals)
@@ -432,30 +432,33 @@ def _stddev(vals: list[float]) -> float:
 
 
 def _rung_summary(records: list[dict]) -> dict:
-    """Aggregate metrics for a set of records (one rung, possibly multiple replicates)."""
     total = len(records)
-    if total == 0:
-        return {
-            "total": 0,
-            "parse": 0,
-            "wf": 0,
-            "health_mean": 0.0,
-            "health_std": 0.0,
-            "coverage_mean": None,
-        }
-
     parsed = [r for r in records if r["parse_ok"]]
-    wf_records = [r for r in records if r["wf"]]
+    wf = [r for r in records if r["well_formed"]]
     health_vals = [r["health"] for r in records]
-    cov_vals = [r["coverage_ratio"] for r in records if r["coverage_ratio"] is not None]
+    cond_health_vals = [r["health"] for r in parsed]
+
+    failures = {}
+    for r in records:
+        cat = r["failure_category"]
+        if cat != "ok":
+            failures[cat] = failures.get(cat, 0) + 1
 
     return {
         "total": total,
-        "parse": len(parsed),
-        "wf": len(wf_records),
-        "health_mean": sum(health_vals) / total,
+        "parse_count": len(parsed),
+        "wf_count": len(wf),
+        "health_mean": sum(health_vals) / total if total > 0 else 0.0,
         "health_std": _stddev(health_vals),
-        "coverage_mean": sum(cov_vals) / len(cov_vals) if cov_vals else None,
+        "cond_health_mean": (
+            sum(cond_health_vals) / len(cond_health_vals) if cond_health_vals else 0.0
+        ),
+        "cond_health_std": _stddev(cond_health_vals) if cond_health_vals else 0.0,
+        "syntax_errors": failures.get("syntax", 0),
+        "import_errors": failures.get("import", 0),
+        "api_misuse_errors": failures.get("api_misuse", 0),
+        "exec_errors": failures.get("exec_error", 0),
+        "wrong_type_errors": failures.get("wrong_type", 0),
     }
 
 
@@ -467,35 +470,34 @@ def _print_rung_summary(
     replicates: int = 1,
 ) -> None:
     total = summary["total"]
-    parse = summary["parse"]
-    wf = summary["wf"]
+    parse = summary["parse_count"]
     health = summary["health_mean"]
-    health_std = summary["health_std"]
-    cov = summary["coverage_mean"]
+    cond_health = summary["cond_health_mean"]
 
-    cov_str = f"{cov * 100:.1f}%" if cov is not None else "n/a"
-    wf_denom = parse if parse > 0 else 1
+    syntax = summary["syntax_errors"]
+    import_err = summary["import_errors"]
+    api = summary["api_misuse_errors"]
 
-    if replicate is not None and replicates > 1:
-        rep_tag = f"[rep {replicate + 1}/{replicates}] "
-    else:
-        rep_tag = ""
+    parse_pct = f"{100 * parse / total:.0f}%" if total > 0 else "0%"
+    rep_tag = f"[rep {replicate + 1}/{replicates}] " if replicate is not None else ""
 
     print(
-        f"  {rep_tag}{rung_name}: {parse}/{total} parse  "
-        f"{wf}/{wf_denom} WF  "
-        f"health={health:.2f} ± {health_std:.2f}  "
-        f"coverage={cov_str}"
+        f"  {rep_tag}{rung_name}: {parse_pct} parse | "
+        f"health={health:.2f} | cond_health={cond_health:.2f} | "
+        f"failures: {syntax} syntax, {import_err} import, {api} api"
     )
 
 
 def _print_comparison_table(rungs: list[dict], all_records: list[dict]) -> None:
-    print("\n" + "═" * 65)
-    print("  Saturation Ladder Results")
-    print("═" * 65)
-    header = f"{'Rung':<6}  {'Examples':>8}  {'Parse':>7}  {'WF':>7}  {'Health':>6}  {'±Std':>5}  {'Coverage':>9}  {'Tokens':>10}"
+    print("\n" + "═" * 90)
+    print("  Saturation Ladder S1 Results")
+    print("═" * 90)
+    header = (
+        f"{'Rung':<6}  {'Ex':>2}  {'Parse':>6}  {'Health':>6}  {'±Std':>5}  "
+        f"{'CondH':>6}  {'±Std':>5}  {'Syn':>3}  {'Imp':>3}  {'API':>3}  {'Tok':>5}"
+    )
     print(header)
-    print("─" * 65)
+    print("─" * 90)
 
     for rung in rungs:
         rung_name = rung["name"]
@@ -507,24 +509,20 @@ def _print_comparison_table(rungs: list[dict], all_records: list[dict]) -> None:
         summary = _rung_summary(rung_records)
 
         total = summary["total"]
-        parse = summary["parse"]
-        wf = summary["wf"]
-        health = summary["health_mean"]
-        health_std = summary["health_std"]
-        cov = summary["coverage_mean"]
-
-        parse_pct = f"{100 * parse / total:.1f}%" if total > 0 else "n/a"
-        wf_denom = parse if parse > 0 else 1
-        wf_pct = f"{100 * wf / wf_denom:.1f}%" if parse > 0 else "n/a"
-        cov_str = f"{cov * 100:.1f}%" if cov is not None else "n/a"
-        std_str = f"{health_std:.2f}"
+        parse_pct = (
+            f"{100 * summary['parse_count'] / total:.0f}%" if total > 0 else "n/a"
+        )
 
         short = rung_name[:6]
         print(
-            f"{short:<6}  {n_examples:>8}  {parse_pct:>7}  {wf_pct:>7}  {health:>6.2f}  {std_str:>5}  {cov_str:>9}  {tok_label:>10}"
+            f"{short:<6}  {n_examples:>2}  {parse_pct:>6}  "
+            f"{summary['health_mean']:>6.2f}  {summary['health_std']:>5.2f}  "
+            f"{summary['cond_health_mean']:>6.2f}  {summary['cond_health_std']:>5.2f}  "
+            f"{summary['syntax_errors']:>3}  {summary['import_errors']:>3}  "
+            f"{summary['api_misuse_errors']:>3}  {tok_label:>5}"
         )
 
-    print("═" * 65 + "\n")
+    print("═" * 90 + "\n")
 
 
 # ---------------------------------------------------------------------------
@@ -542,13 +540,11 @@ def _save_results(
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # results.jsonl — one record per (rung, domain, replicate)
     jsonl_path = output_dir / "results.jsonl"
     with jsonl_path.open("w", encoding="utf-8") as fh:
         for rec in all_records:
             fh.write(json.dumps(rec) + "\n")
 
-    # summary.csv — one row per rung, pooling ALL replicates
     summary_path = output_dir / "summary.csv"
     with summary_path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
@@ -557,116 +553,89 @@ def _save_results(
                 "rung",
                 "n_examples",
                 "total",
-                "parse",
-                "wf",
+                "parse_count",
+                "wf_count",
                 "health_mean",
                 "health_std",
-                "coverage_mean",
+                "cond_health_mean",
+                "cond_health_std",
+                "syntax_errors",
+                "import_errors",
+                "api_misuse_errors",
+                "exec_errors",
+                "wrong_type_errors",
                 "tokens_est",
             ]
         )
         for rung in rungs:
-            rung_name = rung["name"]
-            n_examples = len(rung["chunks"]) - len(FOUNDATION)
-            tok = _estimate_tokens(rung["chunks"])
-            rung_records = [r for r in all_records if r["rung"] == rung_name]
-            summary = _rung_summary(rung_records)
+            rung_records = [r for r in all_records if r["rung"] == rung["name"]]
+            s = _rung_summary(rung_records)
             writer.writerow(
                 [
-                    rung_name,
-                    n_examples,
-                    summary["total"],
-                    summary["parse"],
-                    summary["wf"],
-                    f"{summary['health_mean']:.4f}",
-                    f"{summary['health_std']:.4f}",
-                    (
-                        f"{summary['coverage_mean']:.4f}"
-                        if summary["coverage_mean"] is not None
-                        else ""
-                    ),
-                    tok,
+                    rung["name"],
+                    len(rung["chunks"]) - len(FOUNDATION),
+                    s["total"],
+                    s["parse_count"],
+                    s["wf_count"],
+                    f"{s['health_mean']:.4f}",
+                    f"{s['health_std']:.4f}",
+                    f"{s['cond_health_mean']:.4f}",
+                    f"{s['cond_health_std']:.4f}",
+                    s["syntax_errors"],
+                    s["import_errors"],
+                    s["api_misuse_errors"],
+                    s["exec_errors"],
+                    s["wrong_type_errors"],
+                    _estimate_tokens(rung["chunks"]),
                 ]
             )
 
-    # Collect all domain ids in stable order from records
-    domain_ids: list[str] = []
-    seen_ids: set[str] = set()
-    for rec in all_records:
-        if rec["domain_id"] not in seen_ids:
-            domain_ids.append(rec["domain_id"])
-            seen_ids.add(rec["domain_id"])
+    domain_ids = sorted(list(set(r["domain_id"] for r in all_records)))
 
-    # per_domain.csv — rows=domains, columns=rungs, values=MEDIAN health across replicates
     per_domain_path = output_dir / "per_domain.csv"
     with per_domain_path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
         writer.writerow(["domain"] + [r["name"] + "_health" for r in rungs])
-        for domain_id in domain_ids:
-            row = [domain_id]
+        for d_id in domain_ids:
+            row = [d_id]
             for rung in rungs:
-                rung_name = rung["name"]
-                cell_records = [
+                recs = [
                     r
                     for r in all_records
-                    if r["rung"] == rung_name and r["domain_id"] == domain_id
+                    if r["rung"] == rung["name"] and r["domain_id"] == d_id
                 ]
-                if cell_records:
-                    health_vals = [r["health"] for r in cell_records]
-                    row.append(f"{_median(health_vals):.4f}")
+                if recs:
+                    h_vals = sorted([r["health"] for r in recs])
+                    mid = len(h_vals) // 2
+                    median = (
+                        h_vals[mid]
+                        if len(h_vals) % 2 == 1
+                        else (h_vals[mid - 1] + h_vals[mid]) / 2.0
+                    )
+                    row.append(f"{median:.4f}")
                 else:
                     row.append("")
             writer.writerow(row)
 
-    # per_domain_raw.csv — one row per (domain, replicate) with all rung health values
-    per_domain_raw_path = output_dir / "per_domain_raw.csv"
-    with per_domain_raw_path.open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.writer(fh)
-        writer.writerow(["domain", "replicate"] + [r["name"] + "_health" for r in rungs])
-        for domain_id in domain_ids:
-            for rep in range(replicates):
-                row: list = [domain_id, rep]
-                for rung in rungs:
-                    rung_name = rung["name"]
-                    cell_records = [
-                        r
-                        for r in all_records
-                        if r["rung"] == rung_name
-                        and r["domain_id"] == domain_id
-                        and r["replicate"] == rep
-                    ]
-                    if cell_records:
-                        row.append(f"{cell_records[0]['health']:.4f}")
-                    else:
-                        row.append("")
-                writer.writerow(row)
-
-    # config.json
     config_path = output_dir / "config.json"
     config = {
         "model": model,
         "timestamp": timestamp,
         "replicates": replicates,
+        "experiment_type": "stage1_only",
         "rungs": [
             {
-                "name": rung["name"],
-                "label": rung["label"],
-                "n_examples": len(rung["chunks"]) - len(FOUNDATION),
-                "chunks": [c.name for c in rung["chunks"]],
-                "tokens_est": _estimate_tokens(rung["chunks"]),
+                "name": r["name"],
+                "n_examples": len(r["chunks"]) - len(FOUNDATION),
+                "tokens_est": _estimate_tokens(r["chunks"]),
             }
-            for rung in rungs
+            for r in rungs
         ],
     }
     with config_path.open("w", encoding="utf-8") as fh:
         json.dump(config, fh, indent=2)
 
     print(f"  Saved results to {output_dir}/")
-    print(f"    results.jsonl      ({len(all_records)} records)")
-    print(f"    summary.csv        (per-rung aggregates, pooled replicates)")
-    print(f"    per_domain.csv     (median health matrix)")
-    print(f"    per_domain_raw.csv (one row per domain×replicate)")
-    print(f"    config.json        (run metadata)")
 
 
 # ---------------------------------------------------------------------------
@@ -675,36 +644,16 @@ def _save_results(
 
 
 async def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Saturation ladder experiment: sweep example count across all eval domains."
-    )
+    parser = argparse.ArgumentParser(description="Saturation ladder (Stage 1 only)")
     parser.add_argument(
         "--model",
         default="google/gemini-3-flash-preview",
-        help="LLM model identifier (default: google/gemini-3-flash-preview)",
+        help="LLM model identifier",
     )
-    parser.add_argument(
-        "--output-dir",
-        default=None,
-        help="Directory to write results into (default: results/saturation-ladder-<timestamp>/)",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print rung definitions and token estimates without making LLM calls",
-    )
-    parser.add_argument(
-        "--concurrency",
-        type=int,
-        default=8,
-        help="Max concurrent domain calls per rung (default: 8)",
-    )
-    parser.add_argument(
-        "--replicates",
-        type=int,
-        default=1,
-        help="Number of times to repeat each (rung, domain) pair (default: 1)",
-    )
+    parser.add_argument("--output-dir", default=None)
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--concurrency", type=int, default=10)
+    parser.add_argument("--replicates", type=int, default=1)
     args = parser.parse_args()
 
     from alspec.eval.domains import DOMAINS
@@ -713,105 +662,46 @@ async def main() -> int:
         _dry_run(RUNGS, DOMAINS, args.replicates)
         return 0
 
-    replicates: int = args.replicates
-
-    # Build output dir
     timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    if args.output_dir is not None:
-        output_dir = Path(args.output_dir)
-    else:
-        output_dir = Path("results") / f"saturation-ladder-{timestamp}"
+    output_dir = Path(args.output_dir or f"results/saturation-s1-{timestamp}")
 
-    # Initialise LLM client
     from alspec.llm import AsyncLLMClient
-
-    from alspec.result import Err, Ok
+    from alspec.result import Ok
 
     client_res = AsyncLLMClient.from_env()
     match client_res:
-        case Err(e):
-            print(f"Failed to initialize LLM client: {e}", file=sys.stderr)
-            return 1
         case Ok(client):
-            client._session_id = f"saturation-ladder-{timestamp}"
+            client._session_id = f"saturation-s1-{timestamp}"
+        case _:
+            print("Failed to init LLM client")
+            return 1
 
-    model: str = args.model
-    max_concurrent: int = args.concurrency
-    total_calls = len(RUNGS) * len(DOMAINS) * replicates
+    total_calls = len(RUNGS) * len(DOMAINS) * args.replicates
+    all_records = []
+    start = time.monotonic()
 
-    logger.info("Saturation Ladder Experiment")
-    logger.info("  model       : %s", model)
-    logger.info("  output-dir  : %s", output_dir)
-    logger.info("  domains     : %d", len(DOMAINS))
-    logger.info("  rungs       : %d", len(RUNGS))
-    logger.info("  replicates  : %d", replicates)
-    logger.info("  concurrency : %d", max_concurrent)
-    logger.info(
-        "  total calls : %d rungs × %d domains × %d replicates = %d",
-        len(RUNGS),
-        len(DOMAINS),
-        replicates,
-        total_calls,
-    )
-    logger.info("")
-
-    all_records: list[dict] = []
-    experiment_start = time.monotonic()
-
-    # Outer loop: replicate index — so all domains for rep 0 run before rep 1
     for rung in RUNGS:
-        rung_name = rung["name"]
-        n_examples = len(rung["chunks"]) - len(FOUNDATION)
-        tok = _estimate_tokens(rung["chunks"])
-
         logger.info("─" * 60)
-        logger.info(
-            "  Rung: %s  (%d example%s, %s tokens est.)",
-            rung_name,
-            n_examples,
-            "s" if n_examples != 1 else "",
-            _tokens_label(tok),
-        )
+        logger.info("  Rung: %s", rung["name"])
         logger.info("─" * 60)
 
-        for rep in range(replicates):
-            if replicates > 1:
-                logger.info(
-                    "  [rep %d/%d] %s",
-                    rep + 1,
-                    replicates,
-                    rung_name,
-                )
-
-            rung_rep_records = await _run_rung_replicate(
+        for rep in range(args.replicates):
+            recs = await _run_rung_replicate(
                 client,
                 rung,
                 DOMAINS,
-                model,
-                max_concurrent,
+                args.model,
+                args.concurrency,
                 rep,
-                replicates,
-                experiment_start=experiment_start,
+                args.replicates,
+                experiment_start=start,
                 completed_before=len(all_records),
                 total_calls=total_calls,
             )
-            all_records.extend(rung_rep_records)
-
-        # Print pooled rung summary (across all replicates) when replicates > 1
-        if replicates > 1:
-            rung_all = [r for r in all_records if r["rung"] == rung_name]
-            summary = _rung_summary(rung_all)
-            print(
-                f"  Rung total: {rung_name}: {summary['parse']}/{summary['total']} parse  "
-                f"health={summary['health_mean']:.2f} ± {summary['health_std']:.2f}"
-            )
+            all_records.extend(recs)
 
     _print_comparison_table(RUNGS, all_records)
-    _save_results(output_dir, all_records, RUNGS, model, timestamp, replicates)
-
-    total_elapsed = time.monotonic() - experiment_start
-    logger.info("Experiment completed in %.1fm", total_elapsed / 60)
-
+    _save_results(output_dir, all_records, RUNGS, args.model, timestamp, args.replicates)
     return 0
 
 

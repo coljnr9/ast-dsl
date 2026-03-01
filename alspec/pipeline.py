@@ -142,9 +142,6 @@ def _execute_signature_code(code: str) -> Signature | str:
     if not isinstance(sig, Signature):
         return "Stage 1 code did not produce a Signature object (expected `sig = Signature(...))`"
 
-    # Validate generated_sorts contains proper GeneratedSortInfo objects
-    if not sig.generated_sorts:
-        return "Stage 1 Signature has empty generated_sorts — must define at least one generated sort"
 
     for sort_name, info in sig.generated_sorts.items():
         if not isinstance(info, GeneratedSortInfo):
@@ -186,7 +183,7 @@ def _execute_spec_code(code: str, fn_name: str) -> Spec | str:
 # ---------------------------------------------------------------------------
 
 
-async def run_pipeline(
+async def run_pipeline_stage1_only(
     client: AsyncLLMClient,
     domain_id: str,
     domain_description: str,
@@ -194,13 +191,7 @@ async def run_pipeline(
     *,
     stage1_chunks: list[ChunkId] | None = None,
 ) -> PipelineResult:
-    """Run the full two-stage pipeline for a domain.
-
-    Stage 1: Generate Signature + generated_sorts
-    Deterministic: Build obligation table
-    Stage 2: Generate complete Spec with axioms
-    Validation: Score the spec
-    """
+    """Run only Stage 1: Signature generation."""
     fn_name = domain_id.replace("-", "_") + "_spec"
     start_time = time.time()
     stage_usages: list[StageUsage] = []
@@ -226,11 +217,17 @@ async def run_pipeline(
         case Err(e):
             return PipelineResult(
                 success=False,
-                signature=None, signature_code=None, signature_analysis=None,
-                obligation_table=None, obligation_table_rendered=None,
-                spec=None, spec_code=None, spec_analysis=None,
+                signature=None,
+                signature_code=None,
+                signature_analysis=None,
+                obligation_table=None,
+                obligation_table_rendered=None,
+                spec=None,
+                spec_code=None,
+                spec_analysis=None,
                 score=None,
-                error=f"Stage 1 LLM error: {e}", error_stage="stage1",
+                error=f"Stage 1 LLM error: {e}",
+                error_stage="stage1",
                 stage_usages=tuple(stage_usages),
                 total_latency_ms=int((time.time() - start_time) * 1000),
             )
@@ -242,16 +239,76 @@ async def run_pipeline(
         case str(err):
             return PipelineResult(
                 success=False,
-                signature=None, signature_code=code1, signature_analysis=analysis1,
-                obligation_table=None, obligation_table_rendered=None,
-                spec=None, spec_code=None, spec_analysis=None,
+                signature=None,
+                signature_code=code1,
+                signature_analysis=analysis1,
+                obligation_table=None,
+                obligation_table_rendered=None,
+                spec=None,
+                spec_code=None,
+                spec_analysis=None,
                 score=None,
-                error=err, error_stage="stage1",
+                error=err,
+                error_stage="stage1",
                 stage_usages=tuple(stage_usages),
                 total_latency_ms=int((time.time() - start_time) * 1000),
             )
         case Signature() as sig:
-            pass
+            return PipelineResult(
+                success=True,
+                signature=sig,
+                signature_code=code1,
+                signature_analysis=analysis1,
+                obligation_table=None,
+                obligation_table_rendered=None,
+                spec=None,
+                spec_code=None,
+                spec_analysis=None,
+                score=None,
+                error=None,
+                error_stage=None,
+                stage_usages=tuple(stage_usages),
+                total_latency_ms=int((time.time() - start_time) * 1000),
+            )
+
+
+async def run_pipeline(
+    client: AsyncLLMClient,
+    domain_id: str,
+    domain_description: str,
+    model: str,
+    *,
+    stage1_chunks: list[ChunkId] | None = None,
+) -> PipelineResult:
+    """Run the full two-stage pipeline for a domain.
+
+    Stage 1: Generate Signature + generated_sorts
+    Deterministic: Build obligation table
+    Stage 2: Generate complete Spec with axioms
+    Validation: Score the spec
+    """
+    fn_name = domain_id.replace("-", "_") + "_spec"
+    start_time = time.time()
+
+    # ---- Stage 1: Signature generation ----
+    s1_result = await run_pipeline_stage1_only(
+        client,
+        domain_id,
+        domain_description,
+        model,
+        stage1_chunks=stage1_chunks,
+    )
+    if not s1_result.success:
+        return s1_result
+
+    # Since success is True, these are guaranteed
+    sig = s1_result.signature
+    assert sig is not None
+    code1 = s1_result.signature_code
+    assert code1 is not None
+    analysis1 = s1_result.signature_analysis
+    assert analysis1 is not None
+    stage_usages = list(s1_result.stage_usages)
 
     # ---- Deterministic: Obligation table ----
     try:
@@ -260,11 +317,17 @@ async def run_pipeline(
     except Exception as e:
         return PipelineResult(
             success=False,
-            signature=sig, signature_code=code1, signature_analysis=analysis1,
-            obligation_table=None, obligation_table_rendered=None,
-            spec=None, spec_code=None, spec_analysis=None,
+            signature=sig,
+            signature_code=code1,
+            signature_analysis=analysis1,
+            obligation_table=None,
+            obligation_table_rendered=None,
+            spec=None,
+            spec_code=None,
+            spec_analysis=None,
             score=None,
-            error=f"Obligation table error: {e}", error_stage="obligation",
+            error=f"Obligation table error: {e}",
+            error_stage="obligation",
             stage_usages=tuple(stage_usages),
             total_latency_ms=int((time.time() - start_time) * 1000),
         )

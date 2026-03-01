@@ -17,7 +17,7 @@ function profile refers to a sort in S.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
 
@@ -126,7 +126,7 @@ class GeneratedSortInfo:
     """
 
     constructors: tuple[str, ...]
-    selectors: Mapping[str, Mapping[str, str]]  # ctor_name → {selector_name: result_sort}
+    selectors: Mapping[str, Mapping[str, str]] = field(default_factory=dict)  # ctor_name → {selector_name: result_sort}
 
 
 # ---------------------------------------------------------------------------
