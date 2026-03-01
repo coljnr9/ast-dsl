@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 # are visible when the Langfuse client initializes.
 load_dotenv()
 
+from langfuse import propagate_attributes
 from langfuse.openai import AsyncOpenAI  # type: ignore[attr-defined]
 
 from alspec.result import Err, Ok, Result
@@ -145,11 +146,12 @@ class AsyncLLMClient:
     tracing code is needed in this class.
     """
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, session_id: str | None = None):
         self._client = AsyncOpenAI(
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
         )
+        self._session_id = session_id
 
     @classmethod
     def from_env(cls) -> Result["AsyncLLMClient", Exception]:
@@ -190,12 +192,21 @@ class AsyncLLMClient:
                 "type": "function",
                 "function": {"name": tool_name},
             }
-            response = await self._client.chat.completions.create(  # type: ignore[call-overload]
-                model=model,
-                messages=messages,
-                tools=[tool_schema],
-                tool_choice=tool_choice,
-            )
+            extra_body: dict[str, object] = {}
+            match self._session_id:
+                case str(sid):
+                    extra_body["langfuse_session_id"] = sid
+                case _:
+                    pass
+
+            with propagate_attributes(session_id=self._session_id):
+                response = await self._client.chat.completions.create(  # type: ignore[call-overload]
+                    model=model,
+                    messages=messages,
+                    tools=[tool_schema],
+                    tool_choice=tool_choice,
+                    extra_body=extra_body,
+                )
 
             match response.choices:
                 case []:
@@ -251,10 +262,19 @@ class AsyncLLMClient:
         """
         try:
             messages = self._prepare_messages(messages)
-            response = await self._client.chat.completions.create(
-                model=model,
-                messages=messages,  # type: ignore[arg-type]
-            )
+            extra_body: dict[str, object] = {}
+            match self._session_id:
+                case str(sid):
+                    extra_body["langfuse_session_id"] = sid
+                case _:
+                    pass
+
+            with propagate_attributes(session_id=self._session_id):
+                response = await self._client.chat.completions.create(
+                    model=model,
+                    messages=messages,  # type: ignore[arg-type]
+                    extra_body=extra_body,
+                )
 
             match response.choices:
                 case [choice, *_]:
