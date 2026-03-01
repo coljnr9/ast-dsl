@@ -678,9 +678,9 @@ def _walk_formula_preds(f: Formula, acc: set[str]) -> None:
         case Definedness(term):
             _walk_term_preds(term, acc)
         case _:
-            raise TypeError(
-                f"_walk_formula_preds: unexpected node type {type(f).__name__}"
-            )
+            # Unknown formula node — skip rather than crash the matcher.
+            # This can happen when the LLM puts a FnApp in formula position.
+            return
 
 
 def _walk_term_preds(t: Term, acc: set[str]) -> None:
@@ -696,9 +696,9 @@ def _walk_term_preds(t: Term, acc: set[str]) -> None:
         case Literal(_, _):
             pass
         case _:
-            raise TypeError(
-                f"_walk_term_preds: unexpected node type {type(t).__name__}"
-            )
+            # Unknown term node — skip rather than crash the matcher.
+            # This can happen when the LLM puts a PredApp in term position.
+            return
 
 
 def _collect_fn_names(f: Formula) -> set[str]:

@@ -27,7 +27,7 @@ model = "google/gemini-3-flash-preview"
 temperature = 0.7
 
 # Maximum number of concurrent LLM API calls. Semaphore-limited.
-max_concurrent = 4
+max_concurrent = 5
 
 [domains]
 # Which golden specs to evaluate against.

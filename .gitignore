@@ -14,3 +14,7 @@ wheels/
 
 # Reference PDFs
 algebraic-specification-references/
+*.pdf
+
+# Experiment Results
+results/
