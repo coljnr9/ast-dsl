@@ -28,16 +28,18 @@ def session_store_spec() -> Spec:
 
     - Selector extraction + foreign (get_token, last_input)
     - Equality predicate basis axioms (eq_token)
+    - Enumeration sort with explicit distinctness (Status: active/expired)
     - Partial constructor with definedness biconditional (refresh)
-    - Enumeration sort (Status: active/expired)
+    - Definedness-guarded preservation (all observers × refresh)
     - Domain case split in PLAIN cell (is_verified × verify)
     - State verification — guard references stored observer value (get_token)
     - Derived/composite predicate (needs_auth)
-    - Guarded preservation on partial constructor (all observers × refresh)
 
-    Obligation table: 4 observers × 4 constructors = 16 cells.
+    Obligation table: 5 observers × 4 constructors = 20 cells.
     All cells PLAIN (no key dispatch — observers take no key parameter).
-    Total axioms: 27 (22 obligation + 3 basis + 1 definedness + 1 derived).
+    Cells 14 and 18 (is_verified/needs_auth × verify) each split into
+    positive/negative guard sub-cases, yielding 22 obligation axioms.
+    Total axioms: 28 (22 obligation + 6 non-obligation).
     """
     # --- Variables ---
     s = var("s", "Session")
@@ -53,7 +55,7 @@ def session_store_spec() -> Spec:
             "Status": atomic("Status"),
         },
         functions={
-            # Status enumeration (pattern 11)
+            # Status enumeration
             "active": fn("active", [], "Status"),
             "expired": fn("expired", [], "Status"),
             # Session constructors
@@ -119,9 +121,8 @@ def session_store_spec() -> Spec:
             ),
         ),
         # ==================================================================
-        # BASIS AXIOMS — eq_token (pattern 6, §9h)
+        # BASIS AXIOMS — eq_token (§9h)
         # ==================================================================
-        # Reflexivity
         Axiom(
             label="eq_token_refl",
             formula=forall(
@@ -129,7 +130,6 @@ def session_store_spec() -> Spec:
                 PredApp("eq_token", (t, t)),
             ),
         ),
-        # Symmetry
         Axiom(
             label="eq_token_sym",
             formula=forall(
@@ -140,7 +140,6 @@ def session_store_spec() -> Spec:
                 ),
             ),
         ),
-        # Transitivity
         Axiom(
             label="eq_token_trans",
             formula=forall(
@@ -155,7 +154,7 @@ def session_store_spec() -> Spec:
             ),
         ),
         # ==================================================================
-        # CONSTRUCTOR DEFINEDNESS — refresh (pattern 9, §9f)
+        # CONSTRUCTOR DEFINEDNESS — refresh (§9f)
         # ==================================================================
         Axiom(
             label="refresh_def",
@@ -166,6 +165,15 @@ def session_store_spec() -> Spec:
                     eq(app("get_status", s), const("active")),
                 ),
             ),
+        ),
+        # ==================================================================
+        # ENUMERATION DISTINCTNESS — Status
+        # active and expired are distinct constructors. Without this axiom,
+        # loose semantics permits models where active = expired.
+        # ==================================================================
+        Axiom(
+            label="active_expired_distinct",
+            formula=Negation(eq(const("active"), const("expired"))),
         ),
         # ==================================================================
         # DOMAIN CELLS — get_token (preservation)
@@ -192,13 +200,16 @@ def session_store_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 4: get_token × refresh — guarded preservation
+        # Cell 4: get_token × refresh — definedness-guarded preservation.
+        # The guard uses def(refresh(s)) rather than duplicating the
+        # definedness condition from refresh_def. Define the condition
+        # once (refresh_def), then reference it via Definedness.
         Axiom(
             label="get_token_refresh",
             formula=forall(
                 [s],
                 Implication(
-                    eq(app("get_status", s), const("active")),
+                    Definedness(app("refresh", s)),
                     eq(
                         app("get_token", app("refresh", s)),
                         app("get_token", s),
@@ -236,13 +247,13 @@ def session_store_spec() -> Spec:
                 eq(app("get_status", app("expire", s)), const("expired")),
             ),
         ),
-        # Cell 8: get_status × refresh — guarded
+        # Cell 8: get_status × refresh — definedness-guarded
         Axiom(
             label="get_status_refresh",
             formula=forall(
                 [s],
                 Implication(
-                    eq(app("get_status", s), const("active")),
+                    Definedness(app("refresh", s)),
                     eq(
                         app("get_status", app("refresh", s)),
                         const("active"),
@@ -253,7 +264,8 @@ def session_store_spec() -> Spec:
         # ==================================================================
         # DOMAIN CELLS — last_input (preservation)
         # ==================================================================
-        # Cell 11: last_input × expire — preservation (strong equality)
+        # Cell 11: last_input × expire — preservation (strong equality:
+        # if last_input(s) is undefined, both sides are undefined)
         Axiom(
             label="last_input_expire",
             formula=forall(
@@ -264,13 +276,13 @@ def session_store_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 12: last_input × refresh — guarded preservation (strong equality)
+        # Cell 12: last_input × refresh — definedness-guarded preservation
         Axiom(
             label="last_input_refresh",
             formula=forall(
                 [s],
                 Implication(
-                    eq(app("get_status", s), const("active")),
+                    Definedness(app("refresh", s)),
                     eq(
                         app("last_input", app("refresh", s)),
                         app("last_input", s),
@@ -279,7 +291,7 @@ def session_store_spec() -> Spec:
             ),
         ),
         # ==================================================================
-        # DOMAIN CELLS — is_verified (pattern 3)
+        # DOMAIN CELLS — is_verified
         # ==================================================================
         # Cell 13: is_verified × create — basis
         Axiom(
@@ -289,10 +301,15 @@ def session_store_spec() -> Spec:
                 Negation(PredApp("is_verified", (app("create", t),))),
             ),
         ),
-        # Cell 14a: is_verified × verify — POSITIVE polarity (patterns 17, 20)
-        # Guard: eq_token(t, get_token(s)) ∧ get_status(s) = active
+        # Cell 14a: is_verified × verify — POSITIVE guard polarity.
+        # Guard: eq_token(t, get_token(s)) ∧ get_status(s) = active.
+        # This is a domain-level case split in a PLAIN cell (the observer
+        # is_verified takes no key parameter, so the eq_token guard is
+        # domain logic, not structural key dispatch).
+        # State verification: the guard references get_token(s), a stored
+        # observer value.
         Axiom(
-            label="is_verified_verify_hit",
+            label="is_verified_verify_pos",
             formula=forall(
                 [s, t],
                 Implication(
@@ -304,10 +321,13 @@ def session_store_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 14b: is_verified × verify — NEGATIVE polarity
-        # Guard negated: wrong token OR expired session → preserve
+        # Cell 14b: is_verified × verify — NEGATIVE guard polarity.
+        # Wrong token OR expired session → preserve current verification.
+        # Domain choice: failed authentication preserves an already-verified
+        # session. Alternative domains might invalidate on any failed attempt.
+        # This is a design decision, not a structural necessity.
         Axiom(
-            label="is_verified_verify_miss",
+            label="is_verified_verify_neg",
             formula=forall(
                 [s, t],
                 Implication(
@@ -332,13 +352,13 @@ def session_store_spec() -> Spec:
                 Negation(PredApp("is_verified", (app("expire", s),))),
             ),
         ),
-        # Cell 16: is_verified × refresh — guarded
+        # Cell 16: is_verified × refresh — definedness-guarded
         Axiom(
             label="is_verified_refresh",
             formula=forall(
                 [s],
                 Implication(
-                    eq(app("get_status", s), const("active")),
+                    Definedness(app("refresh", s)),
                     Negation(
                         PredApp("is_verified", (app("refresh", s),)),
                     ),
@@ -346,13 +366,13 @@ def session_store_spec() -> Spec:
             ),
         ),
         # ==================================================================
-        # OBLIGATION CELLS — needs_auth (pattern 19)
-        # The per-constructor axioms are derivable from needs_auth_def +
-        # the is_verified and get_status axioms. We write both: the
-        # definition teaches the "derived predicate" pattern, and the
-        # per-constructor axioms satisfy obligation table completeness.
+        # OBLIGATION CELLS — needs_auth
+        # The per-constructor axioms are structurally required by the
+        # obligation table. The standalone definition (needs_auth_def)
+        # provides the conceptual meaning; these axioms ensure every cell
+        # is explicitly constrained under loose semantics.
         # ==================================================================
-        # Cell 17: needs_auth × create — active ∧ ¬verified → needs_auth
+        # Cell 17: needs_auth × create
         Axiom(
             label="needs_auth_create",
             formula=forall(
@@ -362,7 +382,7 @@ def session_store_spec() -> Spec:
         ),
         # Cell 18a: needs_auth × verify — POSITIVE guard → ¬needs_auth
         Axiom(
-            label="needs_auth_verify_hit",
+            label="needs_auth_verify_pos",
             formula=forall(
                 [s, t],
                 Implication(
@@ -376,7 +396,7 @@ def session_store_spec() -> Spec:
         ),
         # Cell 18b: needs_auth × verify — NEGATIVE guard → preserve
         Axiom(
-            label="needs_auth_verify_miss",
+            label="needs_auth_verify_neg",
             formula=forall(
                 [s, t],
                 Implication(
@@ -393,7 +413,7 @@ def session_store_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 19: needs_auth × expire — expired → ¬needs_auth
+        # Cell 19: needs_auth × expire
         Axiom(
             label="needs_auth_expire",
             formula=forall(
@@ -401,24 +421,23 @@ def session_store_spec() -> Spec:
                 Negation(PredApp("needs_auth", (app("expire", s),))),
             ),
         ),
-        # Cell 20: needs_auth × refresh — guarded: refresh clears verification
+        # Cell 20: needs_auth × refresh — definedness-guarded
         Axiom(
             label="needs_auth_refresh",
             formula=forall(
                 [s],
                 Implication(
-                    eq(app("get_status", s), const("active")),
+                    Definedness(app("refresh", s)),
                     PredApp("needs_auth", (app("refresh", s),)),
                 ),
             ),
         ),
         # ==================================================================
-        # DERIVED DEFINITION — needs_auth (pattern 19, non-obligation)
-        # This standalone biconditional defines needs_auth in terms of
-        # get_status and is_verified. It is logically redundant with the
-        # per-constructor axioms above, but teaches the "derived predicate"
-        # pattern: a predicate whose meaning is defined compositionally
-        # rather than by constructor analysis.
+        # DERIVED DEFINITION — needs_auth (non-obligation)
+        # Defines needs_auth compositionally in terms of get_status and
+        # is_verified. The obligation table still requires per-constructor
+        # axioms above — this definition provides the conceptual meaning
+        # but does not substitute for obligation coverage.
         # ==================================================================
         Axiom(
             label="needs_auth_def",

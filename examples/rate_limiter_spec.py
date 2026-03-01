@@ -1,6 +1,8 @@
 from alspec import (
     Axiom,
+    Definedness,
     GeneratedSortInfo,
+    Negation,
     PredApp,
     Signature,
     Spec,
@@ -20,19 +22,21 @@ def rate_limiter_spec() -> Spec:
     """Rate Limiter specification.
 
     Models a rate limiter tracking request counts against a configured
-    maximum per window with a configurable warning threshold. Demonstrates:
+    maximum per window. Demonstrates:
 
-    - Selector extraction including multi-constructor selector (get_max)
+    - Selector extraction including multi-constructor selector (get_max
+      is a selector of both create and set_max)
     - Selector foreign with preservation (total selectors on non-home ctors)
     - Cross-sort helpers (Nat with zero/succ)
-    - Helper composition: succ(get_count(l))
-    - Accumulator pattern (get_count across 5 constructors)
+    - Helper composition: succ(get_count(l)) in accumulator axiom
+    - Accumulator pattern (get_count across constructors)
     - Comparison-driven predicate (over_limit via geq)
+    - Inductive helper axioms (Peano definition of geq)
     - Preservation collapse across unrelated constructors
 
-    Obligation table: 4 observers × 5 constructors = 20 cells, all PLAIN.
+    Obligation table: 3 observers × 4 constructors = 12 cells, all PLAIN.
     No key dispatch. No partial functions.
-    Total axioms: 21 (20 obligation + 1 derived definition).
+    Total axioms: 16 (12 obligation + 4 non-obligation).
     """
     # --- Variables ---
     l = var("l", "Limiter")
@@ -46,7 +50,7 @@ def rate_limiter_spec() -> Spec:
             "Nat": atomic("Nat"),
         },
         functions={
-            # Nat helpers (pattern 10)
+            # Nat helpers (cross-sort, pattern 10)
             "zero": fn("zero", [], "Nat"),
             "succ": fn("succ", [("n", "Nat")], "Nat"),
             # Limiter constructors
@@ -54,11 +58,9 @@ def rate_limiter_spec() -> Spec:
             "record": fn("record", [("l", "Limiter")], "Limiter"),
             "reset": fn("reset", [("l", "Limiter")], "Limiter"),
             "set_max": fn("set_max", [("l", "Limiter"), ("n", "Nat")], "Limiter"),
-            "set_warn": fn("set_warn", [("l", "Limiter"), ("n", "Nat")], "Limiter"),
             # Limiter observers
             "get_count": fn("get_count", [("l", "Limiter")], "Nat"),
             "get_max": fn("get_max", [("l", "Limiter")], "Nat"),
-            "get_warn": fn("get_warn", [("l", "Limiter")], "Nat"),
         },
         predicates={
             "geq": pred("geq", [("a", "Nat"), ("b", "Nat")]),
@@ -66,11 +68,10 @@ def rate_limiter_spec() -> Spec:
         },
         generated_sorts={
             "Limiter": GeneratedSortInfo(
-                constructors=("create", "record", "reset", "set_max", "set_warn"),
+                constructors=("create", "record", "reset", "set_max"),
                 selectors={
                     "create": {"get_max": "Nat"},
                     "set_max": {"get_max": "Nat"},
-                    "set_warn": {"get_warn": "Nat"},
                 },
             ),
         },
@@ -80,7 +81,7 @@ def rate_limiter_spec() -> Spec:
         # ==================================================================
         # SELECTOR CELLS (mechanical)
         # ==================================================================
-        # Cell 6: get_max × create — SELECTOR_EXTRACT
+        # Cell 1: get_max × create — SELECTOR_EXTRACT
         Axiom(
             label="get_max_create",
             formula=forall(
@@ -88,8 +89,8 @@ def rate_limiter_spec() -> Spec:
                 eq(app("get_max", app("create", m)), m),
             ),
         ),
-        # Cell 9: get_max × set_max — extraction (tier says foreign, but
-        # get_max is also a selector of set_max; matcher accepts this)
+        # Cell 2: get_max × set_max — SELECTOR_EXTRACT
+        # get_max is declared as a selector of both create and set_max.
         Axiom(
             label="get_max_set_max",
             formula=forall(
@@ -97,26 +98,10 @@ def rate_limiter_spec() -> Spec:
                 eq(app("get_max", app("set_max", l, n)), n),
             ),
         ),
-        # Cell 15: get_warn × set_warn — SELECTOR_EXTRACT
-        Axiom(
-            label="get_warn_set_warn",
-            formula=forall(
-                [l, n],
-                eq(app("get_warn", app("set_warn", l, n)), n),
-            ),
-        ),
-        # Cell 11: get_warn × create — DOMAIN (default: warn threshold = max)
-        Axiom(
-            label="get_warn_create",
-            formula=forall(
-                [m],
-                eq(app("get_warn", app("create", m)), m),
-            ),
-        ),
         # ==================================================================
         # DOMAIN CELLS — get_count (accumulator, pattern 13)
         # ==================================================================
-        # Cell 1: get_count × create — basis: new limiter starts at zero
+        # Cell 3: get_count × create — basis: new limiter starts at zero
         Axiom(
             label="get_count_create",
             formula=forall(
@@ -124,7 +109,8 @@ def rate_limiter_spec() -> Spec:
                 eq(app("get_count", app("create", m)), const("zero")),
             ),
         ),
-        # Cell 2: get_count × record — accumulate (pattern 12: helper composition)
+        # Cell 4: get_count × record — accumulate (pattern 12: helper
+        # composition with succ applied to get_count)
         Axiom(
             label="get_count_record",
             formula=forall(
@@ -135,7 +121,7 @@ def rate_limiter_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 3: get_count × reset — window rollover: zero count
+        # Cell 5: get_count × reset — window rollover: zero count
         Axiom(
             label="get_count_reset",
             formula=forall(
@@ -143,24 +129,13 @@ def rate_limiter_spec() -> Spec:
                 eq(app("get_count", app("reset", l)), const("zero")),
             ),
         ),
-        # Cell 4: get_count × set_max — preservation
+        # Cell 6: get_count × set_max — preservation
         Axiom(
             label="get_count_set_max",
             formula=forall(
                 [l, n],
                 eq(
                     app("get_count", app("set_max", l, n)),
-                    app("get_count", l),
-                ),
-            ),
-        ),
-        # Cell 5: get_count × set_warn — preservation
-        Axiom(
-            label="get_count_set_warn",
-            formula=forall(
-                [l, n],
-                eq(
-                    app("get_count", app("set_warn", l, n)),
                     app("get_count", l),
                 ),
             ),
@@ -190,57 +165,12 @@ def rate_limiter_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 10: get_max × set_warn — preservation
-        Axiom(
-            label="get_max_set_warn",
-            formula=forall(
-                [l, n],
-                eq(
-                    app("get_max", app("set_warn", l, n)),
-                    app("get_max", l),
-                ),
-            ),
-        ),
-        # ==================================================================
-        # DOMAIN CELLS — get_warn (preservation on non-extract cells)
-        # ==================================================================
-        # Cell 12: get_warn × record — preservation
-        Axiom(
-            label="get_warn_record",
-            formula=forall(
-                [l],
-                eq(
-                    app("get_warn", app("record", l)),
-                    app("get_warn", l),
-                ),
-            ),
-        ),
-        # Cell 13: get_warn × reset — preservation
-        Axiom(
-            label="get_warn_reset",
-            formula=forall(
-                [l],
-                eq(
-                    app("get_warn", app("reset", l)),
-                    app("get_warn", l),
-                ),
-            ),
-        ),
-        # Cell 14: get_warn × set_max — preservation
-        Axiom(
-            label="get_warn_set_max",
-            formula=forall(
-                [l, n],
-                eq(
-                    app("get_warn", app("set_max", l, n)),
-                    app("get_warn", l),
-                ),
-            ),
-        ),
         # ==================================================================
         # DOMAIN CELLS — over_limit (comparison-driven, pattern 18)
+        # Each per-constructor axiom substitutes the post-constructor
+        # values of get_count and get_max into the geq comparison.
         # ==================================================================
-        # Cell 16: over_limit × create — count=zero vs max=m
+        # Cell 9: over_limit × create — count=zero vs max=m
         Axiom(
             label="over_limit_create",
             formula=forall(
@@ -251,7 +181,7 @@ def rate_limiter_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 17: over_limit × record — count incremented vs max preserved
+        # Cell 10: over_limit × record — count incremented vs max preserved
         Axiom(
             label="over_limit_record",
             formula=forall(
@@ -265,7 +195,7 @@ def rate_limiter_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 18: over_limit × reset — count=zero vs max preserved
+        # Cell 11: over_limit × reset — count=zero vs max preserved
         Axiom(
             label="over_limit_reset",
             formula=forall(
@@ -276,7 +206,7 @@ def rate_limiter_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 19: over_limit × set_max — count preserved vs new max
+        # Cell 12: over_limit × set_max — count preserved vs new max
         Axiom(
             label="over_limit_set_max",
             formula=forall(
@@ -287,23 +217,12 @@ def rate_limiter_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 20: over_limit × set_warn — preservation (set_warn changes
-        # neither count nor max)
-        Axiom(
-            label="over_limit_set_warn",
-            formula=forall(
-                [l, n],
-                iff(
-                    PredApp("over_limit", (app("set_warn", l, n),)),
-                    PredApp("over_limit", (l,)),
-                ),
-            ),
-        ),
         # ==================================================================
-        # DERIVED DEFINITION — over_limit (pattern 18, non-obligation)
-        # Standalone definition: over_limit holds when count >= max.
-        # Logically redundant with per-constructor axioms above, but
-        # teaches the comparison-driven predicate pattern.
+        # DERIVED DEFINITION — over_limit (non-obligation)
+        # Defines over_limit compositionally: count ≥ max. The obligation
+        # table still requires the per-constructor axioms above — this
+        # definition provides the conceptual meaning but does not substitute
+        # for obligation coverage.
         # ==================================================================
         Axiom(
             label="over_limit_def",
@@ -315,6 +234,40 @@ def rate_limiter_spec() -> Spec:
                         app("get_count", l),
                         app("get_max", l),
                     )),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # HELPER AXIOMS — geq (inductive definition on Nat)
+        # Without these axioms, loose semantics permits models where geq
+        # is unconditionally false (or true), making over_limit vacuous.
+        # These three axioms provide the minimal Peano characterization
+        # of ≥ on natural numbers built from zero/succ.
+        # ==================================================================
+        # Every natural number is ≥ zero
+        Axiom(
+            label="geq_zero_base",
+            formula=forall(
+                [m],
+                PredApp("geq", (m, const("zero"))),
+            ),
+        ),
+        # Zero is not ≥ any successor
+        Axiom(
+            label="geq_zero_succ",
+            formula=forall(
+                [m],
+                Negation(PredApp("geq", (const("zero"), app("succ", m)))),
+            ),
+        ),
+        # Inductive step: succ(a) ≥ succ(b) ⟺ a ≥ b
+        Axiom(
+            label="geq_succ_succ",
+            formula=forall(
+                [m, n],
+                iff(
+                    PredApp("geq", (app("succ", m), app("succ", n))),
+                    PredApp("geq", (m, n)),
                 ),
             ),
         ),

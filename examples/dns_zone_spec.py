@@ -26,18 +26,21 @@ def dns_zone_spec() -> Spec:
     Models a DNS zone storing resource records indexed by (DomainName,
     RecordType). Demonstrates:
 
-    - Dual-key dispatch: obligation table splits on eq_name (DomainName),
-      then domain-level case split on eq_type (RecordType) within HIT cells
+    - Dual-key dispatch: obligation table splits on eq_name (first key),
+      then second-level key dispatch on eq_type (RecordType) within HIT
+      cells via nested implication
     - Two sets of equality predicate basis axioms (eq_name, eq_type)
     - Doubly partial observers (get_rdata, get_ttl undefined on empty zone)
-    - Nested implication guards (eq_name ⇒ eq_type ⇒ ...)
+    - Nested implication guards mirroring hierarchical key dispatch
     - Guard polarity at both key levels
-    - Preservation collapse (MISS cells delegate unconditionally)
+    - Delegation via strong equality (preserves/propagates undefinedness)
+    - Existence predicate linked to observer definedness (has_record_def)
 
     Obligation table: 3 observers × 3 constructors = 9 base cells.
-    empty cells are PLAIN (3). Keyed constructor cells split into HIT/MISS (12).
-    HIT cells further split on eq_type (domain sub-cases).
-    Total axioms: 27 (21 obligation + 6 basis).
+    empty cells are PLAIN (3). Keyed constructor cells split into HIT/MISS
+    on eq_name (12 cells). HIT cells further split on eq_type (second-level
+    key dispatch).
+    Total axioms: 28 (21 obligation + 7 non-obligation).
     """
     # --- Variables ---
     z = var("z", "Zone")
@@ -60,9 +63,6 @@ def dns_zone_spec() -> Spec:
             "Nat": atomic("Nat"),
         },
         functions={
-            # Nat helpers
-            "zero": fn("zero", [], "Nat"),
-            "succ": fn("succ", [("n", "Nat")], "Nat"),
             # Zone constructors
             "empty": fn("empty", [], "Zone"),
             "add_record": fn(
@@ -185,7 +185,7 @@ def dns_zone_spec() -> Spec:
         # ==================================================================
         # PLAIN CELLS — empty (base cases)
         # ==================================================================
-        # Cell 1: get_rdata × empty — undefined
+        # Cell 1: get_rdata × empty — undefined (no records in empty zone)
         Axiom(
             label="get_rdata_empty",
             formula=forall(
@@ -216,9 +216,13 @@ def dns_zone_spec() -> Spec:
             ),
         ),
         # ==================================================================
-        # get_rdata × add_record (HIT/MISS with eq_type sub-cases)
+        # get_rdata × add_record
+        # First-level key dispatch on eq_name (from obligation table).
+        # Second-level key dispatch on eq_type (within HIT cells, via
+        # nested implication — both DomainName and RecordType are key
+        # sorts with equality predicates).
         # ==================================================================
-        # Cell 2a: HIT + type match → return new data
+        # Cell 2a: HIT(name) + HIT(type) → return new data
         Axiom(
             label="get_rdata_add_hit_type_hit",
             formula=forall(
@@ -235,7 +239,7 @@ def dns_zone_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 2b: HIT + type miss → delegate
+        # Cell 2b: HIT(name) + MISS(type) → delegate (strong equality)
         Axiom(
             label="get_rdata_add_hit_type_miss",
             formula=forall(
@@ -252,7 +256,7 @@ def dns_zone_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 3: MISS → delegate (name doesn't match, type irrelevant)
+        # Cell 3: MISS(name) → delegate unconditionally (strong equality)
         Axiom(
             label="get_rdata_add_miss",
             formula=forall(
@@ -267,9 +271,9 @@ def dns_zone_spec() -> Spec:
             ),
         ),
         # ==================================================================
-        # get_rdata × remove_record (HIT/MISS with eq_type sub-cases)
+        # get_rdata × remove_record
         # ==================================================================
-        # Cell 4a: HIT + type match → undefined (record removed)
+        # Cell 4a: HIT(name) + HIT(type) → undefined (record removed)
         Axiom(
             label="get_rdata_remove_hit_type_hit",
             formula=forall(
@@ -287,7 +291,7 @@ def dns_zone_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 4b: HIT + type miss → delegate
+        # Cell 4b: HIT(name) + MISS(type) → delegate
         Axiom(
             label="get_rdata_remove_hit_type_miss",
             formula=forall(
@@ -304,7 +308,7 @@ def dns_zone_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 5: MISS → delegate
+        # Cell 5: MISS(name) → delegate
         Axiom(
             label="get_rdata_remove_miss",
             formula=forall(
@@ -319,9 +323,9 @@ def dns_zone_spec() -> Spec:
             ),
         ),
         # ==================================================================
-        # get_ttl × add_record (mirrors get_rdata structure)
+        # get_ttl × add_record (parallel structure to get_rdata)
         # ==================================================================
-        # Cell 7a: HIT + type match → return new TTL
+        # Cell 7a: HIT(name) + HIT(type) → return new TTL
         Axiom(
             label="get_ttl_add_hit_type_hit",
             formula=forall(
@@ -338,7 +342,7 @@ def dns_zone_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 7b: HIT + type miss → delegate
+        # Cell 7b: HIT(name) + MISS(type) → delegate
         Axiom(
             label="get_ttl_add_hit_type_miss",
             formula=forall(
@@ -355,7 +359,7 @@ def dns_zone_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 8: MISS → delegate
+        # Cell 8: MISS(name) → delegate
         Axiom(
             label="get_ttl_add_miss",
             formula=forall(
@@ -370,9 +374,9 @@ def dns_zone_spec() -> Spec:
             ),
         ),
         # ==================================================================
-        # get_ttl × remove_record (mirrors get_rdata structure)
+        # get_ttl × remove_record (parallel structure to get_rdata)
         # ==================================================================
-        # Cell 9a: HIT + type match → undefined
+        # Cell 9a: HIT(name) + HIT(type) → undefined
         Axiom(
             label="get_ttl_remove_hit_type_hit",
             formula=forall(
@@ -390,7 +394,7 @@ def dns_zone_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 9b: HIT + type miss → delegate
+        # Cell 9b: HIT(name) + MISS(type) → delegate
         Axiom(
             label="get_ttl_remove_hit_type_miss",
             formula=forall(
@@ -407,7 +411,7 @@ def dns_zone_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 10: MISS → delegate
+        # Cell 10: MISS(name) → delegate
         Axiom(
             label="get_ttl_remove_miss",
             formula=forall(
@@ -424,7 +428,7 @@ def dns_zone_spec() -> Spec:
         # ==================================================================
         # has_record × add_record
         # ==================================================================
-        # Cell 12a: HIT + type match → true (record exists)
+        # Cell 12a: HIT(name) + HIT(type) → true (record exists)
         Axiom(
             label="has_record_add_hit_type_hit",
             formula=forall(
@@ -441,7 +445,7 @@ def dns_zone_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 12b: HIT + type miss → delegate
+        # Cell 12b: HIT(name) + MISS(type) → delegate
         Axiom(
             label="has_record_add_hit_type_miss",
             formula=forall(
@@ -461,7 +465,7 @@ def dns_zone_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 13: MISS → delegate
+        # Cell 13: MISS(name) → delegate
         Axiom(
             label="has_record_add_miss",
             formula=forall(
@@ -481,7 +485,7 @@ def dns_zone_spec() -> Spec:
         # ==================================================================
         # has_record × remove_record
         # ==================================================================
-        # Cell 14a: HIT + type match → false (record removed)
+        # Cell 14a: HIT(name) + HIT(type) → false (record removed)
         Axiom(
             label="has_record_remove_hit_type_hit",
             formula=forall(
@@ -500,7 +504,7 @@ def dns_zone_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 14b: HIT + type miss → delegate
+        # Cell 14b: HIT(name) + MISS(type) → delegate
         Axiom(
             label="has_record_remove_hit_type_miss",
             formula=forall(
@@ -520,7 +524,7 @@ def dns_zone_spec() -> Spec:
                 ),
             ),
         ),
-        # Cell 15: MISS → delegate
+        # Cell 15: MISS(name) → delegate
         Axiom(
             label="has_record_remove_miss",
             formula=forall(
@@ -534,6 +538,24 @@ def dns_zone_spec() -> Spec:
                         ),
                         PredApp("has_record", (z, n2, t2)),
                     ),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # DERIVED DEFINITION — has_record (non-obligation)
+        # Explicitly links the membership predicate to observer definedness:
+        # a record exists at (name, type) iff get_rdata is defined there.
+        # The obligation table still requires the per-constructor axioms
+        # above — this definition provides the conceptual meaning but does
+        # not substitute for obligation coverage.
+        # ==================================================================
+        Axiom(
+            label="has_record_def",
+            formula=forall(
+                [z, n, t],
+                iff(
+                    PredApp("has_record", (z, n, t)),
+                    Definedness(app("get_rdata", z, n, t)),
                 ),
             ),
         ),
