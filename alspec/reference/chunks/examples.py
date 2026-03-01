@@ -113,3 +113,63 @@ def _example_traffic_light() -> str:
 )
 def _example_queue() -> str:
     return ALL_EXAMPLES["queue"].render(RenderMode.FULL)
+
+
+@register(
+    id=ChunkId.EXAMPLE_SESSION_STORE,
+    stages=BOTH,
+    concepts=frozenset({
+        Concept.SELECTORS,
+        Concept.SELECTOR_EXTRACT,
+        Concept.SELECTOR_FOREIGN,
+        Concept.PARTIAL_CONSTRUCTORS,
+        Concept.DEFINEDNESS_BICONDITIONAL,
+        Concept.GUARD_POLARITY,
+        Concept.BOTH_CASES,
+        Concept.OBLIGATION_TABLE,
+        Concept.NDEF_AXIOMS,
+        Concept.GENERATED_SORTS,
+        Concept.EQ_PRED,
+        Concept.REFLEXIVITY_SYMMETRY_TRANSITIVITY,
+    }),
+    depends_on=(ChunkId.OBLIGATION_PATTERN,),
+)
+def _example_session_store() -> str:
+    return ALL_EXAMPLES["session-store"].render(RenderMode.FULL)
+
+
+@register(
+    id=ChunkId.EXAMPLE_RATE_LIMITER,
+    stages=BOTH,
+    concepts=frozenset({
+        Concept.SELECTORS,
+        Concept.SELECTOR_EXTRACT,
+        Concept.OBLIGATION_TABLE,
+        Concept.COMPLETENESS,
+        Concept.STANDARD_PATTERNS,
+        Concept.PRESERVATION,
+    }),
+    depends_on=(ChunkId.OBLIGATION_PATTERN,),
+)
+def _example_rate_limiter() -> str:
+    return ALL_EXAMPLES["rate-limiter"].render(RenderMode.FULL)
+
+
+@register(
+    id=ChunkId.EXAMPLE_DNS_ZONE,
+    stages=BOTH,
+    concepts=frozenset({
+        Concept.KEY_DISPATCH,
+        Concept.HIT_MISS,
+        Concept.OBLIGATION_TABLE,
+        Concept.NDEF_AXIOMS,
+        Concept.GUARD_POLARITY,
+        Concept.EQ_PRED,
+        Concept.REFLEXIVITY_SYMMETRY_TRANSITIVITY,
+        Concept.PRESERVATION,
+        Concept.SHARED_KEY_SORT,
+    }),
+    depends_on=(ChunkId.OBLIGATION_PATTERN,),
+)
+def _example_dns_zone() -> str:
+    return ALL_EXAMPLES["dns-zone"].render(RenderMode.FULL)

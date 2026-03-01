@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
-"""Saturation ladder experiment: measure how spec quality scales with example count.
+"""Saturation ladder experiment (Full pipeline version).
 
-Each rung adds one more worked example to the Stage 1 prompt.
-Stage 2 prompt is held constant (default config).
-All 20 eval domains are tested at each rung.
+Measures how specification quality scales with the new high-quality
+worked examples (Rate Limiter, Session Store, DNS Zone).
+
+Arms:
+  R0: Stack only (legacy baseline anchor)
+  R1: Rate Limiter only (simplest new example)
+  R2: Rate Limiter + Session Store
+  R3: Rate Limiter + Session Store + DNS Zone (all new)
+
+No methodology chunks — DoE Phase B showed methodology effects ≈ 0.
+No mixing old + new examples — clean comparison.
 
 Usage:
-    python experiments/saturation_ladder.py [--model MODEL] [--output-dir DIR] [--dry-run]
-    python experiments/saturation_ladder.py --replicates 3 --dry-run
+    python experiments/saturation_ladder.py --dry-run
+    python experiments/saturation_ladder.py --replicates 3
+    python experiments/saturation_ladder.py --replicates 3 --model google/gemini-3-flash-preview
 """
 
 from __future__ import annotations
@@ -45,63 +54,30 @@ FOUNDATION = [
 
 RUNGS: list[dict] = [
     {
-        "name": "R0_stack_only",
-        "label": "Stack only",
+        "name": "R0_stack_baseline",
+        "label": "Stack only (legacy baseline)",
         "chunks": FOUNDATION + [ChunkId.EXAMPLE_STACK],
     },
     {
-        "name": "R1_plus_bug_tracker",
-        "label": "+ Bug Tracker Analysis",
-        "chunks": FOUNDATION
-        + [
-            ChunkId.EXAMPLE_STACK,
-            ChunkId.EXAMPLE_BUG_TRACKER_ANALYSIS,
+        "name": "R1_rate_limiter",
+        "label": "Rate Limiter only",
+        "chunks": FOUNDATION + [ChunkId.EXAMPLE_RATE_LIMITER],
+    },
+    {
+        "name": "R2_rl_session",
+        "label": "Rate Limiter + Session Store",
+        "chunks": FOUNDATION + [
+            ChunkId.EXAMPLE_RATE_LIMITER,
+            ChunkId.EXAMPLE_SESSION_STORE,
         ],
     },
     {
-        "name": "R2_plus_traffic_light",
-        "label": "+ Traffic Light",
-        "chunks": FOUNDATION
-        + [
-            ChunkId.EXAMPLE_STACK,
-            ChunkId.EXAMPLE_BUG_TRACKER_ANALYSIS,
-            ChunkId.EXAMPLE_BOUNDED_COUNTER,
-        ],
-    },
-    {
-        "name": "R3_plus_bounded_counter",
-        "label": "+ Bounded Counter",
-        "chunks": FOUNDATION
-        + [
-            ChunkId.EXAMPLE_STACK,
-            ChunkId.EXAMPLE_BUG_TRACKER_ANALYSIS,
-            ChunkId.EXAMPLE_BOUNDED_COUNTER,
-            ChunkId.EXAMPLE_TRAFFIC_LIGHT,
-        ],
-    },
-    {
-        "name": "R4_plus_counter",
-        "label": "+ Counter",
-        "chunks": FOUNDATION
-        + [
-            ChunkId.EXAMPLE_STACK,
-            ChunkId.EXAMPLE_BUG_TRACKER_ANALYSIS,
-            ChunkId.EXAMPLE_BOUNDED_COUNTER,
-            ChunkId.EXAMPLE_TRAFFIC_LIGHT,
-            ChunkId.EXAMPLE_COUNTER,
-        ],
-    },
-    {
-        "name": "R5_plus_queue",
-        "label": "+ Queue",
-        "chunks": FOUNDATION
-        + [
-            ChunkId.EXAMPLE_STACK,
-            ChunkId.EXAMPLE_BUG_TRACKER_ANALYSIS,
-            ChunkId.EXAMPLE_BOUNDED_COUNTER,
-            ChunkId.EXAMPLE_TRAFFIC_LIGHT,
-            ChunkId.EXAMPLE_COUNTER,
-            ChunkId.EXAMPLE_QUEUE,
+        "name": "R3_all_new",
+        "label": "Rate Limiter + Session Store + DNS Zone",
+        "chunks": FOUNDATION + [
+            ChunkId.EXAMPLE_RATE_LIMITER,
+            ChunkId.EXAMPLE_SESSION_STORE,
+            ChunkId.EXAMPLE_DNS_ZONE,
         ],
     },
 ]

@@ -5797,6 +5797,1502 @@ def bug_tracker_spec() -> Spec:
 )
 
 
+# ============================================================
+# Session Store
+# ============================================================
+
+SESSION_STORE = WorkedExample(
+    domain_name="Session Store",
+    summary="Models a single authentication session lifecycle with token-based verification, expiry, and refresh. Demonstrates selector extraction/foreign, equality predicate basis, enumeration with explicit distinctness, partial constructor with definedness biconditional, definedness-guarded preservation, domain case split in PLAIN cells, state verification via stored observer values, and derived predicates.",
+    patterns=frozenset({
+        Pattern.SEL_EXTRACT,
+        Pattern.EXPLICIT_UNDEF,
+        Pattern.ENUMERATION,
+        Pattern.PARTIAL_CTOR,
+        Pattern.COND_DEF,
+        Pattern.PRESERVATION,
+        Pattern.BOTH_GUARD_POL,
+        Pattern.STATE_DEPENDENT,
+        Pattern.BICOND_CHAR,
+        Pattern.MULTI_GEN_SORT,
+    }),
+    sorts=(
+        SortInfo("Session", "GENERATED", "Central domain object representing authentication session state"),
+        SortInfo("Token", "ATOMIC", "Opaque credential for session verification"),
+        SortInfo("Status", "ENUMERATION", "Session lifecycle state (active/expired) with explicit distinctness"),
+    ),
+    functions=(
+        FunctionInfo("active", "→ Status", FunctionRole.CONSTANT, "Enumeration value for active session"),
+        FunctionInfo("expired", "→ Status", FunctionRole.CONSTANT, "Enumeration value for expired session"),
+        FunctionInfo("create", "Token → Session", FunctionRole.CONSTRUCTOR, "Creates new active session with token"),
+        FunctionInfo("verify", "Session × Token → Session", FunctionRole.CONSTRUCTOR, "Attempts token verification against stored token"),
+        FunctionInfo("expire", "Session → Session", FunctionRole.CONSTRUCTOR, "Transitions session to expired state"),
+        FunctionInfo("refresh", "Session →? Session", FunctionRole.CONSTRUCTOR, "Extends active session, undefined on expired"),
+        FunctionInfo("get_token", "Session → Token", FunctionRole.SELECTOR, "Extracts stored authentication token"),
+        FunctionInfo("get_status", "Session → Status", FunctionRole.OBSERVER, "Returns current session lifecycle status"),
+        FunctionInfo("last_input", "Session →? Token", FunctionRole.SELECTOR, "Extracts last verification attempt token, undefined on create"),
+        FunctionInfo("eq_token", "Token × Token", FunctionRole.PREDICATE, "Token equality for verification dispatch"),
+        FunctionInfo("is_verified", "Session", FunctionRole.PREDICATE, "True iff session has been successfully verified"),
+        FunctionInfo("needs_auth", "Session", FunctionRole.PREDICATE, "Derived: active ∧ ¬is_verified"),
+    ),
+    obligations=(
+        ObligationCell("get_token", "create", CellType.SELECTOR_EXTRACT, "t"),
+        ObligationCell("get_token", "verify", CellType.PRESERVATION, "get_token(s)"),
+        ObligationCell("get_token", "expire", CellType.PRESERVATION, "get_token(s)"),
+        ObligationCell("get_token", "refresh", CellType.GUARDED, "get_token(s)", "def(refresh(s))"),
+        ObligationCell("get_status", "create", CellType.BASIS, "active"),
+        ObligationCell("get_status", "verify", CellType.PRESERVATION, "get_status(s)"),
+        ObligationCell("get_status", "expire", CellType.DOMAIN, "expired"),
+        ObligationCell("get_status", "refresh", CellType.GUARDED, "active", "def(refresh(s))"),
+        ObligationCell("last_input", "create", CellType.SELECTOR_FOREIGN, "¬def(last_input(create(t)))"),
+        ObligationCell("last_input", "verify", CellType.SELECTOR_EXTRACT, "t"),
+        ObligationCell("last_input", "expire", CellType.PRESERVATION, "last_input(s)"),
+        ObligationCell("last_input", "refresh", CellType.GUARDED, "last_input(s)", "def(refresh(s))"),
+        ObligationCell("is_verified", "create", CellType.BASIS, "¬is_verified(create(t))"),
+        ObligationCell("is_verified", "verify", CellType.GUARDED, "is_verified(verify(s,t))", "eq_token(t,get_token(s)) ∧ active"),
+        ObligationCell("is_verified", "verify", CellType.GUARDED, "preserve is_verified(s)", "¬(eq_token ∧ active)"),
+        ObligationCell("is_verified", "expire", CellType.DOMAIN, "¬is_verified(expire(s))"),
+        ObligationCell("is_verified", "refresh", CellType.GUARDED, "¬is_verified(refresh(s))", "def(refresh(s))"),
+        ObligationCell("needs_auth", "create", CellType.DOMAIN, "needs_auth(create(t))"),
+        ObligationCell("needs_auth", "verify", CellType.GUARDED, "¬needs_auth(verify(s,t))", "eq_token(t,get_token(s)) ∧ active"),
+        ObligationCell("needs_auth", "verify", CellType.GUARDED, "preserve needs_auth(s)", "¬(eq_token ∧ active)"),
+        ObligationCell("needs_auth", "expire", CellType.DOMAIN, "¬needs_auth(expire(s))"),
+        ObligationCell("needs_auth", "refresh", CellType.GUARDED, "needs_auth(refresh(s))", "def(refresh(s))"),
+    ),
+    design_decisions=(
+        DesignDecision("Partial refresh", "refresh is undefined on expired sessions via definedness biconditional, not via guard"),
+        DesignDecision("Definedness guards", "All observer×refresh axioms guard with def(refresh(s)), not the raw condition — define once, reference via Definedness"),
+        DesignDecision("Failed auth preserves verification", "Domain choice: failed verify preserves existing is_verified state rather than invalidating"),
+        DesignDecision("Enumeration distinctness", "Explicit ¬eq(active, expired) prevents model collapse under loose semantics"),
+        DesignDecision("Derived needs_auth", "Defined compositionally as active ∧ ¬is_verified; per-constructor axioms still required for obligation coverage"),
+    ),
+    code='''from alspec import (
+    Axiom,
+    Conjunction,
+    Definedness,
+    GeneratedSortInfo,
+    Implication,
+    Negation,
+    PredApp,
+    Signature,
+    Spec,
+    atomic,
+    fn,
+    pred,
+    var,
+    app,
+    const,
+    eq,
+    forall,
+    iff,
+)
+
+
+def session_store_spec() -> Spec:
+    """Session Store specification.
+
+    Models a single authentication session lifecycle with token-based
+    verification, expiry, and refresh. Demonstrates:
+
+    - Selector extraction + foreign (get_token, last_input)
+    - Equality predicate basis axioms (eq_token)
+    - Enumeration sort with explicit distinctness (Status: active/expired)
+    - Partial constructor with definedness biconditional (refresh)
+    - Definedness-guarded preservation (all observers × refresh)
+    - Domain case split in PLAIN cell (is_verified × verify)
+    - State verification — guard references stored observer value (get_token)
+    - Derived/composite predicate (needs_auth)
+
+    Obligation table: 5 observers × 4 constructors = 20 cells.
+    All cells PLAIN (no key dispatch — observers take no key parameter).
+    Cells 14 and 18 (is_verified/needs_auth × verify) each split into
+    positive/negative guard sub-cases, yielding 22 obligation axioms.
+    Total axioms: 28 (22 obligation + 6 non-obligation).
+    """
+    # --- Variables ---
+    s = var("s", "Session")
+    t = var("t", "Token")
+    t2 = var("t2", "Token")
+    t3 = var("t3", "Token")
+
+    # --- Signature ---
+    sig = Signature(
+        sorts={
+            "Session": atomic("Session"),
+            "Token": atomic("Token"),
+            "Status": atomic("Status"),
+        },
+        functions={
+            # Status enumeration
+            "active": fn("active", [], "Status"),
+            "expired": fn("expired", [], "Status"),
+            # Session constructors
+            "create": fn("create", [("t", "Token")], "Session"),
+            "verify": fn("verify", [("s", "Session"), ("t", "Token")], "Session"),
+            "expire": fn("expire", [("s", "Session")], "Session"),
+            "refresh": fn(
+                "refresh", [("s", "Session")], "Session", total=False
+            ),
+            # Session observers
+            "get_token": fn("get_token", [("s", "Session")], "Token"),
+            "get_status": fn("get_status", [("s", "Session")], "Status"),
+            "last_input": fn(
+                "last_input", [("s", "Session")], "Token", total=False
+            ),
+        },
+        predicates={
+            "eq_token": pred("eq_token", [("t1", "Token"), ("t2", "Token")]),
+            "is_verified": pred("is_verified", [("s", "Session")]),
+            "needs_auth": pred("needs_auth", [("s", "Session")]),
+        },
+        generated_sorts={
+            "Session": GeneratedSortInfo(
+                constructors=("create", "verify", "expire", "refresh"),
+                selectors={
+                    "create": {"get_token": "Token"},
+                    "verify": {"last_input": "Token"},
+                },
+            ),
+            "Status": GeneratedSortInfo(
+                constructors=("active", "expired"),
+                selectors={},
+            ),
+        },
+    )
+
+    axioms = (
+        # ==================================================================
+        # SELECTOR CELLS (mechanical)
+        # ==================================================================
+        # Cell 1: get_token × create — SELECTOR_EXTRACT
+        Axiom(
+            label="get_token_create",
+            formula=forall(
+                [t],
+                eq(app("get_token", app("create", t)), t),
+            ),
+        ),
+        # Cell 10: last_input × verify — SELECTOR_EXTRACT
+        Axiom(
+            label="last_input_verify",
+            formula=forall(
+                [s, t],
+                eq(app("last_input", app("verify", s, t)), t),
+            ),
+        ),
+        # Cell 9: last_input × create — SELECTOR_FOREIGN
+        Axiom(
+            label="last_input_create_undef",
+            formula=forall(
+                [t],
+                Negation(Definedness(app("last_input", app("create", t)))),
+            ),
+        ),
+        # ==================================================================
+        # BASIS AXIOMS — eq_token (§9h)
+        # ==================================================================
+        Axiom(
+            label="eq_token_refl",
+            formula=forall(
+                [t],
+                PredApp("eq_token", (t, t)),
+            ),
+        ),
+        Axiom(
+            label="eq_token_sym",
+            formula=forall(
+                [t, t2],
+                Implication(
+                    PredApp("eq_token", (t, t2)),
+                    PredApp("eq_token", (t2, t)),
+                ),
+            ),
+        ),
+        Axiom(
+            label="eq_token_trans",
+            formula=forall(
+                [t, t2, t3],
+                Implication(
+                    Conjunction((
+                        PredApp("eq_token", (t, t2)),
+                        PredApp("eq_token", (t2, t3)),
+                    )),
+                    PredApp("eq_token", (t, t3)),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # CONSTRUCTOR DEFINEDNESS — refresh (§9f)
+        # ==================================================================
+        Axiom(
+            label="refresh_def",
+            formula=forall(
+                [s],
+                iff(
+                    Definedness(app("refresh", s)),
+                    eq(app("get_status", s), const("active")),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # ENUMERATION DISTINCTNESS — Status
+        # active and expired are distinct constructors. Without this axiom,
+        # loose semantics permits models where active = expired.
+        # ==================================================================
+        Axiom(
+            label="active_expired_distinct",
+            formula=Negation(eq(const("active"), const("expired"))),
+        ),
+        # ==================================================================
+        # DOMAIN CELLS — get_token (preservation)
+        # ==================================================================
+        # Cell 2: get_token × verify — preservation
+        Axiom(
+            label="get_token_verify",
+            formula=forall(
+                [s, t],
+                eq(
+                    app("get_token", app("verify", s, t)),
+                    app("get_token", s),
+                ),
+            ),
+        ),
+        # Cell 3: get_token × expire — preservation
+        Axiom(
+            label="get_token_expire",
+            formula=forall(
+                [s],
+                eq(
+                    app("get_token", app("expire", s)),
+                    app("get_token", s),
+                ),
+            ),
+        ),
+        # Cell 4: get_token × refresh — definedness-guarded preservation.
+        # The guard uses def(refresh(s)) rather than duplicating the
+        # definedness condition from refresh_def. Define the condition
+        # once (refresh_def), then reference it via Definedness.
+        Axiom(
+            label="get_token_refresh",
+            formula=forall(
+                [s],
+                Implication(
+                    Definedness(app("refresh", s)),
+                    eq(
+                        app("get_token", app("refresh", s)),
+                        app("get_token", s),
+                    ),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # DOMAIN CELLS — get_status
+        # ==================================================================
+        # Cell 5: get_status × create — basis
+        Axiom(
+            label="get_status_create",
+            formula=forall(
+                [t],
+                eq(app("get_status", app("create", t)), const("active")),
+            ),
+        ),
+        # Cell 6: get_status × verify — preservation
+        Axiom(
+            label="get_status_verify",
+            formula=forall(
+                [s, t],
+                eq(
+                    app("get_status", app("verify", s, t)),
+                    app("get_status", s),
+                ),
+            ),
+        ),
+        # Cell 7: get_status × expire
+        Axiom(
+            label="get_status_expire",
+            formula=forall(
+                [s],
+                eq(app("get_status", app("expire", s)), const("expired")),
+            ),
+        ),
+        # Cell 8: get_status × refresh — definedness-guarded
+        Axiom(
+            label="get_status_refresh",
+            formula=forall(
+                [s],
+                Implication(
+                    Definedness(app("refresh", s)),
+                    eq(
+                        app("get_status", app("refresh", s)),
+                        const("active"),
+                    ),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # DOMAIN CELLS — last_input (preservation)
+        # ==================================================================
+        # Cell 11: last_input × expire — preservation (strong equality:
+        # if last_input(s) is undefined, both sides are undefined)
+        Axiom(
+            label="last_input_expire",
+            formula=forall(
+                [s],
+                eq(
+                    app("last_input", app("expire", s)),
+                    app("last_input", s),
+                ),
+            ),
+        ),
+        # Cell 12: last_input × refresh — definedness-guarded preservation
+        Axiom(
+            label="last_input_refresh",
+            formula=forall(
+                [s],
+                Implication(
+                    Definedness(app("refresh", s)),
+                    eq(
+                        app("last_input", app("refresh", s)),
+                        app("last_input", s),
+                    ),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # DOMAIN CELLS — is_verified
+        # ==================================================================
+        # Cell 13: is_verified × create — basis
+        Axiom(
+            label="is_verified_create",
+            formula=forall(
+                [t],
+                Negation(PredApp("is_verified", (app("create", t),))),
+            ),
+        ),
+        # Cell 14a: is_verified × verify — POSITIVE guard polarity.
+        # Guard: eq_token(t, get_token(s)) ∧ get_status(s) = active.
+        # This is a domain-level case split in a PLAIN cell (the observer
+        # is_verified takes no key parameter, so the eq_token guard is
+        # domain logic, not structural key dispatch).
+        # State verification: the guard references get_token(s), a stored
+        # observer value.
+        Axiom(
+            label="is_verified_verify_pos",
+            formula=forall(
+                [s, t],
+                Implication(
+                    Conjunction((
+                        PredApp("eq_token", (t, app("get_token", s))),
+                        eq(app("get_status", s), const("active")),
+                    )),
+                    PredApp("is_verified", (app("verify", s, t),)),
+                ),
+            ),
+        ),
+        # Cell 14b: is_verified × verify — NEGATIVE guard polarity.
+        # Wrong token OR expired session → preserve current verification.
+        # Domain choice: failed authentication preserves an already-verified
+        # session. Alternative domains might invalidate on any failed attempt.
+        # This is a design decision, not a structural necessity.
+        Axiom(
+            label="is_verified_verify_neg",
+            formula=forall(
+                [s, t],
+                Implication(
+                    Negation(
+                        Conjunction((
+                            PredApp("eq_token", (t, app("get_token", s))),
+                            eq(app("get_status", s), const("active")),
+                        )),
+                    ),
+                    iff(
+                        PredApp("is_verified", (app("verify", s, t),)),
+                        PredApp("is_verified", (s,)),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 15: is_verified × expire
+        Axiom(
+            label="is_verified_expire",
+            formula=forall(
+                [s],
+                Negation(PredApp("is_verified", (app("expire", s),))),
+            ),
+        ),
+        # Cell 16: is_verified × refresh — definedness-guarded
+        Axiom(
+            label="is_verified_refresh",
+            formula=forall(
+                [s],
+                Implication(
+                    Definedness(app("refresh", s)),
+                    Negation(
+                        PredApp("is_verified", (app("refresh", s),)),
+                    ),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # OBLIGATION CELLS — needs_auth
+        # The per-constructor axioms are structurally required by the
+        # obligation table. The standalone definition (needs_auth_def)
+        # provides the conceptual meaning; these axioms ensure every cell
+        # is explicitly constrained under loose semantics.
+        # ==================================================================
+        # Cell 17: needs_auth × create
+        Axiom(
+            label="needs_auth_create",
+            formula=forall(
+                [t],
+                PredApp("needs_auth", (app("create", t),)),
+            ),
+        ),
+        # Cell 18a: needs_auth × verify — POSITIVE guard → ¬needs_auth
+        Axiom(
+            label="needs_auth_verify_pos",
+            formula=forall(
+                [s, t],
+                Implication(
+                    Conjunction((
+                        PredApp("eq_token", (t, app("get_token", s))),
+                        eq(app("get_status", s), const("active")),
+                    )),
+                    Negation(PredApp("needs_auth", (app("verify", s, t),))),
+                ),
+            ),
+        ),
+        # Cell 18b: needs_auth × verify — NEGATIVE guard → preserve
+        Axiom(
+            label="needs_auth_verify_neg",
+            formula=forall(
+                [s, t],
+                Implication(
+                    Negation(
+                        Conjunction((
+                            PredApp("eq_token", (t, app("get_token", s))),
+                            eq(app("get_status", s), const("active")),
+                        )),
+                    ),
+                    iff(
+                        PredApp("needs_auth", (app("verify", s, t),)),
+                        PredApp("needs_auth", (s,)),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 19: needs_auth × expire
+        Axiom(
+            label="needs_auth_expire",
+            formula=forall(
+                [s],
+                Negation(PredApp("needs_auth", (app("expire", s),))),
+            ),
+        ),
+        # Cell 20: needs_auth × refresh — definedness-guarded
+        Axiom(
+            label="needs_auth_refresh",
+            formula=forall(
+                [s],
+                Implication(
+                    Definedness(app("refresh", s)),
+                    PredApp("needs_auth", (app("refresh", s),)),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # DERIVED DEFINITION — needs_auth (non-obligation)
+        # Defines needs_auth compositionally in terms of get_status and
+        # is_verified. The obligation table still requires per-constructor
+        # axioms above — this definition provides the conceptual meaning
+        # but does not substitute for obligation coverage.
+        # ==================================================================
+        Axiom(
+            label="needs_auth_def",
+            formula=forall(
+                [s],
+                iff(
+                    PredApp("needs_auth", (s,)),
+                    Conjunction((
+                        eq(app("get_status", s), const("active")),
+                        Negation(PredApp("is_verified", (s,))),
+                    )),
+                ),
+            ),
+        ),
+    )
+
+    return Spec(name="SessionStore", signature=sig, axioms=axioms)
+'''
+)
+
+# ============================================================
+# Rate Limiter
+# ============================================================
+
+RATE_LIMITER = WorkedExample(
+    domain_name="Rate Limiter",
+    summary="Models a rate limiter tracking request counts against a configured maximum per window. Demonstrates multi-constructor selector extraction, cross-sort helpers (Nat with zero/succ), helper composition in accumulator axioms, comparison-driven predicate via inductive Peano geq, and preservation collapse.",
+    patterns=frozenset({
+        Pattern.SEL_EXTRACT,
+        Pattern.PRESERVATION,
+        Pattern.CROSS_SORT,
+        Pattern.ACCUMULATION,
+        Pattern.BICOND_CHAR,
+        Pattern.KEYLESS_AGG,
+    }),
+    sorts=(
+        SortInfo("Limiter", "GENERATED", "Central domain object representing rate limiter state"),
+        SortInfo("Nat", "ATOMIC", "Cross-sort Peano naturals for counting (zero/succ)"),
+    ),
+    functions=(
+        FunctionInfo("zero", "→ Nat", FunctionRole.CONSTANT, "Natural number zero"),
+        FunctionInfo("succ", "Nat → Nat", FunctionRole.HELPER, "Successor function for Peano naturals"),
+        FunctionInfo("create", "Nat → Limiter", FunctionRole.CONSTRUCTOR, "Creates limiter with given maximum"),
+        FunctionInfo("record", "Limiter → Limiter", FunctionRole.CONSTRUCTOR, "Records one request, increments count"),
+        FunctionInfo("reset", "Limiter → Limiter", FunctionRole.CONSTRUCTOR, "Resets count to zero for window rollover"),
+        FunctionInfo("set_max", "Limiter × Nat → Limiter", FunctionRole.CONSTRUCTOR, "Updates maximum threshold"),
+        FunctionInfo("get_count", "Limiter → Nat", FunctionRole.OBSERVER, "Returns current request count"),
+        FunctionInfo("get_max", "Limiter → Nat", FunctionRole.SELECTOR, "Multi-constructor selector of create and set_max"),
+        FunctionInfo("geq", "Nat × Nat", FunctionRole.PREDICATE, "Greater-or-equal comparison with Peano inductive definition"),
+        FunctionInfo("over_limit", "Limiter", FunctionRole.PREDICATE, "Derived: geq(get_count(l), get_max(l))"),
+    ),
+    obligations=(
+        ObligationCell("get_max", "create", CellType.SELECTOR_EXTRACT, "m"),
+        ObligationCell("get_max", "set_max", CellType.SELECTOR_EXTRACT, "n"),
+        ObligationCell("get_max", "record", CellType.PRESERVATION, "get_max(l)"),
+        ObligationCell("get_max", "reset", CellType.PRESERVATION, "get_max(l)"),
+        ObligationCell("get_count", "create", CellType.BASIS, "zero"),
+        ObligationCell("get_count", "record", CellType.DOMAIN, "succ(get_count(l))"),
+        ObligationCell("get_count", "reset", CellType.DOMAIN, "zero"),
+        ObligationCell("get_count", "set_max", CellType.PRESERVATION, "get_count(l)"),
+        ObligationCell("over_limit", "create", CellType.DOMAIN, "geq(zero, m)"),
+        ObligationCell("over_limit", "record", CellType.DOMAIN, "geq(succ(get_count(l)), get_max(l))"),
+        ObligationCell("over_limit", "reset", CellType.DOMAIN, "geq(zero, get_max(l))"),
+        ObligationCell("over_limit", "set_max", CellType.DOMAIN, "geq(get_count(l), n)"),
+    ),
+    design_decisions=(
+        DesignDecision("Multi-constructor selector", "get_max is declared as selector of both create and set_max"),
+        DesignDecision("No partiality", "All constructors and observers are total — simplest possible obligation table"),
+        DesignDecision("Peano geq axioms", "Three inductive axioms (base, zero<succ, succ-succ) prevent vacuous models under loose semantics"),
+        DesignDecision("Derived over_limit", "Defined compositionally via geq(get_count, get_max); per-constructor obligation axioms still required"),
+        DesignDecision("Dropped warn infrastructure", "Original design had set_warn/get_warn but stored config with no observable predicate is dead state — removed"),
+    ),
+    code='''from alspec import (
+    Axiom,
+    Definedness,
+    GeneratedSortInfo,
+    Negation,
+    PredApp,
+    Signature,
+    Spec,
+    atomic,
+    fn,
+    pred,
+    var,
+    app,
+    const,
+    eq,
+    forall,
+    iff,
+)
+
+
+def rate_limiter_spec() -> Spec:
+    """Rate Limiter specification.
+
+    Models a rate limiter tracking request counts against a configured
+    maximum per window. Demonstrates:
+
+    - Selector extraction including multi-constructor selector (get_max
+      is a selector of both create and set_max)
+    - Selector foreign with preservation (total selectors on non-home ctors)
+    - Cross-sort helpers (Nat with zero/succ)
+    - Helper composition: succ(get_count(l)) in accumulator axiom
+    - Accumulator pattern (get_count across constructors)
+    - Comparison-driven predicate (over_limit via geq)
+    - Inductive helper axioms (Peano definition of geq)
+    - Preservation collapse across unrelated constructors
+
+    Obligation table: 3 observers × 4 constructors = 12 cells, all PLAIN.
+    No key dispatch. No partial functions.
+    Total axioms: 16 (12 obligation + 4 non-obligation).
+    """
+    # --- Variables ---
+    l = var("l", "Limiter")
+    m = var("m", "Nat")
+    n = var("n", "Nat")
+
+    # --- Signature ---
+    sig = Signature(
+        sorts={
+            "Limiter": atomic("Limiter"),
+            "Nat": atomic("Nat"),
+        },
+        functions={
+            # Nat helpers (cross-sort, pattern 10)
+            "zero": fn("zero", [], "Nat"),
+            "succ": fn("succ", [("n", "Nat")], "Nat"),
+            # Limiter constructors
+            "create": fn("create", [("m", "Nat")], "Limiter"),
+            "record": fn("record", [("l", "Limiter")], "Limiter"),
+            "reset": fn("reset", [("l", "Limiter")], "Limiter"),
+            "set_max": fn("set_max", [("l", "Limiter"), ("n", "Nat")], "Limiter"),
+            # Limiter observers
+            "get_count": fn("get_count", [("l", "Limiter")], "Nat"),
+            "get_max": fn("get_max", [("l", "Limiter")], "Nat"),
+        },
+        predicates={
+            "geq": pred("geq", [("a", "Nat"), ("b", "Nat")]),
+            "over_limit": pred("over_limit", [("l", "Limiter")]),
+        },
+        generated_sorts={
+            "Limiter": GeneratedSortInfo(
+                constructors=("create", "record", "reset", "set_max"),
+                selectors={
+                    "create": {"get_max": "Nat"},
+                    "set_max": {"get_max": "Nat"},
+                },
+            ),
+        },
+    )
+
+    axioms = (
+        # ==================================================================
+        # SELECTOR CELLS (mechanical)
+        # ==================================================================
+        # Cell 1: get_max × create — SELECTOR_EXTRACT
+        Axiom(
+            label="get_max_create",
+            formula=forall(
+                [m],
+                eq(app("get_max", app("create", m)), m),
+            ),
+        ),
+        # Cell 2: get_max × set_max — SELECTOR_EXTRACT
+        # get_max is declared as a selector of both create and set_max.
+        Axiom(
+            label="get_max_set_max",
+            formula=forall(
+                [l, n],
+                eq(app("get_max", app("set_max", l, n)), n),
+            ),
+        ),
+        # ==================================================================
+        # DOMAIN CELLS — get_count (accumulator, pattern 13)
+        # ==================================================================
+        # Cell 3: get_count × create — basis: new limiter starts at zero
+        Axiom(
+            label="get_count_create",
+            formula=forall(
+                [m],
+                eq(app("get_count", app("create", m)), const("zero")),
+            ),
+        ),
+        # Cell 4: get_count × record — accumulate (pattern 12: helper
+        # composition with succ applied to get_count)
+        Axiom(
+            label="get_count_record",
+            formula=forall(
+                [l],
+                eq(
+                    app("get_count", app("record", l)),
+                    app("succ", app("get_count", l)),
+                ),
+            ),
+        ),
+        # Cell 5: get_count × reset — window rollover: zero count
+        Axiom(
+            label="get_count_reset",
+            formula=forall(
+                [l],
+                eq(app("get_count", app("reset", l)), const("zero")),
+            ),
+        ),
+        # Cell 6: get_count × set_max — preservation
+        Axiom(
+            label="get_count_set_max",
+            formula=forall(
+                [l, n],
+                eq(
+                    app("get_count", app("set_max", l, n)),
+                    app("get_count", l),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # DOMAIN CELLS — get_max (preservation on non-extract cells)
+        # ==================================================================
+        # Cell 7: get_max × record — preservation
+        Axiom(
+            label="get_max_record",
+            formula=forall(
+                [l],
+                eq(
+                    app("get_max", app("record", l)),
+                    app("get_max", l),
+                ),
+            ),
+        ),
+        # Cell 8: get_max × reset — preservation
+        Axiom(
+            label="get_max_reset",
+            formula=forall(
+                [l],
+                eq(
+                    app("get_max", app("reset", l)),
+                    app("get_max", l),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # DOMAIN CELLS — over_limit (comparison-driven, pattern 18)
+        # Each per-constructor axiom substitutes the post-constructor
+        # values of get_count and get_max into the geq comparison.
+        # ==================================================================
+        # Cell 9: over_limit × create — count=zero vs max=m
+        Axiom(
+            label="over_limit_create",
+            formula=forall(
+                [m],
+                iff(
+                    PredApp("over_limit", (app("create", m),)),
+                    PredApp("geq", (const("zero"), m)),
+                ),
+            ),
+        ),
+        # Cell 10: over_limit × record — count incremented vs max preserved
+        Axiom(
+            label="over_limit_record",
+            formula=forall(
+                [l],
+                iff(
+                    PredApp("over_limit", (app("record", l),)),
+                    PredApp("geq", (
+                        app("succ", app("get_count", l)),
+                        app("get_max", l),
+                    )),
+                ),
+            ),
+        ),
+        # Cell 11: over_limit × reset — count=zero vs max preserved
+        Axiom(
+            label="over_limit_reset",
+            formula=forall(
+                [l],
+                iff(
+                    PredApp("over_limit", (app("reset", l),)),
+                    PredApp("geq", (const("zero"), app("get_max", l))),
+                ),
+            ),
+        ),
+        # Cell 12: over_limit × set_max — count preserved vs new max
+        Axiom(
+            label="over_limit_set_max",
+            formula=forall(
+                [l, n],
+                iff(
+                    PredApp("over_limit", (app("set_max", l, n),)),
+                    PredApp("geq", (app("get_count", l), n)),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # DERIVED DEFINITION — over_limit (non-obligation)
+        # Defines over_limit compositionally: count ≥ max. The obligation
+        # table still requires the per-constructor axioms above — this
+        # definition provides the conceptual meaning but does not substitute
+        # for obligation coverage.
+        # ==================================================================
+        Axiom(
+            label="over_limit_def",
+            formula=forall(
+                [l],
+                iff(
+                    PredApp("over_limit", (l,)),
+                    PredApp("geq", (
+                        app("get_count", l),
+                        app("get_max", l),
+                    )),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # HELPER AXIOMS — geq (inductive definition on Nat)
+        # Without these axioms, loose semantics permits models where geq
+        # is unconditionally false (or true), making over_limit vacuous.
+        # These three axioms provide the minimal Peano characterization
+        # of ≥ on natural numbers built from zero/succ.
+        # ==================================================================
+        # Every natural number is ≥ zero
+        Axiom(
+            label="geq_zero_base",
+            formula=forall(
+                [m],
+                PredApp("geq", (m, const("zero"))),
+            ),
+        ),
+        # Zero is not ≥ any successor
+        Axiom(
+            label="geq_zero_succ",
+            formula=forall(
+                [m],
+                Negation(PredApp("geq", (const("zero"), app("succ", m)))),
+            ),
+        ),
+        # Inductive step: succ(a) ≥ succ(b) ⟺ a ≥ b
+        Axiom(
+            label="geq_succ_succ",
+            formula=forall(
+                [m, n],
+                iff(
+                    PredApp("geq", (app("succ", m), app("succ", n))),
+                    PredApp("geq", (m, n)),
+                ),
+            ),
+        ),
+    )
+
+    return Spec(name="RateLimiter", signature=sig, axioms=axioms)
+'''
+)
+
+
+# ============================================================
+# DNS Zone
+# ============================================================
+
+DNS_ZONE = WorkedExample(
+    domain_name="DNS Zone",
+    summary="Models a DNS zone storing resource records indexed by (DomainName, RecordType). Demonstrates dual-key dispatch where the obligation table splits on the first key (eq_name) and the second key (eq_type) is handled as domain-level dispatch within HIT cells via nested implication. Features two equality predicate basis sets, doubly partial observers, delegation via strong equality, and existence predicate linked to observer definedness.",
+    patterns=frozenset({
+        Pattern.COLLECTION_CONTAINER,
+        Pattern.KEYED_CONSTRUCTOR,
+        Pattern.KEY_DISPATCH,
+        Pattern.DELEGATION,
+        Pattern.EXPLICIT_UNDEF,
+        Pattern.OVERWRITE,
+        Pattern.DOUBLY_PARTIAL,
+        Pattern.NESTED_GUARD,
+        Pattern.BOTH_GUARD_POL,
+        Pattern.BICOND_CHAR,
+    }),
+    sorts=(
+        SortInfo("Zone", "GENERATED", "Central collection storing DNS resource records"),
+        SortInfo("DomainName", "ATOMIC", "First key sort — opaque domain name identifier"),
+        SortInfo("RecordType", "ATOMIC", "Second key sort — opaque record type identifier"),
+        SortInfo("RData", "ATOMIC", "Opaque record data payload"),
+        SortInfo("Nat", "ATOMIC", "Opaque TTL value (no zero/succ — purely opaque in this domain)"),
+    ),
+    functions=(
+        FunctionInfo("empty", "→ Zone", FunctionRole.CONSTRUCTOR, "Creates empty DNS zone"),
+        FunctionInfo("add_record", "Zone × DomainName × RecordType × RData × Nat → Zone", FunctionRole.CONSTRUCTOR, "Adds or overwrites record at (name, type)"),
+        FunctionInfo("remove_record", "Zone × DomainName × RecordType → Zone", FunctionRole.CONSTRUCTOR, "Removes record at (name, type)"),
+        FunctionInfo("get_rdata", "Zone × DomainName × RecordType →? RData", FunctionRole.PARTIAL_OBSERVER, "Record data, undefined if no record exists"),
+        FunctionInfo("get_ttl", "Zone × DomainName × RecordType →? Nat", FunctionRole.PARTIAL_OBSERVER, "TTL value, undefined if no record exists"),
+        FunctionInfo("eq_name", "DomainName × DomainName", FunctionRole.PREDICATE, "First key equality for structural dispatch in obligation table"),
+        FunctionInfo("eq_type", "RecordType × RecordType", FunctionRole.PREDICATE, "Second key equality for domain-level dispatch within HIT cells"),
+        FunctionInfo("has_record", "Zone × DomainName × RecordType", FunctionRole.PREDICATE, "Record existence, linked to def(get_rdata) via biconditional"),
+    ),
+    obligations=(
+        # get_rdata
+        ObligationCell("get_rdata", "empty", CellType.UNDEF, "¬def(get_rdata(empty,n,t))"),
+        ObligationCell("get_rdata", "add_record", CellType.KEY_HIT, "d", "eq_name(n,n2) ∧ eq_type(t,t2)"),
+        ObligationCell("get_rdata", "add_record", CellType.KEY_MISS, "delegate", "eq_name(n,n2) ∧ ¬eq_type(t,t2)"),
+        ObligationCell("get_rdata", "add_record", CellType.KEY_MISS, "delegate", "¬eq_name(n,n2)"),
+        ObligationCell("get_rdata", "remove_record", CellType.KEY_HIT, "¬def", "eq_name(n,n2) ∧ eq_type(t,t2)"),
+        ObligationCell("get_rdata", "remove_record", CellType.KEY_MISS, "delegate", "eq_name(n,n2) ∧ ¬eq_type(t,t2)"),
+        ObligationCell("get_rdata", "remove_record", CellType.KEY_MISS, "delegate", "¬eq_name(n,n2)"),
+        # get_ttl (parallel structure)
+        ObligationCell("get_ttl", "empty", CellType.UNDEF, "¬def(get_ttl(empty,n,t))"),
+        ObligationCell("get_ttl", "add_record", CellType.KEY_HIT, "ttl", "eq_name ∧ eq_type"),
+        ObligationCell("get_ttl", "add_record", CellType.KEY_MISS, "delegate", "eq_name ∧ ¬eq_type"),
+        ObligationCell("get_ttl", "add_record", CellType.KEY_MISS, "delegate", "¬eq_name"),
+        ObligationCell("get_ttl", "remove_record", CellType.KEY_HIT, "¬def", "eq_name ∧ eq_type"),
+        ObligationCell("get_ttl", "remove_record", CellType.KEY_MISS, "delegate", "eq_name ∧ ¬eq_type"),
+        ObligationCell("get_ttl", "remove_record", CellType.KEY_MISS, "delegate", "¬eq_name"),
+        # has_record
+        ObligationCell("has_record", "empty", CellType.BASIS, "¬has_record(empty,n,t)"),
+        ObligationCell("has_record", "add_record", CellType.KEY_HIT, "has_record", "eq_name ∧ eq_type"),
+        ObligationCell("has_record", "add_record", CellType.KEY_MISS, "delegate iff", "eq_name ∧ ¬eq_type"),
+        ObligationCell("has_record", "add_record", CellType.KEY_MISS, "delegate iff", "¬eq_name"),
+        ObligationCell("has_record", "remove_record", CellType.KEY_HIT, "¬has_record", "eq_name ∧ eq_type"),
+        ObligationCell("has_record", "remove_record", CellType.KEY_MISS, "delegate iff", "eq_name ∧ ¬eq_type"),
+        ObligationCell("has_record", "remove_record", CellType.KEY_MISS, "delegate iff", "¬eq_name"),
+    ),
+    design_decisions=(
+        DesignDecision("Dual-key dispatch via nested implication", "Obligation table splits on first key (DomainName); second key (RecordType) handled as domain logic within HIT cells via nested Implication"),
+        DesignDecision("Nat is purely opaque", "No zero/succ — TTL has no arithmetic in this domain, unlike Rate Limiter"),
+        DesignDecision("has_record linked to definedness", "has_record(z,n,t) ⟺ def(get_rdata(z,n,t)) via explicit biconditional; obligation axioms still required"),
+        DesignDecision("Strong equality delegation", "MISS cells use strong equality (eq) which correctly propagates undefinedness for partial observers"),
+    ),
+    code='''from alspec import (
+    Axiom,
+    Conjunction,
+    Definedness,
+    GeneratedSortInfo,
+    Implication,
+    Negation,
+    PredApp,
+    Signature,
+    Spec,
+    atomic,
+    fn,
+    pred,
+    var,
+    app,
+    const,
+    eq,
+    forall,
+    iff,
+)
+
+
+def dns_zone_spec() -> Spec:
+    """DNS Zone specification.
+
+    Models a DNS zone storing resource records indexed by (DomainName,
+    RecordType). Demonstrates:
+
+    - Dual-key dispatch: obligation table splits on eq_name (first key),
+      then second-level key dispatch on eq_type (RecordType) within HIT
+      cells via nested implication
+    - Two sets of equality predicate basis axioms (eq_name, eq_type)
+    - Doubly partial observers (get_rdata, get_ttl undefined on empty zone)
+    - Nested implication guards mirroring hierarchical key dispatch
+    - Guard polarity at both key levels
+    - Delegation via strong equality (preserves/propagates undefinedness)
+    - Existence predicate linked to observer definedness (has_record_def)
+
+    Obligation table: 3 observers × 3 constructors = 9 base cells.
+    empty cells are PLAIN (3). Keyed constructor cells split into HIT/MISS
+    on eq_name (12 cells). HIT cells further split on eq_type (second-level
+    key dispatch).
+    Total axioms: 28 (21 obligation + 7 non-obligation).
+    """
+    # --- Variables ---
+    z = var("z", "Zone")
+    n = var("n", "DomainName")
+    n2 = var("n2", "DomainName")
+    n3 = var("n3", "DomainName")
+    t = var("t", "RecordType")
+    t2 = var("t2", "RecordType")
+    t3 = var("t3", "RecordType")
+    d = var("d", "RData")
+    ttl = var("ttl", "Nat")
+
+    # --- Signature ---
+    sig = Signature(
+        sorts={
+            "Zone": atomic("Zone"),
+            "DomainName": atomic("DomainName"),
+            "RecordType": atomic("RecordType"),
+            "RData": atomic("RData"),
+            "Nat": atomic("Nat"),
+        },
+        functions={
+            # Zone constructors
+            "empty": fn("empty", [], "Zone"),
+            "add_record": fn(
+                "add_record",
+                [
+                    ("z", "Zone"),
+                    ("n", "DomainName"),
+                    ("t", "RecordType"),
+                    ("d", "RData"),
+                    ("ttl", "Nat"),
+                ],
+                "Zone",
+            ),
+            "remove_record": fn(
+                "remove_record",
+                [("z", "Zone"), ("n", "DomainName"), ("t", "RecordType")],
+                "Zone",
+            ),
+            # Zone observers (partial — undefined when no record exists)
+            "get_rdata": fn(
+                "get_rdata",
+                [("z", "Zone"), ("n", "DomainName"), ("t", "RecordType")],
+                "RData",
+                total=False,
+            ),
+            "get_ttl": fn(
+                "get_ttl",
+                [("z", "Zone"), ("n", "DomainName"), ("t", "RecordType")],
+                "Nat",
+                total=False,
+            ),
+        },
+        predicates={
+            "eq_name": pred(
+                "eq_name", [("n1", "DomainName"), ("n2", "DomainName")]
+            ),
+            "eq_type": pred(
+                "eq_type", [("t1", "RecordType"), ("t2", "RecordType")]
+            ),
+            "has_record": pred(
+                "has_record",
+                [("z", "Zone"), ("n", "DomainName"), ("t", "RecordType")],
+            ),
+        },
+        generated_sorts={
+            "Zone": GeneratedSortInfo(
+                constructors=("empty", "add_record", "remove_record"),
+                selectors={},
+            ),
+        },
+    )
+
+    axioms = (
+        # ==================================================================
+        # BASIS AXIOMS — eq_name (§9h)
+        # ==================================================================
+        Axiom(
+            label="eq_name_refl",
+            formula=forall(
+                [n],
+                PredApp("eq_name", (n, n)),
+            ),
+        ),
+        Axiom(
+            label="eq_name_sym",
+            formula=forall(
+                [n, n2],
+                Implication(
+                    PredApp("eq_name", (n, n2)),
+                    PredApp("eq_name", (n2, n)),
+                ),
+            ),
+        ),
+        Axiom(
+            label="eq_name_trans",
+            formula=forall(
+                [n, n2, n3],
+                Implication(
+                    Conjunction((
+                        PredApp("eq_name", (n, n2)),
+                        PredApp("eq_name", (n2, n3)),
+                    )),
+                    PredApp("eq_name", (n, n3)),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # BASIS AXIOMS — eq_type (§9h)
+        # ==================================================================
+        Axiom(
+            label="eq_type_refl",
+            formula=forall(
+                [t],
+                PredApp("eq_type", (t, t)),
+            ),
+        ),
+        Axiom(
+            label="eq_type_sym",
+            formula=forall(
+                [t, t2],
+                Implication(
+                    PredApp("eq_type", (t, t2)),
+                    PredApp("eq_type", (t2, t)),
+                ),
+            ),
+        ),
+        Axiom(
+            label="eq_type_trans",
+            formula=forall(
+                [t, t2, t3],
+                Implication(
+                    Conjunction((
+                        PredApp("eq_type", (t, t2)),
+                        PredApp("eq_type", (t2, t3)),
+                    )),
+                    PredApp("eq_type", (t, t3)),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # PLAIN CELLS — empty (base cases)
+        # ==================================================================
+        # Cell 1: get_rdata × empty — undefined (no records in empty zone)
+        Axiom(
+            label="get_rdata_empty",
+            formula=forall(
+                [n, t],
+                Negation(
+                    Definedness(app("get_rdata", const("empty"), n, t))
+                ),
+            ),
+        ),
+        # Cell 6: get_ttl × empty — undefined
+        Axiom(
+            label="get_ttl_empty",
+            formula=forall(
+                [n, t],
+                Negation(
+                    Definedness(app("get_ttl", const("empty"), n, t))
+                ),
+            ),
+        ),
+        # Cell 11: has_record × empty — no records
+        Axiom(
+            label="has_record_empty",
+            formula=forall(
+                [n, t],
+                Negation(
+                    PredApp("has_record", (const("empty"), n, t))
+                ),
+            ),
+        ),
+        # ==================================================================
+        # get_rdata × add_record
+        # First-level key dispatch on eq_name (from obligation table).
+        # Second-level key dispatch on eq_type (within HIT cells, via
+        # nested implication — both DomainName and RecordType are key
+        # sorts with equality predicates).
+        # ==================================================================
+        # Cell 2a: HIT(name) + HIT(type) → return new data
+        Axiom(
+            label="get_rdata_add_hit_type_hit",
+            formula=forall(
+                [z, n, n2, t, t2, d, ttl],
+                Implication(
+                    PredApp("eq_name", (n, n2)),
+                    Implication(
+                        PredApp("eq_type", (t, t2)),
+                        eq(
+                            app("get_rdata", app("add_record", z, n, t, d, ttl), n2, t2),
+                            d,
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 2b: HIT(name) + MISS(type) → delegate (strong equality)
+        Axiom(
+            label="get_rdata_add_hit_type_miss",
+            formula=forall(
+                [z, n, n2, t, t2, d, ttl],
+                Implication(
+                    PredApp("eq_name", (n, n2)),
+                    Implication(
+                        Negation(PredApp("eq_type", (t, t2))),
+                        eq(
+                            app("get_rdata", app("add_record", z, n, t, d, ttl), n2, t2),
+                            app("get_rdata", z, n2, t2),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 3: MISS(name) → delegate unconditionally (strong equality)
+        Axiom(
+            label="get_rdata_add_miss",
+            formula=forall(
+                [z, n, n2, t, t2, d, ttl],
+                Implication(
+                    Negation(PredApp("eq_name", (n, n2))),
+                    eq(
+                        app("get_rdata", app("add_record", z, n, t, d, ttl), n2, t2),
+                        app("get_rdata", z, n2, t2),
+                    ),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # get_rdata × remove_record
+        # ==================================================================
+        # Cell 4a: HIT(name) + HIT(type) → undefined (record removed)
+        Axiom(
+            label="get_rdata_remove_hit_type_hit",
+            formula=forall(
+                [z, n, n2, t, t2],
+                Implication(
+                    PredApp("eq_name", (n, n2)),
+                    Implication(
+                        PredApp("eq_type", (t, t2)),
+                        Negation(
+                            Definedness(
+                                app("get_rdata", app("remove_record", z, n, t), n2, t2)
+                            )
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 4b: HIT(name) + MISS(type) → delegate
+        Axiom(
+            label="get_rdata_remove_hit_type_miss",
+            formula=forall(
+                [z, n, n2, t, t2],
+                Implication(
+                    PredApp("eq_name", (n, n2)),
+                    Implication(
+                        Negation(PredApp("eq_type", (t, t2))),
+                        eq(
+                            app("get_rdata", app("remove_record", z, n, t), n2, t2),
+                            app("get_rdata", z, n2, t2),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 5: MISS(name) → delegate
+        Axiom(
+            label="get_rdata_remove_miss",
+            formula=forall(
+                [z, n, n2, t, t2],
+                Implication(
+                    Negation(PredApp("eq_name", (n, n2))),
+                    eq(
+                        app("get_rdata", app("remove_record", z, n, t), n2, t2),
+                        app("get_rdata", z, n2, t2),
+                    ),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # get_ttl × add_record (parallel structure to get_rdata)
+        # ==================================================================
+        # Cell 7a: HIT(name) + HIT(type) → return new TTL
+        Axiom(
+            label="get_ttl_add_hit_type_hit",
+            formula=forall(
+                [z, n, n2, t, t2, d, ttl],
+                Implication(
+                    PredApp("eq_name", (n, n2)),
+                    Implication(
+                        PredApp("eq_type", (t, t2)),
+                        eq(
+                            app("get_ttl", app("add_record", z, n, t, d, ttl), n2, t2),
+                            ttl,
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 7b: HIT(name) + MISS(type) → delegate
+        Axiom(
+            label="get_ttl_add_hit_type_miss",
+            formula=forall(
+                [z, n, n2, t, t2, d, ttl],
+                Implication(
+                    PredApp("eq_name", (n, n2)),
+                    Implication(
+                        Negation(PredApp("eq_type", (t, t2))),
+                        eq(
+                            app("get_ttl", app("add_record", z, n, t, d, ttl), n2, t2),
+                            app("get_ttl", z, n2, t2),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 8: MISS(name) → delegate
+        Axiom(
+            label="get_ttl_add_miss",
+            formula=forall(
+                [z, n, n2, t, t2, d, ttl],
+                Implication(
+                    Negation(PredApp("eq_name", (n, n2))),
+                    eq(
+                        app("get_ttl", app("add_record", z, n, t, d, ttl), n2, t2),
+                        app("get_ttl", z, n2, t2),
+                    ),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # get_ttl × remove_record (parallel structure to get_rdata)
+        # ==================================================================
+        # Cell 9a: HIT(name) + HIT(type) → undefined
+        Axiom(
+            label="get_ttl_remove_hit_type_hit",
+            formula=forall(
+                [z, n, n2, t, t2],
+                Implication(
+                    PredApp("eq_name", (n, n2)),
+                    Implication(
+                        PredApp("eq_type", (t, t2)),
+                        Negation(
+                            Definedness(
+                                app("get_ttl", app("remove_record", z, n, t), n2, t2)
+                            )
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 9b: HIT(name) + MISS(type) → delegate
+        Axiom(
+            label="get_ttl_remove_hit_type_miss",
+            formula=forall(
+                [z, n, n2, t, t2],
+                Implication(
+                    PredApp("eq_name", (n, n2)),
+                    Implication(
+                        Negation(PredApp("eq_type", (t, t2))),
+                        eq(
+                            app("get_ttl", app("remove_record", z, n, t), n2, t2),
+                            app("get_ttl", z, n2, t2),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 10: MISS(name) → delegate
+        Axiom(
+            label="get_ttl_remove_miss",
+            formula=forall(
+                [z, n, n2, t, t2],
+                Implication(
+                    Negation(PredApp("eq_name", (n, n2))),
+                    eq(
+                        app("get_ttl", app("remove_record", z, n, t), n2, t2),
+                        app("get_ttl", z, n2, t2),
+                    ),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # has_record × add_record
+        # ==================================================================
+        # Cell 12a: HIT(name) + HIT(type) → true (record exists)
+        Axiom(
+            label="has_record_add_hit_type_hit",
+            formula=forall(
+                [z, n, n2, t, t2, d, ttl],
+                Implication(
+                    PredApp("eq_name", (n, n2)),
+                    Implication(
+                        PredApp("eq_type", (t, t2)),
+                        PredApp(
+                            "has_record",
+                            (app("add_record", z, n, t, d, ttl), n2, t2),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 12b: HIT(name) + MISS(type) → delegate
+        Axiom(
+            label="has_record_add_hit_type_miss",
+            formula=forall(
+                [z, n, n2, t, t2, d, ttl],
+                Implication(
+                    PredApp("eq_name", (n, n2)),
+                    Implication(
+                        Negation(PredApp("eq_type", (t, t2))),
+                        iff(
+                            PredApp(
+                                "has_record",
+                                (app("add_record", z, n, t, d, ttl), n2, t2),
+                            ),
+                            PredApp("has_record", (z, n2, t2)),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 13: MISS(name) → delegate
+        Axiom(
+            label="has_record_add_miss",
+            formula=forall(
+                [z, n, n2, t, t2, d, ttl],
+                Implication(
+                    Negation(PredApp("eq_name", (n, n2))),
+                    iff(
+                        PredApp(
+                            "has_record",
+                            (app("add_record", z, n, t, d, ttl), n2, t2),
+                        ),
+                        PredApp("has_record", (z, n2, t2)),
+                    ),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # has_record × remove_record
+        # ==================================================================
+        # Cell 14a: HIT(name) + HIT(type) → false (record removed)
+        Axiom(
+            label="has_record_remove_hit_type_hit",
+            formula=forall(
+                [z, n, n2, t, t2],
+                Implication(
+                    PredApp("eq_name", (n, n2)),
+                    Implication(
+                        PredApp("eq_type", (t, t2)),
+                        Negation(
+                            PredApp(
+                                "has_record",
+                                (app("remove_record", z, n, t), n2, t2),
+                            )
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 14b: HIT(name) + MISS(type) → delegate
+        Axiom(
+            label="has_record_remove_hit_type_miss",
+            formula=forall(
+                [z, n, n2, t, t2],
+                Implication(
+                    PredApp("eq_name", (n, n2)),
+                    Implication(
+                        Negation(PredApp("eq_type", (t, t2))),
+                        iff(
+                            PredApp(
+                                "has_record",
+                                (app("remove_record", z, n, t), n2, t2),
+                            ),
+                            PredApp("has_record", (z, n2, t2)),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # Cell 15: MISS(name) → delegate
+        Axiom(
+            label="has_record_remove_miss",
+            formula=forall(
+                [z, n, n2, t, t2],
+                Implication(
+                    Negation(PredApp("eq_name", (n, n2))),
+                    iff(
+                        PredApp(
+                            "has_record",
+                            (app("remove_record", z, n, t), n2, t2),
+                        ),
+                        PredApp("has_record", (z, n2, t2)),
+                    ),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # DERIVED DEFINITION — has_record (non-obligation)
+        # Explicitly links the membership predicate to observer definedness:
+        # a record exists at (name, type) iff get_rdata is defined there.
+        # The obligation table still requires the per-constructor axioms
+        # above — this definition provides the conceptual meaning but does
+        # not substitute for obligation coverage.
+        # ==================================================================
+        Axiom(
+            label="has_record_def",
+            formula=forall(
+                [z, n, t],
+                iff(
+                    PredApp("has_record", (z, n, t)),
+                    Definedness(app("get_rdata", z, n, t)),
+                ),
+            ),
+        ),
+    )
+
+    return Spec(name="DnsZone", signature=sig, axioms=axioms)
+'''
+)
+
 ALL_EXAMPLES: dict[str, WorkedExample] = {
     "stack": STACK,
     "bug-tracker": BUG_TRACKER,
@@ -5818,4 +7314,7 @@ ALL_EXAMPLES: dict[str, WorkedExample] = {
     "email-inbox": EMAIL_INBOX,
     "auction": AUCTION,
     "version-history": VERSION_HISTORY,
+    "session-store": SESSION_STORE,
+    "rate-limiter": RATE_LIMITER,
+    "dns-zone": DNS_ZONE,
 }

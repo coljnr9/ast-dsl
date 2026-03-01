@@ -100,6 +100,9 @@ class ChunkId(Enum):
     EXAMPLE_BOUNDED_COUNTER = auto()
     EXAMPLE_TRAFFIC_LIGHT = auto()
     EXAMPLE_QUEUE = auto()
+    EXAMPLE_SESSION_STORE = auto()
+    EXAMPLE_RATE_LIMITER = auto()
+    EXAMPLE_DNS_ZONE = auto()
 
 
 # Convenience sets
