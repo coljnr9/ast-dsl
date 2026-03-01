@@ -10,6 +10,7 @@ dependencies = [
     "openai>=2.24.0",
     "pydoe3>=1.6.2",
     "python-dotenv>=1.2.1",
+    "rapidfuzz>=3.14.3",
 ]
 
 [project.scripts]
