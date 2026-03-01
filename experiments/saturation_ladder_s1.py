@@ -178,10 +178,15 @@ def _make_s1_record(
     well_formed: bool,
     failure_category: str,
     health: float,
+    fuzzy_health: float,
     sort_overlap: float,
     function_overlap: float,
     predicate_overlap: float,
     constructor_overlap: float,
+    fuzzy_sort_overlap: float,
+    fuzzy_function_overlap: float,
+    fuzzy_predicate_overlap: float,
+    fuzzy_constructor_overlap: float,
     cell_count_delta: int,
     error: str | None,
     latency_ms: int,
@@ -195,10 +200,15 @@ def _make_s1_record(
         "well_formed": well_formed,
         "failure_category": failure_category,
         "health": health,
+        "fuzzy_health": fuzzy_health,
         "sort_overlap": sort_overlap,
         "function_overlap": function_overlap,
         "predicate_overlap": predicate_overlap,
         "constructor_overlap": constructor_overlap,
+        "fuzzy_sort_overlap": fuzzy_sort_overlap,
+        "fuzzy_function_overlap": fuzzy_function_overlap,
+        "fuzzy_predicate_overlap": fuzzy_predicate_overlap,
+        "fuzzy_constructor_overlap": fuzzy_constructor_overlap,
         "cell_count_delta": cell_count_delta,
         "error": error,
         "latency_ms": latency_ms,
@@ -239,10 +249,15 @@ async def _run_domain(
             well_formed=False,
             failure_category=FailureCategory.EXEC_ERROR.value,
             health=0.0,
+            fuzzy_health=0.0,
             sort_overlap=0.0,
             function_overlap=0.0,
             predicate_overlap=0.0,
             constructor_overlap=0.0,
+            fuzzy_sort_overlap=0.0,
+            fuzzy_function_overlap=0.0,
+            fuzzy_predicate_overlap=0.0,
+            fuzzy_constructor_overlap=0.0,
             cell_count_delta=0,
             error=str(exc),
             latency_ms=latency_ms,
@@ -268,10 +283,15 @@ async def _run_domain(
         well_formed=score.well_formed,
         failure_category=score.failure_category.value,
         health=score.health,
+        fuzzy_health=score.fuzzy_health,
         sort_overlap=score.sort_overlap,
         function_overlap=score.function_overlap,
         predicate_overlap=score.predicate_overlap,
         constructor_overlap=score.constructor_overlap,
+        fuzzy_sort_overlap=score.fuzzy_sort_overlap,
+        fuzzy_function_overlap=score.fuzzy_function_overlap,
+        fuzzy_predicate_overlap=score.fuzzy_predicate_overlap,
+        fuzzy_constructor_overlap=score.fuzzy_constructor_overlap,
         cell_count_delta=score.cell_count_delta,
         error=score.error_message or result.error,
         latency_ms=latency_ms,
@@ -395,10 +415,15 @@ async def _run_rung_replicate(
                     well_formed=False,
                     failure_category="exec_error",
                     health=0.0,
+                    fuzzy_health=0.0,
                     sort_overlap=0.0,
                     function_overlap=0.0,
                     predicate_overlap=0.0,
                     constructor_overlap=0.0,
+                    fuzzy_sort_overlap=0.0,
+                    fuzzy_function_overlap=0.0,
+                    fuzzy_predicate_overlap=0.0,
+                    fuzzy_constructor_overlap=0.0,
                     cell_count_delta=0,
                     error=str(exc),
                     latency_ms=0,
@@ -437,6 +462,8 @@ def _rung_summary(records: list[dict]) -> dict:
     wf = [r for r in records if r["well_formed"]]
     health_vals = [r["health"] for r in records]
     cond_health_vals = [r["health"] for r in parsed]
+    fuzzy_health_vals = [r["fuzzy_health"] for r in records]
+    cond_fuzzy_health_vals = [r["fuzzy_health"] for r in parsed]
 
     failures = {}
     for r in records:
@@ -454,6 +481,16 @@ def _rung_summary(records: list[dict]) -> dict:
             sum(cond_health_vals) / len(cond_health_vals) if cond_health_vals else 0.0
         ),
         "cond_health_std": _stddev(cond_health_vals) if cond_health_vals else 0.0,
+        "fuzzy_health_mean": sum(fuzzy_health_vals) / total if total > 0 else 0.0,
+        "fuzzy_health_std": _stddev(fuzzy_health_vals),
+        "cond_fuzzy_health_mean": (
+            sum(cond_fuzzy_health_vals) / len(cond_fuzzy_health_vals)
+            if cond_fuzzy_health_vals
+            else 0.0
+        ),
+        "cond_fuzzy_health_std": (
+            _stddev(cond_fuzzy_health_vals) if cond_fuzzy_health_vals else 0.0
+        ),
         "syntax_errors": failures.get("syntax", 0),
         "import_errors": failures.get("import", 0),
         "api_misuse_errors": failures.get("api_misuse", 0),
@@ -473,6 +510,7 @@ def _print_rung_summary(
     parse = summary["parse_count"]
     health = summary["health_mean"]
     cond_health = summary["cond_health_mean"]
+    fuzzy_health = summary["fuzzy_health_mean"]
 
     syntax = summary["syntax_errors"]
     import_err = summary["import_errors"]
@@ -484,20 +522,22 @@ def _print_rung_summary(
     print(
         f"  {rep_tag}{rung_name}: {parse_pct} parse | "
         f"health={health:.2f} | cond_health={cond_health:.2f} | "
+        f"fuzzy_health={fuzzy_health:.2f} | "
         f"failures: {syntax} syntax, {import_err} import, {api} api"
     )
 
 
 def _print_comparison_table(rungs: list[dict], all_records: list[dict]) -> None:
-    print("\n" + "═" * 90)
+    print("\n" + "═" * 105)
     print("  Saturation Ladder S1 Results")
-    print("═" * 90)
+    print("═" * 105)
     header = (
         f"{'Rung':<6}  {'Ex':>2}  {'Parse':>6}  {'Health':>6}  {'±Std':>5}  "
-        f"{'CondH':>6}  {'±Std':>5}  {'Syn':>3}  {'Imp':>3}  {'API':>3}  {'Tok':>5}"
+        f"{'CondH':>6}  {'±Std':>5}  {'FzzyH':>6}  {'±Std':>5}  "
+        f"{'Syn':>3}  {'Imp':>3}  {'API':>3}  {'Tok':>5}"
     )
     print(header)
-    print("─" * 90)
+    print("─" * 105)
 
     for rung in rungs:
         rung_name = rung["name"]
@@ -518,11 +558,12 @@ def _print_comparison_table(rungs: list[dict], all_records: list[dict]) -> None:
             f"{short:<6}  {n_examples:>2}  {parse_pct:>6}  "
             f"{summary['health_mean']:>6.2f}  {summary['health_std']:>5.2f}  "
             f"{summary['cond_health_mean']:>6.2f}  {summary['cond_health_std']:>5.2f}  "
+            f"{summary['fuzzy_health_mean']:>6.2f}  {summary['fuzzy_health_std']:>5.2f}  "
             f"{summary['syntax_errors']:>3}  {summary['import_errors']:>3}  "
             f"{summary['api_misuse_errors']:>3}  {tok_label:>5}"
         )
 
-    print("═" * 90 + "\n")
+    print("═" * 105 + "\n")
 
 
 # ---------------------------------------------------------------------------
@@ -559,6 +600,10 @@ def _save_results(
                 "health_std",
                 "cond_health_mean",
                 "cond_health_std",
+                "fuzzy_health_mean",
+                "fuzzy_health_std",
+                "cond_fuzzy_health_mean",
+                "cond_fuzzy_health_std",
                 "syntax_errors",
                 "import_errors",
                 "api_misuse_errors",
@@ -581,6 +626,10 @@ def _save_results(
                     f"{s['health_std']:.4f}",
                     f"{s['cond_health_mean']:.4f}",
                     f"{s['cond_health_std']:.4f}",
+                    f"{s['fuzzy_health_mean']:.4f}",
+                    f"{s['fuzzy_health_std']:.4f}",
+                    f"{s['cond_fuzzy_health_mean']:.4f}",
+                    f"{s['cond_fuzzy_health_std']:.4f}",
                     s["syntax_errors"],
                     s["import_errors"],
                     s["api_misuse_errors"],
@@ -591,6 +640,19 @@ def _save_results(
             )
 
     domain_ids = sorted(list(set(r["domain_id"] for r in all_records)))
+
+    def _median_health(records: list[dict], key: str) -> str:
+        """Compute median of `key` across records, returning formatted string."""
+        if not records:
+            return ""
+        h_vals = sorted(r[key] for r in records)
+        mid = len(h_vals) // 2
+        median = (
+            h_vals[mid]
+            if len(h_vals) % 2 == 1
+            else (h_vals[mid - 1] + h_vals[mid]) / 2.0
+        )
+        return f"{median:.4f}"
 
     per_domain_path = output_dir / "per_domain.csv"
     with per_domain_path.open("w", newline="", encoding="utf-8") as fh:
@@ -604,17 +666,22 @@ def _save_results(
                     for r in all_records
                     if r["rung"] == rung["name"] and r["domain_id"] == d_id
                 ]
-                if recs:
-                    h_vals = sorted([r["health"] for r in recs])
-                    mid = len(h_vals) // 2
-                    median = (
-                        h_vals[mid]
-                        if len(h_vals) % 2 == 1
-                        else (h_vals[mid - 1] + h_vals[mid]) / 2.0
-                    )
-                    row.append(f"{median:.4f}")
-                else:
-                    row.append("")
+                row.append(_median_health(recs, "health"))
+            writer.writerow(row)
+
+    per_domain_fuzzy_path = output_dir / "per_domain_fuzzy.csv"
+    with per_domain_fuzzy_path.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["domain"] + [r["name"] + "_health" for r in rungs])
+        for d_id in domain_ids:
+            row = [d_id]
+            for rung in rungs:
+                recs = [
+                    r
+                    for r in all_records
+                    if r["rung"] == rung["name"] and r["domain_id"] == d_id
+                ]
+                row.append(_median_health(recs, "fuzzy_health"))
             writer.writerow(row)
 
     config_path = output_dir / "config.json"

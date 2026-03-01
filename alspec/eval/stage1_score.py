@@ -21,6 +21,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from rapidfuzz import fuzz, process
+
 from alspec.obligation import build_obligation_table
 from alspec.pipeline import _execute_signature_code
 from alspec.signature import GeneratedSortInfo, Signature
@@ -120,11 +122,18 @@ class Stage1Score:
     constructor_overlap: float
     cell_count_delta: int  # obligation_cells - golden_obligation_cells (0 is best)
 
+    # --- Fuzzy name matching (rapidfuzz, threshold=80) ---
+    fuzzy_sort_overlap: float = 0.0
+    fuzzy_function_overlap: float = 0.0
+    fuzzy_predicate_overlap: float = 0.0
+    fuzzy_constructor_overlap: float = 0.0
+    fuzzy_health: float = 0.0  # same weighted composite but with fuzzy overlaps
+
     # --- Composite ---
-    health: float  # weighted composite in [0, 1]
+    health: float = 0.0  # weighted composite in [0, 1]
 
     # --- Metadata ---
-    error_message: str | None  # set when parse_success=False
+    error_message: str | None = None  # set when parse_success=False
     failure_category: FailureCategory = FailureCategory.OK
     partial_parse_credit: float = 0.0  # non-zero only when parse_success=False
 
@@ -166,6 +175,11 @@ def _make_zero_score(
         predicate_overlap=0.0,
         constructor_overlap=0.0,
         cell_count_delta=0,
+        fuzzy_sort_overlap=0.0,
+        fuzzy_function_overlap=0.0,
+        fuzzy_predicate_overlap=0.0,
+        fuzzy_constructor_overlap=0.0,
+        fuzzy_health=0.0,
         health=credit,
         error_message=error_message,
         partial_parse_credit=credit,
@@ -262,6 +276,48 @@ def jaccard(a: set[str], b: set[str]) -> float:
         return 1.0
     union = a | b
     return len(a & b) / len(union) if union else 1.0
+
+
+# Fuzzy matching threshold (rapidfuzz ratio score in [0, 100]).
+FUZZY_THRESHOLD: int = 80
+
+
+def fuzzy_jaccard(
+    candidates: set[str], golden: set[str], threshold: int = FUZZY_THRESHOLD
+) -> float:
+    """Bipartite fuzzy Jaccard between two name sets.
+
+    For each candidate, find its best match in golden (by rapidfuzz ratio).
+    A pair is a "hit" if similarity >= threshold. Each golden name can only
+    be claimed once (greedy matching, best-first).
+
+    Returns |hits| / |union|, analogous to exact Jaccard.
+    Returns 1.0 when both sets are empty (vacuously similar).
+    """
+    if not candidates and not golden:
+        return 1.0
+    if not candidates or not golden:
+        return 0.0
+
+    # Build all (candidate, golden, score) triples above threshold
+    pairs: list[tuple[str, str, float]] = []
+    for cand in candidates:
+        result = process.extractOne(cand, golden, scorer=fuzz.partial_ratio)
+        if result is not None and result[1] >= threshold:
+            pairs.append((cand, result[0], result[1]))
+
+    # Greedy match: sort by score descending, assign each golden name at most once
+    pairs.sort(key=lambda x: x[2], reverse=True)
+    matched_cands: set[str] = set()
+    matched_golden: set[str] = set()
+    for cand, gold, _score in pairs:
+        if cand not in matched_cands and gold not in matched_golden:
+            matched_cands.add(cand)
+            matched_golden.add(gold)
+
+    hits = len(matched_cands)
+    union = len(candidates) + len(golden) - hits
+    return hits / union if union > 0 else 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -460,6 +516,17 @@ def score_stage1_output(
         )
         constructor_overlap = jaccard(ctor_names, golden_ctors)
         cell_count_delta = obligation_cell_count - golden_obligation_cells
+
+        fuzzy_sort_overlap = fuzzy_jaccard(
+            set(sig.sorts.keys()), set(golden_sig.sorts.keys())
+        )
+        fuzzy_function_overlap = fuzzy_jaccard(
+            set(sig.functions.keys()), set(golden_sig.functions.keys())
+        )
+        fuzzy_predicate_overlap = fuzzy_jaccard(
+            set(sig.predicates.keys()), set(golden_sig.predicates.keys())
+        )
+        fuzzy_constructor_overlap = fuzzy_jaccard(ctor_names, golden_ctors)
     else:
         # No golden reference → neutral overlaps
         sort_overlap = 0.5
@@ -467,6 +534,11 @@ def score_stage1_output(
         predicate_overlap = 0.5
         constructor_overlap = 0.5
         cell_count_delta = 0
+
+        fuzzy_sort_overlap = 0.5
+        fuzzy_function_overlap = 0.5
+        fuzzy_predicate_overlap = 0.5
+        fuzzy_constructor_overlap = 0.5
 
     # ---- Health ----
     health = compute_health(
@@ -476,6 +548,17 @@ def score_stage1_output(
         function_overlap=function_overlap,
         predicate_overlap=predicate_overlap,
         constructor_overlap=constructor_overlap,
+        cell_count_delta=cell_count_delta,
+        obligation_cell_count=obligation_cell_count,
+    )
+
+    fuzzy_health = compute_health(
+        parse_success=parse_success,
+        well_formed=well_formed,
+        sort_overlap=fuzzy_sort_overlap,
+        function_overlap=fuzzy_function_overlap,
+        predicate_overlap=fuzzy_predicate_overlap,
+        constructor_overlap=fuzzy_constructor_overlap,
         cell_count_delta=cell_count_delta,
         obligation_cell_count=obligation_cell_count,
     )
@@ -500,6 +583,11 @@ def score_stage1_output(
         predicate_overlap=predicate_overlap,
         constructor_overlap=constructor_overlap,
         cell_count_delta=cell_count_delta,
+        fuzzy_sort_overlap=fuzzy_sort_overlap,
+        fuzzy_function_overlap=fuzzy_function_overlap,
+        fuzzy_predicate_overlap=fuzzy_predicate_overlap,
+        fuzzy_constructor_overlap=fuzzy_constructor_overlap,
+        fuzzy_health=fuzzy_health,
         health=health,
         error_message=None,
         failure_category=FailureCategory.OK,
