@@ -1,6 +1,7 @@
 import json
 import os
 from dataclasses import dataclass
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -172,6 +173,7 @@ class AsyncLLMClient:
         messages: list[dict[str, str]],
         model: str = "meta-llama/llama-3.1-8b-instruct",
         tool_name: str = "submit_spec",
+        name: str | None = None,
     ) -> Result[tuple[str, str, UsageInfo | None], Exception]:
         """Call the model with the submit_spec tool and return (analysis, code, usage).
 
@@ -200,13 +202,20 @@ class AsyncLLMClient:
                     pass
 
             with propagate_attributes(session_id=self._session_id):
-                response = await self._client.chat.completions.create(  # type: ignore[call-overload]
-                    model=model,
-                    messages=messages,
-                    tools=[tool_schema],
-                    tool_choice=tool_choice,
-                    extra_body=extra_body,
-                )
+                kwargs: dict[str, Any] = {
+                    "model": model,
+                    "messages": messages,
+                    "tools": [tool_schema],
+                    "tool_choice": tool_choice,
+                    "extra_body": extra_body,
+                }
+                match name:
+                    case str(n):
+                        kwargs["name"] = n
+                    case _:
+                        pass
+
+                response = await self._client.chat.completions.create(**kwargs)  # type: ignore[call-overload]
 
             match response.choices:
                 case []:
@@ -250,6 +259,7 @@ class AsyncLLMClient:
         self,
         messages: list[dict[str, str]],
         model: str = "meta-llama/llama-3.1-8b-instruct",
+        name: str | None = None,
     ) -> Result[tuple[str, UsageInfo | None], Exception]:
         """Fallback: plain chat completion without tool forcing.
 
@@ -270,11 +280,18 @@ class AsyncLLMClient:
                     pass
 
             with propagate_attributes(session_id=self._session_id):
-                response = await self._client.chat.completions.create(
-                    model=model,
-                    messages=messages,  # type: ignore[arg-type]
-                    extra_body=extra_body,
-                )
+                kwargs: dict[str, Any] = {
+                    "model": model,
+                    "messages": messages,  # type: ignore[arg-type]
+                    "extra_body": extra_body,
+                }
+                match name:
+                    case str(n):
+                        kwargs["name"] = n
+                    case _:
+                        pass
+
+                response = await self._client.chat.completions.create(**kwargs)
 
             match response.choices:
                 case [choice, *_]:

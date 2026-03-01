@@ -210,7 +210,10 @@ async def run_pipeline_stage1_only(
     ]
 
     result1 = await client.generate_with_tool_call(
-        stage1_messages, model=model, tool_name="submit_signature"
+        stage1_messages,
+        model=model,
+        tool_name="submit_signature",
+        name=f"Stage 1 - {domain_id}"
     )
 
     match result1:
@@ -346,7 +349,10 @@ async def run_pipeline(
     ]
 
     result2 = await client.generate_with_tool_call(
-        stage2_messages, model=model, tool_name="submit_spec"
+        stage2_messages,
+        model=model,
+        tool_name="submit_spec",
+        name=f"Stage 2 - {domain_id}"
     )
 
     match result2:
