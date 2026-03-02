@@ -26,6 +26,11 @@ from enum import Enum
 from .signature import FnSymbol, GeneratedSortInfo, PredSymbol, Signature, SortRef
 
 
+class ObligationTableError(Exception):
+    """Stage 1 signature is missing infrastructure required for Stage 2."""
+    pass
+
+
 # ---------------------------------------------------------------------------
 # Classification
 # ---------------------------------------------------------------------------
@@ -196,12 +201,26 @@ class CellTier(Enum):
         Under loose semantics, this is a strong default that the LLM can override
         if the domain requires definedness here (rare).
 
+    KEY_DISPATCH: Observer and constructor share a key sort with `eq_*`.
+        Axiom must be split into HIT (eq_k holds) and MISS (¬eq_k).
+        Mechanical if MISS delegates to inner state; domain reasoning for HIT.
+
+    PRESERVATION: Observer's key sort is not affected by this constructor.
+        Constructor does not take the observer's key sort as a parameter.
+        Axiom typically preserves the observer's value from the previous state.
+
+    BASE_CASE: Constructor is the base constructor (no recursive self-referential parameter).
+        Typically results in base values: ¬def for partial, false for predicates.
+
     DOMAIN: General observer or non-selector function.
         Fill depends on domain semantics. LLM must determine the axiom.
     """
 
     SELECTOR_EXTRACT = "selector_extract"
     SELECTOR_FOREIGN = "selector_foreign"
+    KEY_DISPATCH = "key_dispatch"
+    PRESERVATION = "preservation"
+    BASE_CASE = "base_case"
     DOMAIN = "domain"
 
 
@@ -248,36 +267,47 @@ class ObligationTable:
 
 
 def _compute_tier(
-    observer_name: str,
-    observer_is_predicate: bool,
-    constructor_name: str,
-    generated_sort: SortRef,
+    obs: FnSymbol | PredSymbol,
+    ctor: FnSymbol,
+    gen_sort: SortRef,
     fn_roles: dict[str, FnRole],
     sig: Signature,
+    equality_preds: dict[SortRef, str],
 ) -> tuple[CellTier, str | None, str | None]:
     """Compute the tier for a cell. Returns (tier, home_ctor, extracts_sort)."""
-    if observer_is_predicate:
-        return CellTier.DOMAIN, None, None
+    # 1. Selectors take precedence
+    if not isinstance(obs, PredSymbol):
+        role = fn_roles.get(obs.name)
+        if role and role.kind == FnKind.SELECTOR:
+            info = sig.generated_sorts[gen_sort]
+            for ctor_name, sel_map in info.selectors.items():
+                if obs.name in sel_map:
+                    if ctor_name == ctor.name:
+                        return (
+                            CellTier.SELECTOR_EXTRACT,
+                            ctor_name,
+                            sel_map[obs.name],
+                        )
+                    else:
+                        return CellTier.SELECTOR_FOREIGN, ctor_name, None
 
-    role = fn_roles.get(observer_name)
-    if role is None or role.kind != FnKind.SELECTOR:
-        return CellTier.DOMAIN, None, None
+    # 2. Key dispatch (share a key sort with an eq_* pred)
+    obs_key_sorts = {p.sort for p in obs.params[1:]}
+    ctor_non_state_sorts = {
+        p.sort for p in ctor.params if p.sort != gen_sort
+    }
+    shared = obs_key_sorts & ctor_non_state_sorts
 
-    # It's a selector. Is this its home constructor?
-    info = sig.generated_sorts.get(generated_sort)
-    if info is None:
-        return CellTier.DOMAIN, None, None
+    if any(s in equality_preds for s in shared):
+        return CellTier.KEY_DISPATCH, None, None
 
-    for ctor_name, sel_map in info.selectors.items():
-        if observer_name in sel_map:
-            if ctor_name == constructor_name:
-                return (
-                    CellTier.SELECTOR_EXTRACT,
-                    ctor_name,
-                    sel_map[observer_name],
-                )
-            else:
-                return CellTier.SELECTOR_FOREIGN, ctor_name, None
+    # 3. Preservation (observer has keys, constructor doesn't take them)
+    if obs_key_sorts and not (obs_key_sorts & ctor_non_state_sorts):
+        return CellTier.PRESERVATION, None, None
+
+    # 4. Base case (constructor with no recursive self-referential parameter)
+    if all(p.sort != gen_sort for p in ctor.params):
+        return CellTier.BASE_CASE, None, None
 
     return CellTier.DOMAIN, None, None
 
@@ -301,8 +331,47 @@ def build_obligation_table(sig: Signature) -> ObligationTable:
     equality_preds: dict[SortRef, str] = {}
     for name, role in pred_roles.items():
         if role.kind == PredKind.EQUALITY:
-            assert role.sort is not None
-            equality_preds[role.sort] = name
+            match role.sort:
+                case str() as s:
+                    equality_preds[s] = name
+                case _:
+                    pass
+
+    # Check B: Generated sort completeness
+    for gen_sort, info in sig.generated_sorts.items():
+        if not info.constructors:
+            raise ObligationTableError(f"Generated sort '{gen_sort}' has no constructors.")
+
+        has_base = False
+        for ctor_name in info.constructors:
+            if ctor_name not in sig.functions:
+                raise ObligationTableError(
+                    f"Constructor '{ctor_name}' listed for sort '{gen_sort}' not found in signature."
+                )
+            # A base constructor is one whose parameters are all non-recursive:
+            # none of them are of the generated sort itself.  This admits both
+            # nullary constructors (zero params) AND parameterised ones like
+            # init(pv: Word) -> Counter, which take only auxiliary data.
+            ctor_fn = sig.functions[ctor_name]
+            if all(p.sort != gen_sort for p in ctor_fn.params):
+                has_base = True
+
+        if not has_base:
+            raise ObligationTableError(
+                f"Generated sort '{gen_sort}' has no base constructor. "
+                "At least one constructor must take no parameters of the generated sort itself "
+                "(e.g. 'init(pv: Word) -> Counter' or 'new -> Stack'). "
+                "A sort with only recursive constructors cannot be initialised."
+            )
+
+        # Warn about functions that look like constructors but aren't listed
+        for name, f in sig.functions.items():
+            if f.result == gen_sort and not (f.params and f.params[0].sort == gen_sort):
+                if name not in info.constructors:
+                    print(
+                        f"Warning: Function '{name}' returns generated sort '{gen_sort}' "
+                        "but is not listed as a constructor in generated_sorts."
+                    )
 
     cells: list[ObligationCell] = []
 
@@ -334,82 +403,86 @@ def build_obligation_table(sig: Signature) -> ObligationTable:
             key=lambda p: p.name,
         )
 
+        all_observers: list[FnSymbol | PredSymbol] = [
+            *fn_observers,
+            *pred_observers,
+        ]
+
+        # Check C: Partial observer coverage (warning only)
+        from .signature import Totality
+        for obs in fn_observers:
+            if obs.totality == Totality.PARTIAL:
+                # Partial observers usually should be undefined on the base case
+                # This is a weak heuristic, just a warning.
+                pass
+
         for ctor in constructors:
-            for obs in fn_observers:
+            for obs in all_observers:
+                # Check for shared key sorts without equality predicates (Check A)
+                obs_key_sorts = {p.sort for p in obs.params[1:]}
+                ctor_non_state_sorts = {
+                    p.sort for p in ctor.params if p.sort != gen_sort
+                }
+                shared = obs_key_sorts & ctor_non_state_sorts
+                for sort in sorted(shared):
+                    if sort not in equality_preds:
+                        raise ObligationTableError(
+                            f"Observer '{obs.name}' and constructor '{ctor.name}' "
+                            f"share key sort '{sort}' but no equality predicate "
+                            f"'eq_{sort.lower()}' exists in the signature. "
+                            "Stage 1 must declare equality predicates for key dispatch sorts."
+                        )
+
                 dispatch = _detect_key_dispatch(obs, ctor, equality_preds, gen_sort)
                 tier, home_ctor, extracts_sort = _compute_tier(
-                    obs.name, False, ctor.name, gen_sort, fn_roles, sig
+                    obs, ctor, gen_sort, fn_roles, sig, equality_preds
                 )
+                is_pred = isinstance(obs, PredSymbol)
+
                 if dispatch is not None:
                     key_sort, eq_pred = dispatch
-                    cells.append(ObligationCell(
-                        observer_name=obs.name,
-                        observer_is_predicate=False,
-                        constructor_name=ctor.name,
-                        generated_sort=gen_sort,
-                        dispatch=CellDispatch.HIT,
-                        tier=tier,
-                        key_sort=key_sort,
-                        eq_pred=eq_pred,
-                        home_constructor=home_ctor,
-                        extracts_sort=extracts_sort,
-                    ))
-                    cells.append(ObligationCell(
-                        observer_name=obs.name,
-                        observer_is_predicate=False,
-                        constructor_name=ctor.name,
-                        generated_sort=gen_sort,
-                        dispatch=CellDispatch.MISS,
-                        tier=tier,
-                        key_sort=key_sort,
-                        eq_pred=eq_pred,
-                        home_constructor=home_ctor,
-                        extracts_sort=extracts_sort,
-                    ))
+                    cells.append(
+                        ObligationCell(
+                            observer_name=obs.name,
+                            observer_is_predicate=is_pred,
+                            constructor_name=ctor.name,
+                            generated_sort=gen_sort,
+                            dispatch=CellDispatch.HIT,
+                            tier=tier,
+                            key_sort=key_sort,
+                            eq_pred=eq_pred,
+                            home_constructor=home_ctor,
+                            extracts_sort=extracts_sort,
+                        )
+                    )
+                    cells.append(
+                        ObligationCell(
+                            observer_name=obs.name,
+                            observer_is_predicate=is_pred,
+                            constructor_name=ctor.name,
+                            generated_sort=gen_sort,
+                            dispatch=CellDispatch.MISS,
+                            tier=tier,
+                            key_sort=key_sort,
+                            eq_pred=eq_pred,
+                            home_constructor=home_ctor,
+                            extracts_sort=extracts_sort,
+                        )
+                    )
                 else:
-                    cells.append(ObligationCell(
-                        observer_name=obs.name,
-                        observer_is_predicate=False,
-                        constructor_name=ctor.name,
-                        generated_sort=gen_sort,
-                        dispatch=CellDispatch.PLAIN,
-                        tier=tier,
-                        home_constructor=home_ctor,
-                        extracts_sort=extracts_sort,
-                    ))
+                    cells.append(
+                        ObligationCell(
+                            observer_name=obs.name,
+                            observer_is_predicate=is_pred,
+                            constructor_name=ctor.name,
+                            generated_sort=gen_sort,
+                            dispatch=CellDispatch.PLAIN,
+                            tier=tier,
+                            home_constructor=home_ctor,
+                            extracts_sort=extracts_sort,
+                        )
+                    )
 
-            for obs in pred_observers:
-                dispatch = _detect_key_dispatch(obs, ctor, equality_preds, gen_sort)
-                if dispatch is not None:
-                    key_sort, eq_pred = dispatch
-                    cells.append(ObligationCell(
-                        observer_name=obs.name,
-                        observer_is_predicate=True,
-                        constructor_name=ctor.name,
-                        generated_sort=gen_sort,
-                        dispatch=CellDispatch.HIT,
-                        tier=CellTier.DOMAIN,
-                        key_sort=key_sort,
-                        eq_pred=eq_pred,
-                    ))
-                    cells.append(ObligationCell(
-                        observer_name=obs.name,
-                        observer_is_predicate=True,
-                        constructor_name=ctor.name,
-                        generated_sort=gen_sort,
-                        dispatch=CellDispatch.MISS,
-                        tier=CellTier.DOMAIN,
-                        key_sort=key_sort,
-                        eq_pred=eq_pred,
-                    ))
-                else:
-                    cells.append(ObligationCell(
-                        observer_name=obs.name,
-                        observer_is_predicate=True,
-                        constructor_name=ctor.name,
-                        generated_sort=gen_sort,
-                        dispatch=CellDispatch.PLAIN,
-                        tier=CellTier.DOMAIN,
-                    ))
-
-    return ObligationTable(cells=tuple(cells), fn_roles=fn_roles, pred_roles=pred_roles)
+    return ObligationTable(
+        cells=tuple(cells), fn_roles=fn_roles, pred_roles=pred_roles
+    )

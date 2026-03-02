@@ -139,6 +139,12 @@ def render_obligation_table(sig: Signature, table: ObligationTable) -> str:
                     tier_str = "`SELECTOR_EXTRACT`"
                 case CellTier.SELECTOR_FOREIGN:
                     tier_str = "`SELECTOR_FOREIGN`"
+                case CellTier.KEY_DISPATCH:
+                    tier_str = "`KEY_DISPATCH`"
+                case CellTier.PRESERVATION:
+                    tier_str = "`PRESERVATION`"
+                case CellTier.BASE_CASE:
+                    tier_str = "`BASE_CASE`"
                 case CellTier.DOMAIN:
                     tier_str = "`DOMAIN`"
 
@@ -209,46 +215,34 @@ def _cell_hint(
 
     match cell.tier:
         case CellTier.SELECTOR_EXTRACT:
-            ext = cell.extracts_sort or "component"
-            return (
-                f"`{cell.observer_name}({cell.constructor_name}(...)) = <{ext}_var>` "
-                f"— selector extracts component"
-            )
+            return "mechanical: `sel(ctor(x1,...,xn)) = xi`"
 
         case CellTier.SELECTOR_FOREIGN:
-            if obs_is_partial:
-                return (
-                    f"Likely `¬def({cell.observer_name}({cell.constructor_name}(...)))` "
-                    f"— selector undefined on foreign constructor"
-                )
+            return "write `¬def(...)` or preservation"
+
+        case CellTier.KEY_DISPATCH:
+            if cell.dispatch == CellDispatch.HIT:
+                if obs_is_partial:
+                    return "HIT — define value for matching key; MISS — delegate to inner state"
+                elif cell.observer_is_predicate:
+                    return "HIT — define predicate; MISS — delegate to inner state"
+                else:
+                    return "HIT — define value; MISS — delegate to inner state"
             else:
-                return (
-                    f"Must define `{cell.observer_name}({cell.constructor_name}(...))` "
-                    f"— total selector on foreign constructor"
-                )
+                return "delegate to inner state (preservation)"
+
+        case CellTier.PRESERVATION:
+            return "constructor does not affect this observer's key space"
+
+        case CellTier.BASE_CASE:
+            if obs_is_partial:
+                return "base case: typically `¬def` for partial"
+            elif cell.observer_is_predicate:
+                return "base case: typically `false` for predicates"
+            else:
+                return "base case: typically a default value"
 
         case CellTier.DOMAIN:
-            ctor = sig.functions[cell.constructor_name]
-            ctor_is_base = ctor.is_constant
+            return "domain-specific — requires domain reasoning"
 
-            match cell.dispatch:
-                case CellDispatch.PLAIN:
-                    if obs_is_partial and ctor_is_base:
-                        return "Write `¬def(...)` — partial observer undefined on base constructor"
-                    elif cell.observer_is_predicate and ctor_is_base:
-                        return "Base case for predicate"
-                    elif ctor_is_base:
-                        return "Base case: define initial value"
-                    else:
-                        return "Domain-specific — determine from domain description"
-
-                case CellDispatch.HIT:
-                    if obs_is_partial:
-                        return "Key match: write equation, `¬def(...)`, or guarded equation"
-                    elif cell.observer_is_predicate:
-                        return "Key match: write predicate assertion or biconditional"
-                    else:
-                        return "Key match: define value for matching key"
-
-                case CellDispatch.MISS:
-                    return "Key miss: typically delegates to recursive argument (preservation)"
+    return "requires domain reasoning"
