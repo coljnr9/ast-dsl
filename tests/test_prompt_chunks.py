@@ -279,7 +279,8 @@ class TestDomainAnalysisInPrompts:
         prompt = _build_signature_user_prompt("A simple counter")
         assert "Domain Analysis" not in prompt
 
-    def test_axioms_user_prompt_includes_analysis(self):
+    def test_axioms_user_prompt_excludes_domain_analysis(self):
+        """Stage 4 template intentionally drops domain_analysis; confirm it is never rendered."""
         from alspec.pipeline import _build_axioms_user_prompt
         prompt = _build_axioms_user_prompt(
             domain_description="A simple counter",
@@ -289,8 +290,9 @@ class TestDomainAnalysisInPrompts:
             obligation_table_md="| obs | ctor |",
             domain_analysis="ENTITIES: Counter with value...",
         )
-        assert "ENTITIES: Counter with value" in prompt
-        assert "Domain Analysis" in prompt
+        # Even when domain_analysis is supplied, Stage 4 template must NOT render it
+        assert "ENTITIES: Counter with value" not in prompt
+        assert "Domain Analysis" not in prompt
 
     def test_axioms_user_prompt_omits_analysis_when_none(self):
         from alspec.pipeline import _build_axioms_user_prompt

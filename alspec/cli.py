@@ -22,6 +22,7 @@ async def handle_generate(
     model: str = "google/gemini-3-flash-preview",
     sources: list[Path] | None = None,
     cached_analysis: bool = False,
+    signature_only: bool = False,
 ) -> int:
     client_result = AsyncLLMClient.from_env()
     match client_result:
@@ -32,28 +33,61 @@ async def handle_generate(
             return 1
 
     if domain:
-        from alspec.pipeline import run_pipeline_stage1_only
         from alspec.eval.domains import DOMAINS
 
         domain_info = next((d for d in DOMAINS if d.id == domain), None)
         desc = domain_info.description if domain_info else domain.replace("-", " ")
 
-        print(f"Generating Stage 2 signature for domain '{domain}'...", file=sys.stderr)
-        result = await run_pipeline_stage1_only(
-            client=client,
-            domain_id=domain,
-            domain_description=desc,
-            model=model,
-            lens=lens,
-            sources=sources,
-            cached_analysis=cached_analysis,
-        )
-        if result.success:
-            print(result.signature_code)
-            return 0
+        if signature_only:
+            from alspec.pipeline import run_pipeline_signature_only
+            print(f"Generating Stage 2 signature for domain '{domain}'...", file=sys.stderr)
+            result = await run_pipeline_signature_only(
+                client=client,
+                domain_id=domain,
+                domain_description=desc,
+                model=model,
+                lens=lens,
+                sources=sources,
+                cached_analysis=cached_analysis,
+            )
+            if result.success:
+                print(result.signature_code)
+                return 0
+            else:
+                print(f"Error: {result.error}", file=sys.stderr)
+                return 1
         else:
-            print(f"Error: {result.error}", file=sys.stderr)
-            return 1
+            from alspec.pipeline import run_pipeline
+            print(f"Running full pipeline for domain '{domain}'...", file=sys.stderr)
+            result = await run_pipeline(
+                client=client,
+                domain_id=domain,
+                domain_description=desc,
+                model=model,
+                lens=lens,
+                sources=sources,
+                cached_analysis=cached_analysis,
+            )
+            if result.success:
+                if result.signature_code:
+                    print("\n--- Signature (Stage 2) ---")
+                    print(result.signature_code)
+                if result.obligation_table_rendered:
+                    print("\n--- Obligation Table (Stage 3) ---")
+                    print(result.obligation_table_rendered)
+                if result.spec_code:
+                    print("\n--- Spec (Stage 4) ---")
+                    print(result.spec_code)
+                if result.score:
+                    print(f"\nScore (Golden Health): {result.score.health:.3f}")
+                return 0
+            else:
+                print(f"Error at stage '{result.error_stage}': {result.error}", file=sys.stderr)
+                # Print partial results if available
+                if result.signature_code:
+                    print("\n--- Partial Signature ---", file=sys.stderr)
+                    print(result.signature_code, file=sys.stderr)
+                return 1
 
     print("Generating reference documentation to use as context...", file=sys.stderr)
     reference = generate_reference()
@@ -539,6 +573,12 @@ async def async_main() -> int:
         help="Use cached domain analysis if available.",
     )
     generate_parser.add_argument(
+        "--signature-only",
+        action="store_true",
+        default=False,
+        help="Stop after Stage 2 (signature generation). Skip obligation table and axioms.",
+    )
+    generate_parser.add_argument(
         "--model",
         type=str,
         default="google/gemini-3-flash-preview",
@@ -669,6 +709,7 @@ async def async_main() -> int:
                 model=args.model,
                 sources=source_paths,
                 cached_analysis=getattr(args, 'cached_analysis', False),
+                signature_only=getattr(args, 'signature_only', False),
             )
         case "eval":
             return await handle_eval(

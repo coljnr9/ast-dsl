@@ -466,17 +466,26 @@ async def run_pipeline(
         table_md = render_obligation_table(sig, table)
         ob_elapsed_ms = int((time.time() - ob_start) * 1000)
 
-        # Log to Langfuse as a span (not a generation — it's deterministic)
+        # Log to Langfuse as a child span (deterministic stage — not a generation)
         try:
-            import langfuse as _langfuse_mod
-            _langfuse_mod.update_current_observation(
-                name=f"Stage 3 (Obligation) - {domain_id}",
-                input={"signature_sorts": list(sig.sorts.keys()),
-                       "generated_sorts": list(sig.generated_sorts.keys())},
-                output={"cell_count": sum(len(st.cells) for st in [table]),
-                        "rendered_chars": len(table_md)},
-                metadata={"deterministic": True, "elapsed_ms": ob_elapsed_ms},
-            )
+            from langfuse import get_client as _lf_get_client
+            _lf_client = _lf_get_client()
+            if _lf_client:
+                _ob_span = _lf_client.span(
+                    name=f"Stage 3 (Obligation) - {domain_id}",
+                    input={
+                        "signature_sorts": list(sig.sorts.keys()),
+                        "generated_sorts": list(sig.generated_sorts.keys()),
+                    },
+                    metadata={"deterministic": "true"},
+                )
+                _ob_span.end(
+                    output={
+                        "cell_count": len(table.cells),
+                        "rendered_chars": str(len(table_md)),
+                        "elapsed_ms": str(ob_elapsed_ms),
+                    }
+                )
         except Exception:
             # Langfuse not available or no active trace — non-fatal
             pass
