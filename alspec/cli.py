@@ -15,13 +15,40 @@ from alspec.score_report import ScoreResult, print_score_diagnostics, print_scor
 from alspec.spec import Spec
 
 
-async def handle_generate(prompt: str) -> int:
+async def handle_generate(
+    prompt: str | None = None,
+    domain: str | None = None,
+    lens: str | None = None,
+    model: str = "google/gemini-3-flash-preview",
+) -> int:
     client_result = AsyncLLMClient.from_env()
     match client_result:
         case Ok(client):
             pass
         case Err(e):
             print(f"Error initializing LLM client: {e}", file=sys.stderr)
+            return 1
+
+    if domain:
+        from alspec.pipeline import run_pipeline_stage1_only
+        from alspec.eval.domains import DOMAINS
+
+        domain_info = next((d for d in DOMAINS if d.id == domain), None)
+        desc = domain_info.description if domain_info else domain.replace("-", " ")
+
+        print(f"Generating Stage 1 signature for domain '{domain}'...", file=sys.stderr)
+        result = await run_pipeline_stage1_only(
+            client=client,
+            domain_id=domain,
+            domain_description=desc,
+            model=model,
+            lens=lens,
+        )
+        if result.success:
+            print(result.signature_code)
+            return 0
+        else:
+            print(f"Error: {result.error}", file=sys.stderr)
             return 1
 
     print("Generating reference documentation to use as context...", file=sys.stderr)
@@ -31,19 +58,24 @@ async def handle_generate(prompt: str) -> int:
         f"You are an expert at writing many-sorted algebraic specifications.\n"
         f"Using the language reference provided below, write a spec for the following prompt:\n"
         f"PROMPT: {prompt}\n\n"
-        f"LANGUAGE_REFERENCE:\n{reference}\n\n"
-        f"Respond ONLY with valid Python code that returns the `Spec` object as described in the reference, nothing else. Do not format with markdown blocks, just the code."
+        f"LANGUAGE_REFERENCE:\n{reference}"
     )
 
-    print("Sending prompt to LLM...", file=sys.stderr)
-    response_result = await client.generate_text(full_prompt)
+    print("Sending prompt to LLM (using tool calling)...", file=sys.stderr)
+    response_result = await client.generate_with_tool_call(
+        messages=[{"role": "user", "content": full_prompt}],
+        model=model,
+        tool_name="submit_spec",
+        name="Generate from Prompt",
+    )
 
     match response_result:
-        case Ok(code):
+        case Ok((analysis, code, _usage)):
+            print(f'"""\n{analysis}\n"""\n')
             print(code)
             return 0
         case Err(e):
-            print(f"Error generating text: {e}", file=sys.stderr)
+            print(f"Error generating spec: {e}", file=sys.stderr)
             return 1
 
 
@@ -119,6 +151,8 @@ async def handle_eval(
     csv_out: str | None,
     verbose: bool,
     save_specs_dir: str | None,
+    lens: str | None = None,
+    concurrency: int = 8,
 ) -> int:
     from alspec.eval.domains import DOMAINS
     from alspec.eval.harness import EvalResult, EvalRun, run_domain_eval
@@ -155,16 +189,107 @@ async def handle_eval(
     session_id = f"eval-{timestamp}"
     print(f"Langfuse Session ID: {session_id}\n", flush=True)
 
-    results: list[EvalResult] = []
+    # Build the canonical ordered list of (model, domain) pairs so that we can
+    # sort gathered results back into a deterministic order after concurrent
+    # execution.
+    pairs: list[tuple[str, object]] = [
+        (model, domain)
+        for model in models
+        for domain in domains
+    ]
+    total = len(pairs)
 
-    for model in models:
-        for domain in domains:
-            print(f"Evaluating {domain.id} on {model}...", flush=True)
-            res = await run_domain_eval(
-                client, domain, model,
-                session_id=session_id,
+    semaphore = asyncio.Semaphore(concurrency)
+    completed_count = 0
+
+    async def run_one(
+        model: str,
+        domain: object,
+        idx: int,
+    ) -> EvalResult | Exception:
+        nonlocal completed_count
+        import time as _time
+
+        task_start = _time.monotonic()
+        try:
+            async with semaphore:
+                result = await run_domain_eval(
+                    client, domain, model,  # type: ignore[arg-type]
+                    session_id=session_id,
+                    lens=lens,
+                )
+        except Exception as exc:
+            elapsed = _time.monotonic() - task_start
+            completed_count += 1
+            domain_id = getattr(domain, "id", str(domain))
+            print(
+                f"  [{completed_count}/{total}] ✗ {domain_id} ({model}) "
+                f"— {exc} — {elapsed:.1f}s",
+                flush=True,
             )
-            results.append(res)
+            return exc
+
+        elapsed = _time.monotonic() - task_start
+        completed_count += 1
+
+        # Build a short progress line.
+        domain_id = getattr(domain, "id", str(domain))
+        golden_str: str
+        intrinsic_str: str
+        if result.score is not None:
+            golden_str = f"{result.score.health:.2f} golden"
+        else:
+            golden_str = "no score"
+        intrinsic_str = f"{result.intrinsic_health:.2f} intrinsic"
+
+        if result.success:
+            status = f"✓ {domain_id} ({golden_str}, {intrinsic_str})"
+        else:
+            err_summary = result.parse_error or result.checker_error or "failed"
+            status = f"✗ {domain_id} — {err_summary}"
+
+        print(
+            f"  [{completed_count}/{total}] {status} — {elapsed:.1f}s",
+            flush=True,
+        )
+        return result
+
+    print(
+        f"Running {total} eval task(s) with concurrency={concurrency}...",
+        flush=True,
+    )
+    raw_outcomes: list[EvalResult | Exception | BaseException] = list(
+        await asyncio.gather(
+            *[run_one(model, domain, i) for i, (model, domain) in enumerate(pairs)],
+            return_exceptions=True,
+        )
+    )
+
+    # Flush Langfuse once after all tasks finish. langfuse.flush() is a
+    # blocking synchronous call — run it in a thread so it doesn't block the
+    # event loop (and so it's clear this is intentionally off-loop).
+    from alspec.eval.harness import langfuse as _langfuse
+    await asyncio.to_thread(_langfuse.flush)
+
+    # Separate successes from failures; keep only EvalResult objects for reporting.
+    results: list[EvalResult] = []
+    for i, outcome in enumerate(raw_outcomes):
+        if isinstance(outcome, EvalResult):
+            results.append(outcome)
+        else:
+            model, domain = pairs[i]
+            domain_id = getattr(domain, "id", str(domain))
+            print(
+                f"  Task {domain_id!r} ({model}) raised an unexpected exception: {outcome}",
+                file=sys.stderr,
+            )
+
+    # Restore canonical (model, domain) order so the report table is stable.
+    pair_order: dict[tuple[str, str], int] = {
+        (model, getattr(domain, "id", str(domain))): idx
+        for idx, (model, domain) in enumerate(pairs)
+    }
+    results.sort(key=lambda r: pair_order.get((r.model, r.domain_id), 9999))
 
     run = EvalRun(
         timestamp=timestamp,
@@ -385,8 +510,23 @@ async def async_main() -> int:
     generate_parser = subparsers.add_parser(
         "generate", help="Generate a new spec from a prompt using an LLM."
     )
+    # Either --prompt for freeform, or --domain [--lens] for the standard pipeline
+    group = generate_parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--prompt", help="Freeform specification description.")
+    group.add_argument("--domain", help="Domain ID (e.g. 'auction').")
+
     generate_parser.add_argument(
-        "--prompt", required=True, help="The desired specification description."
+        "--lens",
+        type=str,
+        default=None,
+        choices=["entity_lifecycle", "summary", "raw_source", "none"],
+        help="Domain lens to apply before Stage 1.",
+    )
+    generate_parser.add_argument(
+        "--model",
+        type=str,
+        default="google/gemini-3-flash-preview",
+        help="OpenRouter model identifier.",
     )
 
     # Command: eval
@@ -399,6 +539,13 @@ async def async_main() -> int:
         type=str,
         default="google/gemini-3-flash-preview",
         help="Comma-separated list of OpenRouter model identifiers.",
+    )
+    eval_parser.add_argument(
+        "--lens",
+        type=str,
+        default=None,
+        choices=["entity_lifecycle", "summary", "raw_source", "none"],
+        help="Domain lens to apply before Stage 1. Default: none (bare label).",
     )
     eval_parser.add_argument(
         "--domains",
@@ -426,6 +573,12 @@ async def async_main() -> int:
         type=str,
         metavar="DIR",
         help="Save generated spec code to DIR/<domain-id>.py.",
+    )
+    eval_parser.add_argument(
+        "--concurrency", "-j",
+        type=int,
+        default=8,
+        help="Max concurrent LLM calls (default: 8). Use -j1 for sequential.",
     )
 
     # Command group: doe
@@ -477,7 +630,12 @@ async def async_main() -> int:
                 strict=args.strict,
             )
         case "generate":
-            return await handle_generate(args.prompt)
+            return await handle_generate(
+                prompt=args.prompt,
+                domain=args.domain,
+                lens=args.lens if args.lens != "none" else None,
+                model=args.model,
+            )
         case "eval":
             return await handle_eval(
                 domain_ids=[d.strip() for d in args.domains.split(",")] if args.domains else None,
@@ -486,6 +644,8 @@ async def async_main() -> int:
                 csv_out=args.csv,
                 verbose=args.verbose,
                 save_specs_dir=args.save_specs,
+                lens=args.lens if args.lens != "none" else None,
+                concurrency=args.concurrency,
             )
         case "doe":
             match args.doe_command:
