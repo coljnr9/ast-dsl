@@ -9,6 +9,7 @@ The pipeline is the core logic; eval harness is a thin wrapper around it.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -22,6 +23,7 @@ from .result import Err, Ok, Result
 from .score import SpecScore, score_spec
 from .signature import GeneratedSortInfo, Signature
 from .spec import Spec
+from .lenses import apply_lens, load_source
 
 
 # ---------------------------------------------------------------------------
@@ -63,10 +65,12 @@ class PipelineResult:
     # Errors
     error: str | None
     error_stage: str | None  # "stage1", "obligation", "stage2", "validation"
-
     # Timing & usage
     stage_usages: tuple[StageUsage, ...]
     total_latency_ms: int
+
+    # Skip Reasons
+    stage2_skip_reason: str | None = None  # if Stage 2 was intentionally skipped
 
 
 # ---------------------------------------------------------------------------
@@ -84,27 +88,28 @@ def _build_stage2_system_prompt() -> str:
     return build_default_prompt(Stage.STAGE2)
 
 
-def _build_stage1_user_prompt(domain_description: str, fn_name: str) -> str:
+def _build_stage1_user_prompt(domain_description: str) -> str:
     """Build Stage 1 user prompt: generate signature only."""
     return render(
         "generate_signature.md.j2",
         domain_description=domain_description,
-        fn_name=fn_name,
     )
 
 
 def _build_stage2_user_prompt(
     domain_description: str,
-    fn_name: str,
+    spec_name: str,
     signature_code: str,
+    signature_analysis: str,
     obligation_table_md: str,
 ) -> str:
     """Build Stage 2 user prompt: generate axioms from signature + obligation table."""
     return render(
         "generate_axioms.md.j2",
         domain_description=domain_description,
-        fn_name=fn_name,
+        spec_name=spec_name,
         signature_code=signature_code,
+        signature_analysis=signature_analysis,
         obligation_table_md=obligation_table_md,
     )
 
@@ -153,8 +158,8 @@ def _execute_signature_code(code: str) -> Signature | str:
     return sig
 
 
-def _execute_spec_code(code: str, fn_name: str) -> Spec | str:
-    """Execute Stage 2 code and call the spec function."""
+def _execute_spec_code(code: str) -> Spec | str:
+    """Execute Stage 2 code and extract the top-level `spec` variable."""
     namespace: dict[str, Any] = {}
     exec("from alspec import *", namespace)
     exec("from alspec.helpers import *", namespace)
@@ -164,16 +169,13 @@ def _execute_spec_code(code: str, fn_name: str) -> Spec | str:
     except Exception as e:
         return f"Stage 2 code execution failed: {e}"
 
-    if fn_name not in namespace:
-        return f"Function '{fn_name}' not found in generated code"
-
-    try:
-        spec = namespace[fn_name]()
-    except Exception as e:
-        return f"Spec function raised: {e}"
-
+    spec = namespace.get("spec")
     if not isinstance(spec, Spec):
-        return f"Function returned {type(spec).__name__}, expected Spec"
+        return (
+            f"Stage 2 code did not produce a `spec` variable of type Spec "
+            f"(got {type(spec).__name__ if spec is not None else 'nothing'}). "
+            "Expected top-level: `spec = Spec(name=..., signature=sig, axioms=axioms)`"
+        )
 
     return spec
 
@@ -190,11 +192,29 @@ async def run_pipeline_stage1_only(
     model: str,
     *,
     stage1_chunks: list[ChunkId] | None = None,
+    lens: str | None = None,
 ) -> PipelineResult:
     """Run only Stage 1: Signature generation."""
-    fn_name = domain_id.replace("-", "_") + "_spec"
     start_time = time.time()
     stage_usages: list[StageUsage] = []
+
+    # ---- Lens Preprocessing ----
+    if lens and lens != "none":
+        source_text = load_source(domain_id)
+        lens_output = await apply_lens(
+            source_text=source_text,
+            lens_name=lens,
+            domain=domain_id,
+            model=model,
+            langfuse_session_id=getattr(client, "_session_id", None)
+        )
+        if lens_output:
+            domain_label = domain_id.replace("-", " ")
+            domain_description = (
+                f"Write an algebraic specification for: {domain_label}\n\n"
+                f"Here is a domain analysis to guide your specification:\n"
+                f"{lens_output}"
+            )
 
     # ---- Stage 1: Signature generation ----
     if stage1_chunks is not None:
@@ -203,7 +223,7 @@ async def run_pipeline_stage1_only(
         )
     else:
         system1 = _build_stage1_system_prompt()
-    stage1_user = _build_stage1_user_prompt(domain_description, fn_name)
+    stage1_user = _build_stage1_user_prompt(domain_description)
     stage1_messages = [
         {"role": "system", "content": system1},
         {"role": "user", "content": stage1_user},
@@ -229,8 +249,9 @@ async def run_pipeline_stage1_only(
                 spec_code=None,
                 spec_analysis=None,
                 score=None,
-                error=f"Stage 1 LLM error: {e}",
+                error=f"Stage 1 LLM error: {result1.error_value}",
                 error_stage="stage1",
+                stage2_skip_reason="Stage 1 LLM failure",
                 stage_usages=tuple(stage_usages),
                 total_latency_ms=int((time.time() - start_time) * 1000),
             )
@@ -253,6 +274,7 @@ async def run_pipeline_stage1_only(
                 score=None,
                 error=err,
                 error_stage="stage1",
+                stage2_skip_reason="Stage 1 code exec failure",
                 stage_usages=tuple(stage_usages),
                 total_latency_ms=int((time.time() - start_time) * 1000),
             )
@@ -282,6 +304,7 @@ async def run_pipeline(
     model: str,
     *,
     stage1_chunks: list[ChunkId] | None = None,
+    lens: str | None = None,
 ) -> PipelineResult:
     """Run the full two-stage pipeline for a domain.
 
@@ -300,23 +323,45 @@ async def run_pipeline(
         domain_description,
         model,
         stage1_chunks=stage1_chunks,
+        lens=lens,
     )
     if not s1_result.success:
         return s1_result
 
-    # Since success is True, these are guaranteed
-    sig = s1_result.signature
-    assert sig is not None
-    code1 = s1_result.signature_code
-    assert code1 is not None
-    analysis1 = s1_result.signature_analysis
-    assert analysis1 is not None
+    match (s1_result.signature, s1_result.signature_code, s1_result.signature_analysis):
+        case (Signature() as sig, str(code1), str(analysis1)):
+            pass
+        case _:
+            # This should theoretically not happen if success is True.
+            return s1_result
+
     stage_usages = list(s1_result.stage_usages)
 
     # ---- Deterministic: Obligation table ----
+    from .obligation import ObligationTableError
+
     try:
         table = build_obligation_table(sig)
         table_md = render_obligation_table(sig, table)
+    except ObligationTableError as e:
+        # Check failed - skip Stage 2.
+        return PipelineResult(
+            success=False,
+            signature=sig,
+            signature_code=code1,
+            signature_analysis=analysis1,
+            obligation_table=None,
+            obligation_table_rendered=None,
+            spec=None,
+            spec_code=None,
+            spec_analysis=None,
+            score=None,
+            error=f"Obligation Table Validation Failed: {e}",
+            error_stage="obligation",
+            stage2_skip_reason=str(e),
+            stage_usages=tuple(stage_usages),
+            total_latency_ms=int((time.time() - start_time) * 1000),
+        )
     except Exception as e:
         return PipelineResult(
             success=False,
@@ -329,17 +374,19 @@ async def run_pipeline(
             spec_code=None,
             spec_analysis=None,
             score=None,
-            error=f"Obligation table error: {e}",
+            error=f"Unexpected obligation table error: {e}",
             error_stage="obligation",
             stage_usages=tuple(stage_usages),
             total_latency_ms=int((time.time() - start_time) * 1000),
         )
 
     # ---- Stage 2: Axiom generation ----
+    spec_name = domain_id.replace("-", " ").title().replace(" ", "")
     stage2_user = _build_stage2_user_prompt(
         domain_description=domain_description,
-        fn_name=fn_name,
+        spec_name=spec_name,
         signature_code=code1,
+        signature_analysis=analysis1,
         obligation_table_md=table_md,
     )
     system2 = _build_stage2_system_prompt()
@@ -359,11 +406,17 @@ async def run_pipeline(
         case Err(e):
             return PipelineResult(
                 success=False,
-                signature=sig, signature_code=code1, signature_analysis=analysis1,
-                obligation_table=table, obligation_table_rendered=table_md,
-                spec=None, spec_code=None, spec_analysis=None,
+                signature=sig,
+                signature_code=code1,
+                signature_analysis=analysis1,
+                obligation_table=table,
+                obligation_table_rendered=table_md,
+                spec=None,
+                spec_code=None,
+                spec_analysis=None,
                 score=None,
-                error=f"Stage 2 LLM error: {e}", error_stage="stage2",
+                error=f"Stage 2 LLM error: {e}",
+                error_stage="stage2",
                 stage_usages=tuple(stage_usages),
                 total_latency_ms=int((time.time() - start_time) * 1000),
             )
@@ -371,7 +424,7 @@ async def run_pipeline(
             stage_usages.append(StageUsage("stage2", usage2))
 
     # ---- Validation ----
-    spec_or_err = _execute_spec_code(code2, fn_name)
+    spec_or_err = _execute_spec_code(code2)
     match spec_or_err:
         case str(err):
             return PipelineResult(
@@ -399,3 +452,71 @@ async def run_pipeline(
         stage_usages=tuple(stage_usages),
         total_latency_ms=int((time.time() - start_time) * 1000),
     )
+
+
+# ---------------------------------------------------------------------------
+# CLI Entrypoint
+# ---------------------------------------------------------------------------
+
+
+async def _main():
+    import argparse
+    import sys
+    from alspec.llm import AsyncLLMClient
+
+    parser = argparse.ArgumentParser(description="Alspec Pipeline CLI")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    run_parser = subparsers.add_parser("run", help="Run the pipeline for a domain")
+    run_parser.add_argument("--domain", required=True, help="Domain ID (e.g. 'auction')")
+    run_parser.add_argument("--lens", default="none", help="Domain lens to apply")
+    run_parser.add_argument("--model", default="google/gemini-3-flash-preview", help="LLM model")
+    run_parser.add_argument("--stage1", action="store_true", help="Run Stage 1 only")
+
+    args = parser.parse_args()
+
+    client_res = AsyncLLMClient.from_env()
+    match client_res:
+        case Ok(client):
+            pass
+        case Err(e):
+            print(f"Error: {e}")
+            sys.exit(1)
+
+    if args.stage1:
+        result = await run_pipeline_stage1_only(
+            client=client,
+            domain_id=args.domain,
+            domain_description=args.domain.replace("-", " "),
+            model=args.model,
+            lens=args.lens,
+        )
+    else:
+        result = await run_pipeline(
+            client=client,
+            domain_id=args.domain,
+            domain_description=args.domain.replace("-", " "),
+            model=args.model,
+            lens=args.lens,
+        )
+
+    if result.success:
+        print("Pipeline succeeded!")
+        if result.signature_code:
+            print("\n--- Signature Code ---")
+            print(result.signature_code)
+        if result.spec_code:
+            print("\n--- Spec Code ---")
+            print(result.spec_code)
+        if result.score:
+            print(f"\nScore (Golden Health): {result.score.health:.3f}")
+            # Try to get intrinsic health if it's a Stage 1 score or similar
+            # Note: score_spec returns SpecScore, not Stage1Score. 
+            # We'll need a separate path if we want Stage1 intrinsic health here.
+    else:
+        print(f"Pipeline failed at {result.error_stage}: {result.error}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(_main())
