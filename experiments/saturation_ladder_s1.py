@@ -93,7 +93,7 @@ RUNGS: list[dict] = [
 def _estimate_tokens(chunks: list[ChunkId]) -> int:
     """Rough token estimate: assemble prompt, count chars, divide by 4."""
     text = assemble_prompt(
-        chunks, Stage.STAGE1, validate_deps=False, validate_stage=False
+        chunks, Stage.SIGNATURE, validate_deps=False, validate_stage=False
     )
     return len(text) // 4
 

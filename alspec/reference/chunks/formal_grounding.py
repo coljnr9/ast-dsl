@@ -1,10 +1,10 @@
 from alspec.prompt_chunks import (
-    ChunkId, Concept, Stage, BOTH, S1, S2, register,
+    ChunkId, Concept, Stage, SIG_AX, SIG, AX, register,
 )
 
 @register(
     id=ChunkId.GENERATED_SORTS_ROLES,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({Concept.GENERATED_SORTS, Concept.FUNCTION_ROLES, Concept.SELECTORS}),
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
@@ -39,7 +39,7 @@ A function is a selector when its axiom is unconditional component extraction:
 
 @register(
     id=ChunkId.DISPATCH_RULES,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({Concept.KEY_DISPATCH, Concept.HIT_MISS, Concept.SHARED_KEY_SORT}),
     depends_on=(ChunkId.GENERATED_SORTS_ROLES,),
 )
@@ -54,9 +54,9 @@ An obligation cell (observer, constructor) splits into HIT and MISS sub-cells wh
 
 The HIT axiom is guarded by `eq_K(k, k2)`; the MISS axiom by `¬eq_K(k, k2)`.
 
-**Example:** `get_status : Store × TicketId → Status` and
-`create_ticket : Store × TicketId × Title × Body → Store` share `TicketId`, and
-`eq_id : TicketId × TicketId` exists → the cell splits into HIT and MISS.
+**Example:** `get_rdata : Zone × DomainName × RecordType → RData` and
+`add_record : Zone × DomainName × RecordType × RData × Nat → Zone` share `DomainName`, and
+`eq_name : DomainName × DomainName` exists → the cell splits into HIT and MISS.
 
 **Critical: domain guards ≠ dispatch guards.** In door-lock, `get_state(lock(l, c))`
 has a guard `eq_code(c, get_code(l))`, but the cell is PLAIN — `get_state : Lock → State`
@@ -65,7 +65,7 @@ Dispatch requires a shared key sort in the *profiles* of both observer and const
 
 @register(
     id=ChunkId.CELL_TIERS,
-    stages=S2,
+    stages=AX,
     concepts=frozenset({Concept.SELECTORS, Concept.SELECTOR_EXTRACT, Concept.SELECTOR_FOREIGN, Concept.CELL_TIERS}),
     depends_on=(ChunkId.GENERATED_SORTS_ROLES,),
 )
@@ -82,7 +82,7 @@ Selector cells are self-writing — no domain knowledge needed. Focus your reaso
 
 @register(
     id=ChunkId.PRESERVATION_COLLAPSE,
-    stages=S2,
+    stages=AX,
     concepts=frozenset({Concept.PRESERVATION, Concept.KEY_DISPATCH}),
     depends_on=(ChunkId.DISPATCH_RULES,),
 )
@@ -93,19 +93,21 @@ When a constructor does not affect an observer for ANY key, collapse HIT and MIS
 one universal axiom:
 
 ```python
-# One axiom covers both HIT and MISS cells:
-Axiom("get_severity_resolve", forall([s, k, k2],
-    eq(app("get_severity", app("resolve_ticket", s, k), k2),
-       app("get_severity", s, k2))
+# One axiom covers both cases — last_input is orthogonal to expire:
+Axiom("last_input_expire", forall([s],
+    eq(app("last_input", app("expire", s)),
+       app("last_input", s))
 ))
 ```
 
-No `eq_id` guard needed — the equation holds for all keys. Use this when a constructor
-is orthogonal to an observer (e.g., resolving a ticket doesn't change any ticket's severity)."""
+No equality-predicate guard needed — the equation holds unconditionally. Use this when
+a constructor is orthogonal to an observer (e.g., expiring a session does not change
+its stored token input — the value is preserved exactly, including propagating
+undefinedness when `last_input` is itself undefined)."""
 
 @register(
     id=ChunkId.DOMAIN_SUBCASES,
-    stages=S2,
+    stages=AX,
     concepts=frozenset({Concept.MULTI_COVERED, Concept.CASE_SPLITS}),
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
@@ -130,7 +132,7 @@ Both axioms fill the same cell. This is valid — the obligation table counts ce
 
 @register(
     id=ChunkId.EQ_PRED_BASIS,
-    stages=S2,
+    stages=AX,
     concepts=frozenset({Concept.EQ_PRED, Concept.REFLEXIVITY_SYMMETRY_TRANSITIVITY}),
     depends_on=(ChunkId.DISPATCH_RULES,),
 )
@@ -140,12 +142,12 @@ def _eq_pred_basis():
 Every equality predicate needs three structural axioms:
 
 ```python
-Axiom("eq_id_refl",  forall([k], PredApp("eq_id", (k, k))))
-Axiom("eq_id_sym",   forall([k, k2], Implication(
-    PredApp("eq_id", (k, k2)), PredApp("eq_id", (k2, k)))))
-Axiom("eq_id_trans",  forall([k, k2, k3], Implication(
-    Conjunction((PredApp("eq_id", (k, k2)), PredApp("eq_id", (k2, k3)))),
-    PredApp("eq_id", (k, k3)))))
+Axiom("eq_token_refl",  forall([k], PredApp("eq_token", (k, k))))
+Axiom("eq_token_sym",   forall([k, k2], Implication(
+    PredApp("eq_token", (k, k2)), PredApp("eq_token", (k2, k)))))
+Axiom("eq_token_trans",  forall([k, k2, k3], Implication(
+    Conjunction((PredApp("eq_token", (k, k2)), PredApp("eq_token", (k2, k3)))),
+    PredApp("eq_token", (k, k3)))))
 ```
 
 These are NOT obligation cells — they don't involve constructors of the generated sort.

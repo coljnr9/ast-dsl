@@ -36,7 +36,7 @@ from alspec.eval.doe_design import TrialConfig, generate_trials  # noqa: E402
 from alspec.eval.stage1_score import Stage1Score, _make_zero_score, score_stage1_output  # noqa: E402
 from alspec.eval.domains import DOMAINS  # noqa: E402
 from alspec.llm import AsyncLLMClient  # noqa: E402
-from alspec.pipeline import _build_stage1_user_prompt  # noqa: E402
+from alspec.pipeline import _build_signature_user_prompt  # noqa: E402
 from alspec.prompt_chunks import Stage, assemble_prompt  # noqa: E402
 from alspec.result import Err, Ok  # noqa: E402
 
@@ -79,7 +79,7 @@ def _build_prompt_cache(trials: list[TrialConfig]) -> dict[str, str]:
             continue
         try:
             prompt = assemble_prompt(
-                list(trial.chunk_ids), Stage.STAGE1,
+                list(trial.chunk_ids), Stage.SIGNATURE,
                 validate_deps=False,
                 validate_stage=False,   # cross-stage chunks are intentionally allowed
             )
@@ -114,7 +114,6 @@ async def execute_trial(
     Never raises — all errors are recorded as parse_failure scores.
     """
     t0 = time.monotonic()
-    fn_name = domain.replace("-", "_") + "_spec"
     desc = _get_domain_description(domain)
 
     # Empty prompt means assembly failed during the cache-build phase
@@ -129,7 +128,7 @@ async def execute_trial(
             elapsed,
         )
 
-    user_prompt = _build_stage1_user_prompt(desc, fn_name)
+    user_prompt = _build_signature_user_prompt(desc)
 
     messages = [
         {"role": "system", "content": system_prompt},

@@ -1,7 +1,15 @@
-Write the complete algebraic specification for the following system:
+Complete the following algebraic specification by writing its axioms:
 
 {{ domain_description }}
 
+{% if domain_analysis %}
+## Domain Analysis
+
+The following structured domain analysis was produced in Stage 1. It describes the entities, operations, preconditions, postconditions, relationships, and invariants of the domain. Use it to inform your axiom design decisions.
+
+{{ domain_analysis }}
+
+{% endif %}
 ## Previously Generated Signature
 
 A previous stage produced the following signature. Use it exactly as given — do not modify sorts, functions, or predicates.
@@ -10,7 +18,7 @@ A previous stage produced the following signature. Use it exactly as given — d
 {{ signature_code }}
 ```
 
-## Stage 1 Analysis
+## Stage 2 Analysis
 
 The following analysis was produced during signature generation. Use it to inform your axiom design decisions — it contains reasoning about entities, states, operations, and key sorts that is directly relevant to axiom construction.
 
@@ -29,7 +37,7 @@ Include all necessary imports at the top. Reuse the exact signature from above.
 
 Your code should assign:
 - `sig = Signature(...)` — copy the signature exactly as given
-- Variables using `var(...)` 
+- Variables using `var(...)`
 - `axioms = (...)` — tuple of all Axiom objects
 - At the end: `spec = Spec(name="{{ spec_name }}", signature=sig, axioms=axioms)`
 

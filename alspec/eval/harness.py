@@ -71,9 +71,9 @@ def _pipeline_to_eval(domain_id: str, model: str, pr: PipelineResult) -> EvalRes
     parse_error: str | None = None
     checker_error: str | None = None
     if pr.error:
-        if pr.error_stage in ("stage1", "obligation"):
+        if pr.error_stage in ("signature", "obligation"):
             parse_error = pr.error
-        else:  # "stage2", "validation"
+        else:  # "axioms", "validation", "analysis"
             checker_error = pr.error
 
     # Extract coverage from score if available
@@ -114,7 +114,7 @@ def _pipeline_to_eval(domain_id: str, model: str, pr: PipelineResult) -> EvalRes
         }
     else:
         # Minimal credit for trying even if parse fails
-        intrinsic["intrinsic_health"] = 0.05 if pr.error_stage == "stage1" else 0.0
+        intrinsic["intrinsic_health"] = 0.05 if pr.error_stage == "signature" else 0.0
 
     return EvalResult(
         domain_id=domain_id,
@@ -133,7 +133,7 @@ def _pipeline_to_eval(domain_id: str, model: str, pr: PipelineResult) -> EvalRes
         obligation_cell_count=obligation_cell_count,
         covered_cell_count=covered_cell_count,
         coverage_ratio=coverage_ratio,
-        stage2_skip_reason=pr.stage2_skip_reason,
+        stage2_skip_reason=pr.axioms_skip_reason,
         **intrinsic
     )
 

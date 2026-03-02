@@ -12,10 +12,11 @@ References:
   - CASL Language Summary, "generated type" declarations
   - Sannella & Tarlecki (2012), Ch. 2-4
 
-This is Stage 2 of the pipeline:
-    Stage 1: Domain → Signature with generated_sorts (LLM)
-    Stage 2: Signature → ObligationTable (deterministic, this module)
-    Stage 3: ObligationTable → Spec (LLM fills cells)
+This is Stage 3 (OBLIGATION) of the pipeline:
+    Stage 1 (ANALYSIS):   Domain → Structured domain analysis (LLM)
+    Stage 2 (SIGNATURE):  Domain → Signature with generated_sorts (LLM)
+    Stage 3 (OBLIGATION): Signature → ObligationTable (deterministic, this module)
+    Stage 4 (AXIOMS):     ObligationTable → Spec (LLM fills cells)
 """
 
 from __future__ import annotations

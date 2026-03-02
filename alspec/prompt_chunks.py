@@ -16,10 +16,16 @@ class PromptAssemblyError(Exception):
 
 
 class Stage(Enum):
-    """Pipeline stages that consume prompts."""
+    """Pipeline stages that consume prompt chunks.
 
-    STAGE1 = auto()  # Signature generation
-    STAGE2 = auto()  # Axiom generation
+    ANALYSIS and OBLIGATION don't use the chunk system but are included
+    for completeness and future extensibility.
+    """
+
+    ANALYSIS = auto()    # Stage 1 — domain analysis (no chunks currently)
+    SIGNATURE = auto()   # Stage 2 — signature generation
+    OBLIGATION = auto()  # Stage 3 — deterministic obligation table (no chunks currently)
+    AXIOMS = auto()      # Stage 4 — axiom generation
 
 
 class Concept(Enum):
@@ -103,12 +109,16 @@ class ChunkId(Enum):
     EXAMPLE_SESSION_STORE = auto()
     EXAMPLE_RATE_LIMITER = auto()
     EXAMPLE_DNS_ZONE = auto()
+    # Stage 2 variants — same examples, rendered with RenderMode.SPEC (analysis + full axiom code)
+    EXAMPLE_SESSION_STORE_SPEC = auto()
+    EXAMPLE_RATE_LIMITER_SPEC = auto()
+    EXAMPLE_DNS_ZONE_SPEC = auto()
 
 
-# Convenience sets
-BOTH = frozenset({Stage.STAGE1, Stage.STAGE2})
-S1 = frozenset({Stage.STAGE1})
-S2 = frozenset({Stage.STAGE2})
+# Convenience sets for chunk registration (only SIGNATURE and AXIOMS use chunks)
+SIG = frozenset({Stage.SIGNATURE})
+AX = frozenset({Stage.AXIOMS})
+SIG_AX = frozenset({Stage.SIGNATURE, Stage.AXIOMS})
 
 
 @dataclass(frozen=True)
@@ -286,7 +296,7 @@ def _topological_sort(chunks: list[PromptChunk]) -> list[PromptChunk]:
 
 
 _DEFAULT_CONFIGS: dict[Stage, list[ChunkId]] = {
-    Stage.STAGE1: [
+    Stage.SIGNATURE: [
         ChunkId.ROLE_PREAMBLE,
         ChunkId.TYPE_GRAMMAR,
         ChunkId.API_HELPERS,
@@ -295,7 +305,7 @@ _DEFAULT_CONFIGS: dict[Stage, list[ChunkId]] = {
         ChunkId.EXAMPLE_DNS_ZONE,
         ChunkId.OBLIGATION_PATTERN,
     ],
-    Stage.STAGE2: [
+    Stage.AXIOMS: [
         ChunkId.ROLE_PREAMBLE,
         ChunkId.FORMAL_FRAME,
         ChunkId.TYPE_GRAMMAR,
@@ -310,6 +320,8 @@ _DEFAULT_CONFIGS: dict[Stage, list[ChunkId]] = {
         ChunkId.GUARD_POLARITY,
         ChunkId.PRESERVATION_COLLAPSE,
         ChunkId.EQ_PRED_BASIS,
-        ChunkId.EXAMPLE_BUG_TRACKER_FULL,
+        ChunkId.EXAMPLE_SESSION_STORE_SPEC,
+        ChunkId.EXAMPLE_RATE_LIMITER_SPEC,
+        ChunkId.EXAMPLE_DNS_ZONE_SPEC,
     ],
 }

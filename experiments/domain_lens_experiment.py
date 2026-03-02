@@ -536,7 +536,7 @@ def build_user_prompt(domain: str, lens_name: str) -> str:
 def build_system_prompt() -> str:
     """Build the Stage 1 system prompt using foundation + best examples."""
     chunks = FOUNDATION + EXAMPLES
-    return assemble_prompt(chunks, Stage.STAGE1, validate_deps=False, validate_stage=False)
+    return assemble_prompt(chunks, Stage.SIGNATURE, validate_deps=False, validate_stage=False)
 
 
 def extract_python_code(raw: str) -> str:

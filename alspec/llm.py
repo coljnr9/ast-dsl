@@ -64,10 +64,9 @@ SUBMIT_SPEC_TOOL: dict[str, object] = {
         "name": "submit_spec",
         "description": (
             "Submit the completed algebraic specification. "
-            "You MUST complete the full analysis before writing code. "
-            "The analysis should show your reasoning: sort classification, "
-            "function roles, the complete axiom obligation table, and a "
-            "completeness count."
+            "The analysis should show your axiom design reasoning: "
+            "walk through each obligation cell, note which pattern "
+            "applies, and verify completeness against the provided table."
         ),
         "parameters": {
             "type": "object",
@@ -75,18 +74,20 @@ SUBMIT_SPEC_TOOL: dict[str, object] = {
                 "analysis": {
                     "type": "string",
                     "description": (
-                        "Your complete analysis: identify sorts, classify "
-                        "functions as constructor/observer/uninterpreted, "
-                        "build the axiom obligation table, note tricky cases "
-                        "and design decisions, count expected axioms."
+                        "Your axiom design reasoning: for each obligation "
+                        "cell, note which pattern applies (key dispatch, "
+                        "preservation, selector extract, undefinedness, etc.), "
+                        "identify guard polarity decisions, and verify "
+                        "completeness against the provided obligation table. "
+                        "Do NOT re-derive the signature or obligation table."
                     ),
                 },
                 "code": {
                     "type": "string",
                     "description": (
-                        "Python code containing a single function that returns "
-                        "a Spec. Must implement every row of the obligation "
-                        "table from your analysis."
+                        "Python code that assigns sig, axioms, and "
+                        "spec = Spec(...) at top level. No function wrapper. "
+                        "Must implement every row of the obligation table."
                     ),
                 },
             },
@@ -119,10 +120,10 @@ SUBMIT_SIGNATURE_TOOL: dict[str, object] = {
                 "code": {
                     "type": "string",
                     "description": (
-                        "Python code defining: variable declarations, "
-                        "a `sig = Signature(...)` object, and a "
-                        "`generated_sorts = {...}` dict mapping each "
-                        "generated sort to its constructor tuple."
+                        "Python code that assigns sig = Signature(...) at "
+                        "top level. No function wrapper. Include "
+                        "generated_sorts inside the Signature constructor "
+                        "using GeneratedSortInfo objects."
                     ),
                 },
             },
@@ -131,9 +132,37 @@ SUBMIT_SIGNATURE_TOOL: dict[str, object] = {
     },
 }
 
+SUBMIT_ANALYSIS_TOOL: dict[str, object] = {
+    "type": "function",
+    "function": {
+        "name": "submit_analysis",
+        "description": (
+            "Submit a structured domain analysis. The analysis identifies "
+            "entities, their lifecycles, operations, preconditions, postconditions, "
+            "what each operation preserves, and key invariants."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "analysis": {
+                    "type": "string",
+                    "description": (
+                        "The structured domain analysis covering: entities and their data, "
+                        "operations with preconditions and postconditions, what each operation "
+                        "changes and what it preserves, relationships between entities, "
+                        "and system invariants."
+                    ),
+                },
+            },
+            "required": ["analysis"],
+        },
+    },
+}
+
 _TOOL_REGISTRY: dict[str, dict[str, object]] = {
     "submit_spec": SUBMIT_SPEC_TOOL,
     "submit_signature": SUBMIT_SIGNATURE_TOOL,
+    "submit_analysis": SUBMIT_ANALYSIS_TOOL,
 }
 
 
@@ -253,6 +282,84 @@ class AsyncLLMClient:
                 return Err(
                     RuntimeError(
                         f"{tool_name} arguments missing 'analysis' or 'code' fields"
+                    )
+                )
+
+    async def generate_with_analysis_tool(
+        self,
+        messages: list[dict[str, str]],
+        model: str = "meta-llama/llama-3.1-8b-instruct",
+        name: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Result[tuple[str, UsageInfo | None], Exception]:
+        """Call the model with submit_analysis tool. Returns (analysis_text, usage).
+
+        Similar to generate_with_tool_call but uses SUBMIT_ANALYSIS_TOOL
+        and only extracts the 'analysis' field (no 'code').
+        """
+        try:
+            messages = self._prepare_messages(messages)
+            tool_schema = _TOOL_REGISTRY["submit_analysis"]
+            tool_choice: dict[str, object] = {
+                "type": "function",
+                "function": {"name": "submit_analysis"},
+            }
+            extra_body: dict[str, object] = {}
+            match self._session_id:
+                case str(sid):
+                    extra_body["langfuse_session_id"] = sid
+                case _:
+                    pass
+
+            with propagate_attributes(session_id=self._session_id, metadata=metadata):
+                kwargs: dict[str, Any] = {
+                    "model": model,
+                    "messages": messages,
+                    "tools": [tool_schema],
+                    "tool_choice": tool_choice,
+                    "extra_body": extra_body,
+                }
+                match name:
+                    case str(n):
+                        kwargs["name"] = n
+                    case _:
+                        pass
+
+                response = await self._client.chat.completions.create(**kwargs)  # type: ignore[call-overload]
+
+            match response.choices:
+                case []:
+                    return Err(RuntimeError("Model returned no choices."))
+                case [choice, *_]:
+                    pass
+                case _:
+                    return Err(RuntimeError("Unexpected response format from model."))
+
+        except Exception as e:
+            return Err(e)
+
+        usage = _extract_usage(response)
+
+        tool_calls = choice.message.tool_calls
+        match tool_calls:
+            case None | []:
+                return Err(RuntimeError("Model did not use submit_analysis tool"))
+            case [call, *_]:
+                pass
+
+        try:
+            args: dict[str, object] = json.loads(call.function.arguments)
+        except Exception as e:
+            return Err(RuntimeError(f"Failed to parse tool call arguments: {e}"))
+
+        analysis = args.get("analysis")
+        match analysis:
+            case str(a):
+                return Ok((a, usage))
+            case _:
+                return Err(
+                    RuntimeError(
+                        "submit_analysis arguments missing 'analysis' field"
                     )
                 )
 

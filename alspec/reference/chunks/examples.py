@@ -1,5 +1,5 @@
 from alspec.prompt_chunks import (
-    ChunkId, Concept, Stage, BOTH, S1, S2, register,
+    ChunkId, Concept, Stage, SIG_AX, SIG, AX, register,
 )
 from alspec.reference.worked_examples import ALL_EXAMPLES
 from alspec.worked_example import RenderMode
@@ -7,7 +7,7 @@ from alspec.worked_example import RenderMode
 
 @register(
     id=ChunkId.EXAMPLE_COUNTER,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({Concept.OBLIGATION_TABLE, Concept.COMPLETENESS}),
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
@@ -17,7 +17,7 @@ def _example_counter() -> str:
 
 @register(
     id=ChunkId.EXAMPLE_STACK,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({Concept.SELECTORS, Concept.OBLIGATION_TABLE, Concept.NDEF_AXIOMS}),
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
@@ -27,7 +27,7 @@ def _example_stack() -> str:
 
 @register(
     id=ChunkId.EXAMPLE_THERMOSTAT,
-    stages=S2,
+    stages=AX,
     concepts=frozenset({
         Concept.SELECTORS, Concept.PRESERVATION, Concept.DEFINEDNESS_BICONDITIONAL,
     }),
@@ -39,7 +39,7 @@ def _example_thermostat() -> str:
 
 @register(
     id=ChunkId.EXAMPLE_BUG_TRACKER_ANALYSIS,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({
         Concept.OBLIGATION_TABLE, Concept.FUNCTION_ROLES, Concept.KEY_DISPATCH,
         Concept.PRESERVATION, Concept.NDEF_AXIOMS, Concept.GUARD_POLARITY,
@@ -52,7 +52,7 @@ def _example_bug_tracker_analysis() -> str:
 
 @register(
     id=ChunkId.EXAMPLE_BUG_TRACKER_CODE,
-    stages=S2,
+    stages=AX,
     concepts=frozenset({
         Concept.KEY_DISPATCH, Concept.HIT_MISS, Concept.PRESERVATION,
         Concept.NDEF_AXIOMS, Concept.GUARD_POLARITY, Concept.EQ_PRED,
@@ -65,7 +65,7 @@ def _example_bug_tracker_code() -> str:
 
 @register(
     id=ChunkId.EXAMPLE_BUG_TRACKER_FULL,
-    stages=S2,
+    stages=AX,
     concepts=frozenset({
         Concept.OBLIGATION_TABLE, Concept.FUNCTION_ROLES, Concept.KEY_DISPATCH,
         Concept.HIT_MISS, Concept.PRESERVATION, Concept.NDEF_AXIOMS,
@@ -79,7 +79,7 @@ def _example_bug_tracker_full() -> str:
 
 @register(
     id=ChunkId.EXAMPLE_BOUNDED_COUNTER,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({
         Concept.PARTIAL_CONSTRUCTORS, Concept.DEFINEDNESS_BICONDITIONAL,
         Concept.OBLIGATION_TABLE, Concept.COMPLETENESS,
@@ -92,7 +92,7 @@ def _example_bounded_counter() -> str:
 
 @register(
     id=ChunkId.EXAMPLE_TRAFFIC_LIGHT,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({
         Concept.GENERATED_SORTS, Concept.STANDARD_PATTERNS,
         Concept.OBLIGATION_TABLE,
@@ -105,7 +105,7 @@ def _example_traffic_light() -> str:
 
 @register(
     id=ChunkId.EXAMPLE_QUEUE,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({
         Concept.OBLIGATION_TABLE, Concept.NDEF_AXIOMS,
     }),
@@ -117,7 +117,7 @@ def _example_queue() -> str:
 
 @register(
     id=ChunkId.EXAMPLE_SESSION_STORE,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({
         Concept.SELECTORS,
         Concept.SELECTOR_EXTRACT,
@@ -140,7 +140,7 @@ def _example_session_store() -> str:
 
 @register(
     id=ChunkId.EXAMPLE_RATE_LIMITER,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({
         Concept.SELECTORS,
         Concept.SELECTOR_EXTRACT,
@@ -157,7 +157,7 @@ def _example_rate_limiter() -> str:
 
 @register(
     id=ChunkId.EXAMPLE_DNS_ZONE,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({
         Concept.KEY_DISPATCH,
         Concept.HIT_MISS,
@@ -173,3 +173,68 @@ def _example_rate_limiter() -> str:
 )
 def _example_dns_zone() -> str:
     return ALL_EXAMPLES["dns-zone"].render(RenderMode.SIGNATURE)
+
+
+# ---------------------------------------------------------------------------
+# Stage 2 variants — full spec code (analysis + axioms, no function wrapper)
+# ---------------------------------------------------------------------------
+
+
+@register(
+    id=ChunkId.EXAMPLE_SESSION_STORE_SPEC,
+    stages=AX,
+    concepts=frozenset({
+        Concept.SELECTORS,
+        Concept.SELECTOR_EXTRACT,
+        Concept.SELECTOR_FOREIGN,
+        Concept.PARTIAL_CONSTRUCTORS,
+        Concept.DEFINEDNESS_BICONDITIONAL,
+        Concept.GUARD_POLARITY,
+        Concept.BOTH_CASES,
+        Concept.OBLIGATION_TABLE,
+        Concept.NDEF_AXIOMS,
+        Concept.GENERATED_SORTS,
+        Concept.EQ_PRED,
+        Concept.REFLEXIVITY_SYMMETRY_TRANSITIVITY,
+    }),
+    depends_on=(ChunkId.OBLIGATION_PATTERN,),
+)
+def _example_session_store_spec() -> str:
+    return ALL_EXAMPLES["session-store"].render(RenderMode.SPEC)
+
+
+@register(
+    id=ChunkId.EXAMPLE_RATE_LIMITER_SPEC,
+    stages=AX,
+    concepts=frozenset({
+        Concept.SELECTORS,
+        Concept.SELECTOR_EXTRACT,
+        Concept.OBLIGATION_TABLE,
+        Concept.COMPLETENESS,
+        Concept.STANDARD_PATTERNS,
+        Concept.PRESERVATION,
+    }),
+    depends_on=(ChunkId.OBLIGATION_PATTERN,),
+)
+def _example_rate_limiter_spec() -> str:
+    return ALL_EXAMPLES["rate-limiter"].render(RenderMode.SPEC)
+
+
+@register(
+    id=ChunkId.EXAMPLE_DNS_ZONE_SPEC,
+    stages=AX,
+    concepts=frozenset({
+        Concept.KEY_DISPATCH,
+        Concept.HIT_MISS,
+        Concept.OBLIGATION_TABLE,
+        Concept.NDEF_AXIOMS,
+        Concept.GUARD_POLARITY,
+        Concept.EQ_PRED,
+        Concept.REFLEXIVITY_SYMMETRY_TRANSITIVITY,
+        Concept.PRESERVATION,
+        Concept.SHARED_KEY_SORT,
+    }),
+    depends_on=(ChunkId.OBLIGATION_PATTERN,),
+)
+def _example_dns_zone_spec() -> str:
+    return ALL_EXAMPLES["dns-zone"].render(RenderMode.SPEC)

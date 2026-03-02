@@ -1,10 +1,10 @@
 from alspec.prompt_chunks import (
-    ChunkId, Concept, Stage, BOTH, S1, S2, register,
+    ChunkId, Concept, Stage, SIG_AX, SIG, AX, register,
 )
 
 @register(
     id=ChunkId.WF_CHECKLIST,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({Concept.WELL_FORMEDNESS}),
     depends_on=(ChunkId.FORMAL_FRAME,),
 )
@@ -21,7 +21,7 @@ def _wf_checklist():
 
 @register(
     id=ChunkId.OBLIGATION_PATTERN,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({Concept.OBLIGATION_TABLE, Concept.COMPLETENESS}),
     depends_on=(ChunkId.WF_CHECKLIST,),
 )
@@ -44,7 +44,7 @@ Every cell must be filled."""
 
 @register(
     id=ChunkId.LOOSE_SEMANTICS_RULE,
-    stages=BOTH,
+    stages=SIG_AX,
     concepts=frozenset({Concept.LOOSE_SEMANTICS, Concept.NO_OMISSIONS}),
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
@@ -65,7 +65,7 @@ A complete spec has no silent gaps in the obligation table."""
 
 @register(
     id=ChunkId.PARTIAL_FN_PATTERNS,
-    stages=S2,
+    stages=AX,
     concepts=frozenset({Concept.PARTIAL_FUNCTIONS, Concept.DEFINEDNESS, Concept.NDEF_AXIOMS}),
     depends_on=(ChunkId.LOOSE_SEMANTICS_RULE,),
 )
@@ -74,48 +74,52 @@ def _partial_fn_patterns():
 
 **Pattern 1 — Partial constructor with definedness biconditional:**
 ```python
-Axiom("withdraw_def", forall([a, n], iff(
-    Definedness(app("withdraw", a, n)),
-    PredApp("geq", (app("balance", a), n))
+Axiom("refresh_def", forall([s], iff(
+    Definedness(app("refresh", s)),
+    eq(app("get_status", s), const("active"))
 )))
 ```
 
 **Pattern 2 — Partial observer, explicit undefinedness:**
 ```python
 Axiom("pop_new_undef", Negation(Definedness(app("pop", const("new")))))
-Axiom("get_assignee_create_hit", forall([s, k, k2, t, b], Implication(
-    PredApp("eq_id", (k, k2)),
-    Negation(Definedness(app("get_assignee", app("create_ticket", s, k, t, b), k2)))
-)))
+Axiom("last_input_create_undef", forall([t],
+    Negation(Definedness(app("last_input", app("create", t))))
+))
 ```
 
-**Pattern 3 — Total constructor with existence guard (both polarities):**
+**Pattern 3 — Total constructor with domain guard (both polarities):**
 ```python
-# resolve_ticket hit WITH ticket
-Axiom("get_status_resolve_hit", forall([s, k, k2], Implication(
-    PredApp("eq_id", (k, k2)),
-    Implication(PredApp("has_ticket", (s, k)),
-        eq(app("get_status", app("resolve_ticket", s, k), k2), const("resolved"))
-    )
+# is_verified × verify — POSITIVE guard: correct token on active session
+Axiom("is_verified_verify_pos", forall([s, t], Implication(
+    Conjunction((
+        PredApp("eq_token", (t, app("get_token", s))),
+        eq(app("get_status", s), const("active")),
+    )),
+    PredApp("is_verified", (app("verify", s, t),))
 )))
-# resolve_ticket hit WITHOUT ticket — must also be stated
-Axiom("get_status_resolve_hit_noticket", forall([s, k, k2], Implication(
-    PredApp("eq_id", (k, k2)),
-    Implication(Negation(PredApp("has_ticket", (s, k))),
-        eq(app("get_status", app("resolve_ticket", s, k), k2), app("get_status", s, k2))
+# is_verified × verify — NEGATIVE guard: wrong token or expired session
+Axiom("is_verified_verify_neg", forall([s, t], Implication(
+    Negation(Conjunction((
+        PredApp("eq_token", (t, app("get_token", s))),
+        eq(app("get_status", s), const("active")),
+    ))),
+    iff(
+        PredApp("is_verified", (app("verify", s, t),)),
+        PredApp("is_verified", (s,)),
     )
 )))
 ```"""
 
 @register(
     id=ChunkId.GUARD_POLARITY,
-    stages=S2,
+    stages=AX,
     concepts=frozenset({Concept.GUARD_POLARITY, Concept.BOTH_CASES}),
     depends_on=(ChunkId.PARTIAL_FN_PATTERNS,),
 )
 def _guard_polarity():
     return """### Guard Polarity Rule
 
-When an axiom is guarded by a predicate (like `has_ticket`, `is_at_max`, or a state check),
+When an axiom is guarded by a predicate (like `is_verified`, `over_limit`, or a state check),
 write axioms for BOTH the positive and negative case. The positive case gives the real behavior;
 the negative case gives the no-op/delegation behavior. Omitting either leaves models unconstrained."""

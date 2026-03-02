@@ -20,6 +20,8 @@ async def handle_generate(
     domain: str | None = None,
     lens: str | None = None,
     model: str = "google/gemini-3-flash-preview",
+    sources: list[Path] | None = None,
+    cached_analysis: bool = False,
 ) -> int:
     client_result = AsyncLLMClient.from_env()
     match client_result:
@@ -36,13 +38,15 @@ async def handle_generate(
         domain_info = next((d for d in DOMAINS if d.id == domain), None)
         desc = domain_info.description if domain_info else domain.replace("-", " ")
 
-        print(f"Generating Stage 1 signature for domain '{domain}'...", file=sys.stderr)
+        print(f"Generating Stage 2 signature for domain '{domain}'...", file=sys.stderr)
         result = await run_pipeline_stage1_only(
             client=client,
             domain_id=domain,
             domain_description=desc,
             model=model,
             lens=lens,
+            sources=sources,
+            cached_analysis=cached_analysis,
         )
         if result.success:
             print(result.signature_code)
@@ -518,9 +522,21 @@ async def async_main() -> int:
     generate_parser.add_argument(
         "--lens",
         type=str,
-        default=None,
+        default="entity_lifecycle",
         choices=["entity_lifecycle", "summary", "raw_source", "none"],
-        help="Domain lens to apply before Stage 1.",
+        help="Domain lens to apply for Stage 1 (Analysis). Default: entity_lifecycle.",
+    )
+    generate_parser.add_argument(
+        "--source",
+        type=str,
+        nargs="+",
+        default=None,
+        help="Source file(s) for domain analysis. Supports glob patterns.",
+    )
+    generate_parser.add_argument(
+        "--cached-analysis",
+        action="store_true",
+        help="Use cached domain analysis if available.",
     )
     generate_parser.add_argument(
         "--model",
@@ -543,9 +559,14 @@ async def async_main() -> int:
     eval_parser.add_argument(
         "--lens",
         type=str,
-        default=None,
+        default="entity_lifecycle",
         choices=["entity_lifecycle", "summary", "raw_source", "none"],
-        help="Domain lens to apply before Stage 1. Default: none (bare label).",
+        help="Domain lens for Stage 1 (Analysis). Default: entity_lifecycle.",
+    )
+    eval_parser.add_argument(
+        "--cached-analysis",
+        action="store_true",
+        help="Use cached domain analysis if available.",
     )
     eval_parser.add_argument(
         "--domains",
@@ -630,11 +651,24 @@ async def async_main() -> int:
                 strict=args.strict,
             )
         case "generate":
+            # Expand glob patterns for --source
+            import glob
+            source_paths: list[Path] | None = None
+            if hasattr(args, 'source') and args.source:
+                expanded: list[Path] = []
+                for pattern in args.source:
+                    matches = glob.glob(pattern, recursive=True)
+                    expanded.extend(Path(m) for m in matches)
+                if expanded:
+                    source_paths = expanded
+
             return await handle_generate(
                 prompt=args.prompt,
                 domain=args.domain,
                 lens=args.lens if args.lens != "none" else None,
                 model=args.model,
+                sources=source_paths,
+                cached_analysis=getattr(args, 'cached_analysis', False),
             )
         case "eval":
             return await handle_eval(
