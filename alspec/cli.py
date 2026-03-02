@@ -191,14 +191,17 @@ async def handle_eval(
     save_specs_dir: str | None,
     lens: str | None = None,
     concurrency: int = 8,
+    replicates: int = 1,
 ) -> int:
     from alspec.eval.domains import DOMAINS
     from alspec.eval.harness import EvalResult, EvalRun, run_domain_eval
     from alspec.eval.report import (
+        export_combined_csv,
         export_csv,
         print_detailed_diagnostics,
         print_feature_coverage,
         print_multi_model_comparison,
+        print_replicate_summary,
         print_summary_table,
     )
 
@@ -223,10 +226,6 @@ async def handle_eval(
     ref_text = generate_reference()
     prompt_version = f"v3 (sha256: {hashlib.sha256(ref_text.encode()).hexdigest()[:8]})"
 
-    timestamp = datetime.now().isoformat(timespec="seconds")
-    session_id = f"eval-{timestamp}"
-    print(f"Langfuse Session ID: {session_id}\n", flush=True)
-
     # Build the canonical ordered list of (model, domain) pairs so that we can
     # sort gathered results back into a deterministic order after concurrent
     # execution.
@@ -236,142 +235,181 @@ async def handle_eval(
         for domain in domains
     ]
     total = len(pairs)
-
-    semaphore = asyncio.Semaphore(concurrency)
-    completed_count = 0
-
-    async def run_one(
-        model: str,
-        domain: object,
-        idx: int,
-    ) -> EvalResult | Exception:
-        nonlocal completed_count
-        import time as _time
-
-        task_start = _time.monotonic()
-        try:
-            async with semaphore:
-                result = await run_domain_eval(
-                    client, domain, model,  # type: ignore[arg-type]
-                    session_id=session_id,
-                    lens=lens,
-                )
-        except Exception as exc:
-            elapsed = _time.monotonic() - task_start
-            completed_count += 1
-            domain_id = getattr(domain, "id", str(domain))
-            print(
-                f"  [{completed_count}/{total}] ✗ {domain_id} ({model}) "
-                f"— {exc} — {elapsed:.1f}s",
-                flush=True,
-            )
-            return exc
-
-        elapsed = _time.monotonic() - task_start
-        completed_count += 1
-
-        # Build a short progress line.
-        domain_id = getattr(domain, "id", str(domain))
-        golden_str: str
-        intrinsic_str: str
-        if result.score is not None:
-            golden_str = f"{result.score.health:.2f} golden"
-        else:
-            golden_str = "no score"
-        intrinsic_str = f"{result.intrinsic_health:.2f} intrinsic"
-
-        if result.success:
-            status = f"✓ {domain_id} ({golden_str}, {intrinsic_str})"
-        else:
-            err_summary = result.parse_error or result.checker_error or "failed"
-            status = f"✗ {domain_id} — {err_summary}"
-
-        print(
-            f"  [{completed_count}/{total}] {status} — {elapsed:.1f}s",
-            flush=True,
-        )
-        return result
-
-    print(
-        f"Running {total} eval task(s) with concurrency={concurrency}...",
-        flush=True,
-    )
-    raw_outcomes: list[EvalResult | Exception | BaseException] = list(
-        await asyncio.gather(
-            *[run_one(model, domain, i) for i, (model, domain) in enumerate(pairs)],
-            return_exceptions=True,
-        )
-    )
-
-    # Flush Langfuse once after all tasks finish. langfuse.flush() is a
-    # blocking synchronous call — run it in a thread so it doesn't block the
-    # event loop (and so it's clear this is intentionally off-loop).
-    from alspec.eval.harness import langfuse as _langfuse
-    await asyncio.to_thread(_langfuse.flush)
-
-    # Separate successes from failures; keep only EvalResult objects for reporting.
-    results: list[EvalResult] = []
-    for i, outcome in enumerate(raw_outcomes):
-        if isinstance(outcome, EvalResult):
-            results.append(outcome)
-        else:
-            model, domain = pairs[i]
-            domain_id = getattr(domain, "id", str(domain))
-            print(
-                f"  Task {domain_id!r} ({model}) raised an unexpected exception: {outcome}",
-                file=sys.stderr,
-            )
-
-    # Restore canonical (model, domain) order so the report table is stable.
     pair_order: dict[tuple[str, str], int] = {
         (model, getattr(domain, "id", str(domain))): idx
         for idx, (model, domain) in enumerate(pairs)
     }
-    results.sort(key=lambda r: pair_order.get((r.model, r.domain_id), 9999))
 
-    run = EvalRun(
-        timestamp=timestamp,
-        models=tuple(models),
-        prompt_version=prompt_version,
-        results=tuple(results),
-    )
+    # Collect results from all replicates.
+    all_results: list[EvalResult] = []
+    # Use the very first timestamp as the run timestamp for combined CSV.
+    run_timestamp: str = datetime.now().isoformat(timespec="seconds")
 
-    for model in models:
-        print_summary_table(run, model, sys.stdout)
+    for rep in range(1, replicates + 1):
+        timestamp = datetime.now().isoformat(timespec="seconds")
+        if rep == 1:
+            run_timestamp = timestamp
+        session_id = f"eval-{timestamp}-rep{rep}"
+        print(f"\n{'=' * 62}\n  Replicate {rep}/{replicates}\n{'=' * 62}\n")
+        print(f"Langfuse Session ID: {session_id}\n", flush=True)
 
-    if len(models) > 1:
-        print_multi_model_comparison(run, sys.stdout)
+        semaphore = asyncio.Semaphore(concurrency)
+        completed_count = 0
 
-    print_feature_coverage(run, sys.stdout)
+        async def run_one(
+            model: str,
+            domain: object,
+            idx: int,
+            _rep: int = rep,
+            _session_id: str = session_id,
+            _semaphore: asyncio.Semaphore = semaphore,
+        ) -> EvalResult | Exception:
+            nonlocal completed_count
+            import time as _time
 
-    # Cache metrics summary
-    total_prompt = sum(r.prompt_tokens or 0 for r in results)
-    total_cached = sum(r.cached_tokens or 0 for r in results)
-    total_cache_write = sum(r.cache_write_tokens or 0 for r in results)
-    if total_prompt > 0:
-        hit_rate = total_cached / total_prompt
-        print(f"\n  Cache Summary")
-        print(f"  Total prompt tokens:  {total_prompt:,}")
-        print(f"  Cached tokens:        {total_cached:,} ({hit_rate:.1%})")
-        print(f"  Cache write tokens:   {total_cache_write:,}")
+            task_start = _time.monotonic()
+            try:
+                async with _semaphore:
+                    result = await run_domain_eval(
+                        client, domain, model,  # type: ignore[arg-type]
+                        session_id=_session_id,
+                        lens=lens,
+                        replicate=_rep,
+                    )
+            except Exception as exc:
+                elapsed = _time.monotonic() - task_start
+                completed_count += 1
+                domain_id = getattr(domain, "id", str(domain))
+                print(
+                    f"  [{completed_count}/{total}] ✗ {domain_id} ({model}) "
+                    f"— {exc} — {elapsed:.1f}s",
+                    flush=True,
+                )
+                return exc
+
+            elapsed = _time.monotonic() - task_start
+            completed_count += 1
+
+            # Build a short progress line.
+            domain_id = getattr(domain, "id", str(domain))
+            golden_str: str
+            intrinsic_str: str
+            if result.score is not None:
+                golden_str = f"{result.score.health:.2f} golden"
+            else:
+                golden_str = "no score"
+            intrinsic_str = f"{result.intrinsic_health:.2f} intrinsic"
+
+            if result.success:
+                status = f"✓ {domain_id} ({golden_str}, {intrinsic_str})"
+            else:
+                err_summary = result.parse_error or result.checker_error or "failed"
+                status = f"✗ {domain_id} — {err_summary}"
+
+            print(
+                f"  [{completed_count}/{total}] {status} — {elapsed:.1f}s",
+                flush=True,
+            )
+            return result
+
+        print(
+            f"Running {total} eval task(s) with concurrency={concurrency}...",
+            flush=True,
+        )
+        raw_outcomes: list[EvalResult | Exception | BaseException] = list(
+            await asyncio.gather(
+                *[run_one(model, domain, i) for i, (model, domain) in enumerate(pairs)],
+                return_exceptions=True,
+            )
+        )
+
+        # Flush Langfuse once after all tasks finish.
+        from alspec.eval.harness import langfuse as _langfuse
+        await asyncio.to_thread(_langfuse.flush)
+
+        # Separate successes from failures; keep only EvalResult objects.
+        import dataclasses
+        rep_results: list[EvalResult] = []
+        for i, outcome in enumerate(raw_outcomes):
+            if isinstance(outcome, EvalResult):
+                # Stamp the replicate number on each result.
+                stamped = dataclasses.replace(outcome, replicate=rep)
+                rep_results.append(stamped)
+            else:
+                model_str, domain = pairs[i]
+                domain_id = getattr(domain, "id", str(domain))
+                print(
+                    f"  Task {domain_id!r} ({model_str}) raised an unexpected exception: {outcome}",
+                    file=sys.stderr,
+                )
+
+        # Restore canonical (model, domain) order.
+        rep_results.sort(key=lambda r: pair_order.get((r.model, r.domain_id), 9999))
+
+        run = EvalRun(
+            timestamp=timestamp,
+            models=tuple(models),
+            prompt_version=prompt_version,
+            results=tuple(rep_results),
+        )
+
+        for model in models:
+            print_summary_table(run, model, sys.stdout)
+
+        if len(models) > 1:
+            print_multi_model_comparison(run, sys.stdout)
+
+        print_feature_coverage(run, sys.stdout)
+
+        # Cache metrics summary
+        total_prompt = sum(r.prompt_tokens or 0 for r in rep_results)
+        total_cached = sum(r.cached_tokens or 0 for r in rep_results)
+        total_cache_write = sum(r.cache_write_tokens or 0 for r in rep_results)
+        if total_prompt > 0:
+            hit_rate = total_cached / total_prompt
+            print(f"\n  Cache Summary")
+            print(f"  Total prompt tokens:  {total_prompt:,}")
+            print(f"  Cached tokens:        {total_cached:,} ({hit_rate:.1%})")
+            print(f"  Cache write tokens:   {total_cache_write:,}")
+            if verbose:
+                print(f"\n  {'Domain':<25} {'Prompt':>8} {'Cached':>8} {'Hit%':>6}")
+                print(f"  {'─'*25} {'─'*8} {'─'*8} {'─'*6}")
+                for r in rep_results:
+                    pt = r.prompt_tokens or 0
+                    ct = r.cached_tokens or 0
+                    rate = f"{ct/pt:.0%}" if pt > 0 else "—"
+                    print(f"  {r.domain_id:<25} {pt:>8} {ct:>8} {rate:>6}")
+
         if verbose:
-            print(f"\n  {'Domain':<25} {'Prompt':>8} {'Cached':>8} {'Hit%':>6}")
-            print(f"  {'─'*25} {'─'*8} {'─'*8} {'─'*6}")
-            for r in results:
-                pt = r.prompt_tokens or 0
-                ct = r.cached_tokens or 0
-                rate = f"{ct/pt:.0%}" if pt > 0 else "—"
-                print(f"  {r.domain_id:<25} {pt:>8} {ct:>8} {rate:>6}")
+            print_detailed_diagnostics(run, sys.stdout)
 
-    if verbose:
-        print_detailed_diagnostics(run, sys.stdout)
+        # Per-replicate CSV: add suffix only when replicates > 1.
+        if csv_out:
+            if replicates > 1:
+                p = Path(csv_out)
+                rep_csv = str(p.with_stem(f"{p.stem}-rep{rep}"))
+            else:
+                rep_csv = csv_out
+            export_csv(run, rep_csv)
+            print(f"Exported replicate {rep} results to {rep_csv}")
 
-    if csv_out:
-        export_csv(run, csv_out)
-        print(f"Exported results to {csv_out}")
+        # Per-replicate save-specs: add suffix only when replicates > 1.
+        if save_specs_dir:
+            if replicates > 1:
+                rep_dir = f"{save_specs_dir}-rep{rep}"
+            else:
+                rep_dir = save_specs_dir
+            save_specs(list(rep_results), rep_dir)
 
-    if save_specs_dir:
-        save_specs(list(results), save_specs_dir)
+        all_results.extend(rep_results)
+
+    # After all replicates: aggregate summary and combined CSV.
+    if replicates > 1:
+        print_replicate_summary(all_results, replicates, sys.stdout)
+
+        if csv_out:
+            export_combined_csv(all_results, run_timestamp, prompt_version, csv_out)
+            print(f"Exported combined results to {csv_out}")
 
     return 0
 
@@ -641,6 +679,12 @@ async def async_main() -> int:
         default=8,
         help="Max concurrent LLM calls (default: 8). Use -j1 for sequential.",
     )
+    eval_parser.add_argument(
+        "--replicates", "-r",
+        type=int,
+        default=1,
+        help="Number of independent replicates to run (default: 1).",
+    )
 
     # Command group: doe
     doe_parser = subparsers.add_parser(
@@ -721,6 +765,7 @@ async def async_main() -> int:
                 save_specs_dir=args.save_specs,
                 lens=args.lens if args.lens != "none" else None,
                 concurrency=args.concurrency,
+                replicates=args.replicates,
             )
         case "doe":
             match args.doe_command:

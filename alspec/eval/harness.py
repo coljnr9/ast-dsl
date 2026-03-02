@@ -44,6 +44,8 @@ class EvalResult:
     tier5_complexity: float = 0.0
     # NEW: captured failure reasons
     stage2_skip_reason: str | None = None
+    # Replicate index (1-based); 1 means no replication
+    replicate: int = 1
 
 
 @dataclass(frozen=True)
@@ -269,6 +271,7 @@ async def run_domain_eval(
     *,
     session_id: str | None = None,
     lens: str | None = None,
+    replicate: int = 1,
 ) -> EvalResult:
     """Run the two-stage pipeline for a single domain and model.
 
@@ -295,6 +298,7 @@ async def run_domain_eval(
             "model": model,
             "pipeline": "two-stage",
             "lens": lens or "none",
+            "replicate": str(replicate),
         },
         tags=[f"tier:{domain.complexity}", *sorted(domain.expected_features)],
     ):

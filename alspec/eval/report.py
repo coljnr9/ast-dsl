@@ -1,9 +1,10 @@
 import csv
+import math
 from typing import TextIO
 
 from alspec.check import Severity
 from alspec.eval.domains import DOMAINS
-from alspec.eval.harness import EvalRun
+from alspec.eval.harness import EvalResult, EvalRun
 
 
 def print_summary_table(run: EvalRun, model: str, out: TextIO) -> None:
@@ -306,6 +307,203 @@ def export_csv(run: EvalRun, path: str) -> None:
                         run.timestamp,
                         result.model,
                         run.prompt_version,
+                        result.domain_id,
+                        complexity,
+                        result.success,
+                        score.well_formed,
+                        score.health,
+                        result.intrinsic_health,
+                        score.error_count,
+                        score.warning_count,
+                        score.axiom_count,
+                        score.sort_count,
+                        score.function_count,
+                        score.predicate_count,
+                        result.latency_ms,
+                    ]
+                )
+
+
+def _rep_aggregate(results: list[EvalResult]) -> dict[str, float]:
+    """Compute aggregate metrics for a single replicate's results."""
+    total = len(results)
+    if total == 0:
+        return {
+            "parse_rate": 0.0,
+            "wf_rate": 0.0,
+            "mean_golden": 0.0,
+            "mean_intrinsic": 0.0,
+            "total_axioms": 0.0,
+            "total_errors": 0.0,
+            "coverage_ratio": 0.0,
+        }
+
+    parsed = [r for r in results if r.success]
+    wf = [r for r in parsed if r.score and r.score.well_formed]
+    golden_sum = sum(r.score.health for r in parsed if r.score)
+    intrinsic_sum = sum(r.intrinsic_health for r in results)
+    axiom_sum = float(sum(r.score.axiom_count for r in parsed if r.score))
+    error_sum = float(sum(r.score.error_count for r in parsed if r.score))
+
+    cells_total = sum(r.obligation_cell_count for r in parsed if r.score)
+    cells_covered = sum(r.covered_cell_count for r in parsed if r.score)
+    cov_ratio = (cells_covered / cells_total) if cells_total > 0 else 0.0
+
+    return {
+        "parse_rate": len(parsed) / total,
+        "wf_rate": len(wf) / len(parsed) if parsed else 0.0,
+        "mean_golden": golden_sum / len(parsed) if parsed else 0.0,
+        "mean_intrinsic": intrinsic_sum / total,
+        "total_axioms": axiom_sum,
+        "total_errors": error_sum,
+        "coverage_ratio": cov_ratio,
+    }
+
+
+def _stats(values: list[float]) -> tuple[float, float, float, float]:
+    """Return (mean, stddev, min, max) for a list of floats."""
+    n = len(values)
+    if n == 0:
+        return 0.0, 0.0, 0.0, 0.0
+    mean = sum(values) / n
+    variance = sum((v - mean) ** 2 for v in values) / n if n > 1 else 0.0
+    stddev = math.sqrt(variance)
+    return mean, stddev, min(values), max(values)
+
+
+def print_replicate_summary(
+    all_results: list[EvalResult],
+    replicates: int,
+    out: TextIO,
+) -> None:
+    """Print aggregate stats across all replicates."""
+    out.write(f"\n  {'\u2550' * 62}\n")
+    out.write(f"  Aggregate Summary ({replicates} replicates)\n")
+    out.write(f"  {'\u2550' * 62}\n\n")
+
+    # Partition results by replicate number.
+    by_rep: dict[int, list[EvalResult]] = {}
+    for r in all_results:
+        by_rep.setdefault(r.replicate, []).append(r)
+
+    rep_aggs = [_rep_aggregate(by_rep[rep]) for rep in sorted(by_rep)]
+
+    metrics: list[tuple[str, list[float], bool]] = [
+        ("Parse rate",           [a["parse_rate"] for a in rep_aggs],       True),
+        ("Well-formed rate",     [a["wf_rate"] for a in rep_aggs],          True),
+        ("Golden health (mean)", [a["mean_golden"] for a in rep_aggs],      False),
+        ("Intrinsic health",     [a["mean_intrinsic"] for a in rep_aggs],   False),
+        ("Total axioms",         [a["total_axioms"] for a in rep_aggs],     False),
+        ("Total errors",         [a["total_errors"] for a in rep_aggs],     False),
+        ("Coverage ratio",       [a["coverage_ratio"] for a in rep_aggs],   True),
+    ]
+
+    out.write(f"  {'Metric':<22}│ {'Mean':>7} │ {'Stddev':>6} │ {'Min':>6} │ {'Max':>6}\n")
+    out.write(f"  {'─' * 22}┼{'─' * 9}┼{'─' * 8}┼{'─' * 8}┼{'─' * 8}\n")
+
+    for label, values, is_pct in metrics:
+        mean, stddev, vmin, vmax = _stats(values)
+        if is_pct:
+            out.write(
+                f"  {label:<22}│ {mean*100:6.1f}% │ {stddev*100:5.1f}% │ {vmin*100:5.1f}% │ {vmax*100:5.1f}%\n"
+            )
+        else:
+            out.write(
+                f"  {label:<22}│ {mean:>7.2f} │ {stddev:>6.2f} │ {vmin:>6.2f} │ {vmax:>6.2f}\n"
+            )
+
+    out.write(f"  {'─' * 22}┼{'─' * 9}┼{'─' * 8}┼{'─' * 8}┼{'─' * 8}\n")
+
+    # Per-domain parse stability across replicates.
+    all_domain_ids = sorted({r.domain_id for r in all_results})
+    unstable: list[tuple[str, int, int]] = []  # (domain_id, parsed_count, n)
+    for did in all_domain_ids:
+        domain_results = [r for r in all_results if r.domain_id == did]
+        n = max(r.replicate for r in domain_results)
+        parsed_count = sum(1 for r in domain_results if r.success)
+        if parsed_count != 0 and parsed_count != n:
+            unstable.append((did, parsed_count, n))
+
+    out.write("\n")
+    if unstable:
+        out.write("  Per-domain parse stability (domains with variance across replicates):\n")
+        for did, parsed_count, n in unstable:
+            out.write(f"    {did}: {parsed_count}/{n}\n")
+    else:
+        out.write("  All domains parsed consistently across all replicates.\n")
+    out.write("\n")
+
+
+def export_combined_csv(
+    all_results: list[EvalResult],
+    run_timestamp: str,
+    prompt_version: str,
+    path: str,
+) -> None:
+    """Export all replicates into a single CSV with a 'replicate' column."""
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "timestamp",
+                "replicate",
+                "model",
+                "prompt_version",
+                "domain_id",
+                "domain_complexity",
+                "success",
+                "well_formed",
+                "health",
+                "intrinsic_health",
+                "error_count",
+                "warning_count",
+                "axiom_count",
+                "sort_count",
+                "function_count",
+                "predicate_count",
+                "latency_ms",
+            ]
+        )
+
+        for result in all_results:
+            domain = None
+            for d in DOMAINS:
+                if d.id == result.domain_id:
+                    domain = d
+                    break
+
+            complexity = domain.complexity if domain else 0
+
+            if not result.success or result.score is None:
+                writer.writerow(
+                    [
+                        run_timestamp,
+                        result.replicate,
+                        result.model,
+                        prompt_version,
+                        result.domain_id,
+                        complexity,
+                        result.success,
+                        False,
+                        0.0,
+                        result.intrinsic_health,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        result.latency_ms,
+                    ]
+                )
+            else:
+                score = result.score
+                writer.writerow(
+                    [
+                        run_timestamp,
+                        result.replicate,
+                        result.model,
+                        prompt_version,
                         result.domain_id,
                         complexity,
                         result.success,
