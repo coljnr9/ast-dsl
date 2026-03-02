@@ -22,6 +22,8 @@ class RenderMode(Enum):
     CODE = auto()           # Annotated code only (comments preserved)
     CODE_BARE = auto()      # Code with all comments stripped
     ANALYSIS = auto()       # Structured analysis only (no code)
+    SIGNATURE = auto()      # Analysis + signature-only code (no axioms, no function wrapper)
+    SPEC = auto()           # Analysis + full code without function wrapper
 
 
 class FunctionRole(Enum):
@@ -133,6 +135,113 @@ class DesignDecision:
 
 
 # ============================================================
+# Function unwrapping
+# ============================================================
+
+
+def _unwrap_function(code: str) -> str:
+    """Remove function wrapper from example code.
+
+    Strips ``def xxx() -> ...:``, the docstring immediately after it,
+    dedents the body by one level (4 spaces), and removes any
+    ``return Spec(...)`` / ``return sig`` lines.
+    """
+    lines = code.splitlines()
+    result: list[str] = []
+    in_docstring = False
+    docstring_quote: str = ""
+    docstring_done = False
+    skip_def = False
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Skip the def line (may span multiple lines if long, but in practice it
+        # is always a single line ending with ":")
+        if not skip_def and stripped.startswith("def ") and stripped.endswith(":"):
+            skip_def = True
+            continue
+
+        # Skip docstring that immediately follows def
+        if skip_def and not docstring_done:
+            if stripped == "":
+                # Allow blank lines between def and docstring
+                continue
+            if not in_docstring:
+                if stripped.startswith('"""') or stripped.startswith("'''"):
+                    docstring_quote = stripped[:3]
+                    # Check if docstring closes on same line
+                    rest = stripped[3:]
+                    if docstring_quote in rest:
+                        # Single-line docstring
+                        docstring_done = True
+                        continue
+                    else:
+                        in_docstring = True
+                        continue
+                else:
+                    # No docstring — body starts here
+                    docstring_done = True
+            else:
+                if docstring_quote in stripped:
+                    in_docstring = False
+                    docstring_done = True
+                    continue
+                continue
+
+        # Skip return statement
+        if stripped.startswith("return Spec(") or stripped == "return sig":
+            continue
+
+        # Dedent by one level (4 spaces)
+        if line.startswith("    "):
+            line = line[4:]
+
+        result.append(line)
+
+    # Strip leading and trailing blank lines
+    while result and result[0].strip() == "":
+        result.pop(0)
+    while result and result[-1].strip() == "":
+        result.pop()
+
+    return "\n".join(result)
+
+
+def _extract_signature_only(code: str) -> str:
+    """Extract just the signature block from unwrapped code.
+
+    Keeps everything from the start of the unwrapped code through the
+    closing ``)`` of the ``sig = Signature(...)`` block.  Axiom
+    assignments, variable declarations after the signature, and the
+    ``spec = Spec(...)`` line are all removed.
+    """
+    unwrapped = _unwrap_function(code)
+    lines = unwrapped.splitlines()
+
+    # Find the line where sig = Signature( begins
+    sig_start: int | None = None
+    for i, line in enumerate(lines):
+        if "sig = Signature(" in line:
+            sig_start = i
+            break
+
+    if sig_start is None:
+        return unwrapped  # Fallback: no signature block found
+
+    # Walk forward counting open/close parens to find the matching close
+    depth = 0
+    sig_end = sig_start
+    for i in range(sig_start, len(lines)):
+        depth += lines[i].count("(") - lines[i].count(")")
+        if depth == 0:
+            sig_end = i
+            break
+
+    return "\n".join(lines[: sig_end + 1])
+
+
+# ============================================================
 # Comment stripping
 # ============================================================
 
@@ -232,10 +341,20 @@ class WorkedExample:
         parts.append(f"### Worked Example: {self.domain_name}")
         parts.append(f"_{self.summary}_\n")
 
-        if mode in (RenderMode.FULL, RenderMode.ANALYSIS):
+        if mode in (RenderMode.FULL, RenderMode.ANALYSIS, RenderMode.SIGNATURE, RenderMode.SPEC):
             parts.append(self._render_analysis(include_table=include_table))
 
-        if mode in (RenderMode.FULL, RenderMode.CODE, RenderMode.CODE_BARE):
+        if mode == RenderMode.SIGNATURE:
+            code = _extract_signature_only(self.code)
+            parts.append("```python")
+            parts.append(code)
+            parts.append("```")
+        elif mode == RenderMode.SPEC:
+            code = _unwrap_function(self.code)
+            parts.append("```python")
+            parts.append(code)
+            parts.append("```")
+        elif mode in (RenderMode.FULL, RenderMode.CODE, RenderMode.CODE_BARE):
             code = self.code if mode != RenderMode.CODE_BARE else _strip_comments(self.code)
             parts.append("```python")
             parts.append(code)

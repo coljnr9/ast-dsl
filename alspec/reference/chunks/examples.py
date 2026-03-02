@@ -74,7 +74,7 @@ def _example_bug_tracker_code() -> str:
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
 def _example_bug_tracker_full() -> str:
-    return ALL_EXAMPLES["bug-tracker"].render(RenderMode.FULL)
+    return ALL_EXAMPLES["bug-tracker"].render(RenderMode.SPEC)
 
 
 @register(
@@ -135,7 +135,7 @@ def _example_queue() -> str:
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
 def _example_session_store() -> str:
-    return ALL_EXAMPLES["session-store"].render(RenderMode.FULL)
+    return ALL_EXAMPLES["session-store"].render(RenderMode.SIGNATURE)
 
 
 @register(
@@ -152,7 +152,7 @@ def _example_session_store() -> str:
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
 def _example_rate_limiter() -> str:
-    return ALL_EXAMPLES["rate-limiter"].render(RenderMode.FULL)
+    return ALL_EXAMPLES["rate-limiter"].render(RenderMode.SIGNATURE)
 
 
 @register(
@@ -172,4 +172,4 @@ def _example_rate_limiter() -> str:
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
 def _example_dns_zone() -> str:
-    return ALL_EXAMPLES["dns-zone"].render(RenderMode.FULL)
+    return ALL_EXAMPLES["dns-zone"].render(RenderMode.SIGNATURE)

@@ -20,7 +20,7 @@ from alspec.reference import (
     formal_frame,
     methodology,
     type_grammar,
-    worked_example,
+    worked_examples,
 )
 
 
@@ -33,7 +33,7 @@ def generate_reference() -> str:
         api_reference=api_reference.render(),
         basis_catalog=basis_catalog.render(),
         methodology=methodology.render(),
-        worked_example=worked_example.render(),
+        worked_example=worked_examples.BUG_TRACKER.render(),
     )
 
 
