@@ -1,0 +1,74 @@
+This domain analysis is based on the provided text detailing the core components, operations, and behavioral logic of Version Control Systems (VCS).
+
+### **ENTITIES**
+
+**1. Repository**
+*   **Data**: A collection of revisions, history metadata, and (in centralized systems) the authoritative state of the project.
+*   **Lifecycle**:
+    *   **Created**: Initialized as a new project or via a **Clone** of an existing repository.
+    *   **Modified**: When new commits are pushed or checked in.
+    *   **States**: Empty, Active, Synchronized (matching a peer), Out-of-date.
+
+**2. Revision (Version / Commit / Changeset)**
+*   **Data**: A snapshot of files (or a set of changes/diffs), unique ID (number or letter), timestamp, author, and parent reference(s).
+*   **Lifecycle**:
+    *   **Created**: Through a **Commit** or **Check-in** operation.
+    *   **Modified**: Generally immutable once committed (though the article mentions "replacing" for undoing).
+    *   **Transitions**: Proposed (in working copy) → Committed (in repository) → Merged (into another branch).
+
+**3. Working Copy (Checkout)**
+*   **Data**: Local copies of files at a specific revision used for active editing.
+*   **Lifecycle**: 
+    *   **Created**: Via **Checkout** or **Clone**.
+    *   **Modified**: By the user through editors or scripts.
+    *   **Destroyed**: Deleted by the user or overwritten by a new checkout.
+*   **States**: Clean (matches repository), Dirty (contains uncommitted changes), Locked (exclusive write access), Out-of-sync.
+
+**4. Branch**
+*   **Data**: A named line of development (e.g., "Trunk," "Mainline").
+*   **Lifecycle**:
+    *   **Created**: Forked from a specific revision.
+    *   **Modified**: When new revisions are added to its path.
+    *   **Merged**: Absorbed into another branch.
+*   **States**: Active, Stale, Merged, Deleted.
+
+**5. Label (Tag / Baseline)**
+*   **Data**: A human-readable name pointing to a specific significant revision (e.g., "v1.0").
+*   **Lifecycle**: Created to mark milestones; usually static once applied.
+
+---
+
+### **OPERATIONS**
+
+| Operation | Entities Involved | Preconditions | Post-conditions |
+| :--- | :--- | :--- | :--- |
+| **Checkout** | Repository, Working Copy | User selects a valid revision/branch. | A local copy of files is created. |
+| **Commit** | Working Copy, Repository | Changes exist in the working copy. | A new Revision is added to the Repository; working copy is now "Clean." |
+| **Lock** | Repository, File | (In locking models) File must not be locked by another. | File is marked as exclusive; others cannot "Check in" the file. |
+| **Merge** | Two Revisions/Branches | Both branches exist; usually one is the "target." | A new Revision is created combining changes; potential conflicts may remain. |
+| **Clone** | Source & Target Repos | Source repository must be accessible. | A new Repository is created containing the full history of the source. |
+| **Revert** | Working Copy, Revision | A previous revision must exist in history. | Working copy files are restored to the state of the older revision. |
+| **Blame** | File, Repository | File must exist in history. | System identifies the author/revision for every line in the file. |
+
+---
+
+### **RELATIONSHIPS**
+
+*   **Ownership/Containment**:
+    *   A **Repository** contains many **Revisions**, **Branches**, and **Labels**.
+    *   A **Working Copy** is owned by a single user and references one **Repository**.
+*   **Reference (Graph)**:
+    *   A **Revision** references one or more **Parent Revisions** (forming a Directed Acyclic Graph).
+    *   A **Branch** or **Label** points to a specific **Revision**.
+*   **Peer-to-Peer**:
+    *   In **Distributed** systems, Repositories relate to each other as "Clones," exchanging "Patches" (Changesets) to stay synchronized.
+
+---
+
+### **INVARIANTS**
+
+1.  **Acyclicity**: Revisions must always form a Directed Acyclic Graph (DAG); a version cannot be its own ancestor because time moves forward.
+2.  **Immutability of History**: Once a revision is committed (in formal models), its identity and metadata (timestamp, author) should not change.
+3.  **Atomic Commits**: A commit must be "all or nothing"—it either succeeds in saving every change in the set or saves none, ensuring the repository remains in a consistent state.
+4.  **Unique Identification**: Every revision must have a unique identifier (version number or hash) within its repository.
+5.  **Single Root/Multiple Tips**: A repository has at least one "root" (oldest version) and may have multiple "tips" (HEAD revisions for different branches).

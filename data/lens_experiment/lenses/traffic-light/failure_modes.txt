@@ -1,0 +1,76 @@
+This Failure Mode Analysis (FMA) evaluates the traffic signaling system as described in the provided text, focusing on the mechanical, computerized, and regulatory constraints of vehicular and pedestrian control.
+
+### 1. Operations and Failure Modes
+
+#### **Operation: State Transition (Phase Change)**
+*Definition: The process of moving from one signal state to another (e.g., Green to Amber).*
+*   **Failure Modes:**
+    *   **The "Yellow Trap":** Oncoming traffic has an extended green while the turning lane sees amber/red. *Precondition Violated:* Assumption of synchronized clearance.
+    *   **Instantaneous Red-to-Green:** Omitting the Red/Amber (UK) or "Get Ready" phase in jurisdictions that require it.
+    *   **Dilemma Zone Violation (South Korea):** Legal requirement to stop on Amber even if physically impossible. *State Invalid:* Speed/Distance ratio makes stopping unsafe.
+    *   **Omitted All-Red Interval:** Entering a new green phase before the intersection is cleared of the previous flow.
+*   **Failure Response:** 
+    *   *Yellow Trap:* Must be mitigated by signage ("Oncoming traffic has extended green").
+    *   *Dilemma Zone:* Results in "sudden braking" and "multiple collisions" (system-level rejection).
+    *   *System Error:* If logic fails, the system should default to "Fail-Safe" mode (e.g., Flashing Red).
+
+#### **Operation: Countdown Display**
+*Definition: Displaying numerical time remaining for the current phase.*
+*   **Failure Modes:**
+    *   **Value Overflow:** Phase time $> 99$ seconds when the display only supports 2 digits.
+    *   **Zero-Sync Failure:** The main light does not change exactly when the countdown hits 0.
+    *   **Non-Standard Alphanumerics:** Displaying "A0" or "B0" which may be rejected/misunderstood by the user.
+*   **Failure Response:**
+    *   *Overflow:* System must display "--", "99", or hex-like letters (A0, B0) as a fallback.
+    *   *Phasing out:* In Metro Manila, this operation is rejected entirely in favor of "blinking green" to avoid volume-based timing conflicts.
+
+#### **Operation: Pedestrian Request (Push Button)**
+*Definition: User input to trigger a crossing phase (Pelican/HAWK).*
+*   **Failure Modes:**
+    *   **Input Ignored:** Pedestrian demand low or "No Facilities" state active.
+    *   **Mid-block Preemption:** A HAWK beacon failing to activate the Amber warning before the Red stop.
+*   **Failure Response:**
+    *   *Non-provision:* Pedestrians must "self-evaluate" (manual bypass of system control).
+
+#### **Operation: Turn Filtering (Green/Amber Arrows)**
+*Definition: Allowing specific directional movement while main flow is stopped.*
+*   **Failure Modes:**
+    *   **Conflicting Arrows:** Displaying a green filter arrow while oncoming traffic has a green "proceed" without an "indicative arrow" (priority conflict).
+    *   **Missing Amber Arrow:** Transitioning from Green Arrow directly to Red without a clearance interval.
+*   **Failure Response:**
+    *   *Conflict:* Oncoming traffic must be held by a steady red lamp.
+    *   *Omission:* In vertical 5-light bars, the amber arrow is sometimes omitted; users must infer clearance.
+
+---
+
+### 2. System Preservation Requirements
+Even during partial failure or high-stress states (storms, power surges), the system must preserve:
+1.  **Conflict Monitors:** No two conflicting flows (East-West and North-South) can ever have a "Green" aspect simultaneously. 
+2.  **Physical Integrity:** In storm-prone areas, horizontal mounting is required to preserve the signal's physical connection to the mast.
+3.  **Color Universality:** Even with "Blue" (Ao) in Japan or "White" walking men in the US, the relative positions (Red on top/left) must be preserved for color-blind users.
+4.  **Fail-Safe Mode:** If the computer controller fails, the system must either go dark (requiring manual police control) or transition to "Flashing Red" (treating the intersection as a 4-way stop).
+
+---
+
+### 3. Critical State Analysis
+
+**States that cannot be reversed (Permanent Transitions):**
+*   **Phasing out of Flashing Green (Ontario):** Once the infrastructure is upgraded to arrows, the system does not revert to flashing green due to "startling and confusing" effects.
+*   **Computerized Control:** The transition from manual semaphore/officer-controlled towers to automatic timers/computers is permanent in urban environments due to "intersection capacity" requirements.
+
+**Operations impossible in certain states:**
+*   **Diagonal Crossing:** Impossible unless the system is in an "All-Red Stage" (Pedestrian Scramble/Barnes Dance).
+*   **Procedural Change (US):** Circular Green cannot be used as a flashing aspect (prohibited by MUTCD).
+
+**Edge Cases (Combinations of Conditions):**
+*   **The "British Columbia vs. Ontario" Flashing Green:** A driver from BC sees a flashing green as "pedestrian-controlled crosswalk" (Stop required if triggered), while an Ontario driver sees it as "Advance Green" (Proceed/Turn priority).
+*   **Speeding in the South Korean Amber Zone:** If a driver is speeds $> 55\%$ over the limit, the "safe stop" exception for Amber is legally discarded.
+*   **Emergency/Railroad Preemption:** Creates a temporary state that overrides all timers, often triggering the "Yellow Trap" for turning vehicles.
+
+---
+
+### 4. Out of Scope (Deliberate Non-Support)
+*   **Pedestrian Enforcement (UK):** The system does not support the legal prosecution of pedestrians for "Jaywalking" (no direct offence for failing to obey).
+*   **Uncontrolled Crossings:** The system does not control Zebra or uncontrolled crossings (self-evaluation only).
+*   **Absolute Standardization:** The system does *not* support a single global sequence (e.g., UK uses Red-Amber, USA does not).
+*   **Infinite Wait Times:** The system cannot support volume-based signaling and fixed countdowns simultaneously (the latter are being phased out for the former).

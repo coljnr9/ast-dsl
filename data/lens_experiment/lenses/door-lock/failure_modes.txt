@@ -1,0 +1,87 @@
+This Reliability Engineering Failure Mode Analysis (FMA) examines the mechanical and electronic lock-and-key system as described in the provided text.
+
+---
+
+### 1. Operations and Failure Modes
+
+#### **Operation: Insertion (Physical Object into Keyway/Aperture)**
+*   **Failure Modes (Violated Preconditions/Invalid States):**
+    *   **Geometric Mismatch:** Key blade profile does not match the milled keyway shape (incorrect warding).
+    *   **Obstruction:** Physical debris, broken key fragments, or ice inside the keyhole.
+    *   **Orientation Error:** Key inserted upside down (for non-symmetrical keys).
+    *   **Incomplete Insertion:** User does not push the key to the full depth (pins/levers not engaged).
+*   **System Response:**
+    *   **State:** Rejected. The physical stop or internal wards prevent further travel.
+    *   **Result:** No mechanical engagement; the system remains in the "Locked" state.
+
+#### **Operation: Authentication (Alignment of Tumblers/Pins/Levers)**
+*   **Failure Modes (Invalid Inputs):**
+    *   **Incorrect Bitting/Notches:** Key depths are too shallow or too deep (e.g., Barron’s "double acting" lever: "lifting too far is as bad as not lifting far enough").
+    *   **Master Key Conflict:** A standard key attempting to utilize a master-pin elevation it is not cut for.
+    *   **Electronic Signature Mismatch:** Keycard signature or RFID code does not match the stored authorized "signature."
+    *   **Rolling Code Desynchronization:** Smart key transmits a code that the receiver no longer recognizes as valid.
+*   **System Response:**
+    *   **State:** Invalid. Pins do not reach the "shear line"; levers block the bolt.
+    *   **Result:** Rejected. The rotation/actuation mechanism remains physically or electronically blocked.
+
+#### **Operation: Torque Application (Rotation of Plug/Cylinder)**
+*   **Failure Modes (State Violations):**
+    *   **Mechanical Interference:** Applying torque before pins are aligned (binding).
+    *   **Structural Failure:** Excessive torque applied to a weak bow or blade, leading to a "Shear" failure of the key itself.
+    *   **Binding Bed:** The bolt is under physical pressure (e.g., a warped door), preventing the cylinder from moving even with a correct key.
+*   **System Response:**
+    *   **State:** Error State.
+    *   **Result:** Permanent transition to "Broken Key" or "Jammed Lock," requiring destructive entry or professional repair.
+
+#### **Operation: Locking (Engaging the Fastening Device)**
+*   **Failure Modes (Invalid States):**
+    *   **Aperture Realignment Failure:** The bolt cannot extend because the strike plate/hole is not aligned (door not fully closed).
+    *   **Time-Lock Constraint:** Attempting to lock or unlock outside of a pre-set permitted time window.
+*   **System Response:**
+    *   **State:** Ignored or Rejected.
+    *   **Result:** The system remains "Unsecured."
+
+#### **Operation: Duplication (Subtractive Cutting or Electronic Scanning)**
+*   **Failure Modes (Input Rejection):**
+    *   **Blank Mismatch:** The "Blank" key does not have the correct initial milling to fit the target lock.
+    *   **Precision Loss:** The "Original" key is worn; duplication copies the wear (Tolerance stack-up), resulting in a key that fails the Authentication operation.
+    *   **Data Corruption:** Electronic scan of key shape is low-resolution or corrupted.
+*   **System Response:**
+    *   **State:** Success/Failure (Undetermined until tested).
+    *   **Result:** Creation of a "Non-Functional Object" that is rejected by the target lock.
+
+---
+
+### 2. System Preservations
+Even when operations fail, the system must maintain these constraints:
+*   **Security Posture:** In the event of an authentication failure, the bolt must remain in its current state (usually "Locked").
+*   **Evidence of Tamper (Detector Locks):** Systems like the Chubb Detector Lock must preserve the "Interfered" state to notify the owner of a failed picking attempt.
+*   **Physical Integrity of the Boundary:** A failed lock operation should not compromise the door or container’s structural integrity (unless destructive force is used).
+
+---
+
+### 3. State Transitions and Constraints
+
+**Permanent Transitions (Irreversible):**
+*   **Triggering the "Detector":** In Chubb locks, a failed pick attempt moves internal components to a state that requires a specific reset (though modern versions allow a reset, historical ones created a permanent "triggered" state until serviced).
+*   **Physical Key Shear:** A key snapping in the lock is a permanent transition from a "Functional Tool" to "Debris."
+*   **Electronic Rolling Code Expiration:** Once a rolling code is used once, that specific code state is permanently transitioned to "Invalid."
+
+**Impossible Operations:**
+*   **Opening without Authentication:** (By design) The bolt cannot move past levers/pins without the correct height alignment.
+*   **Electronic Picking:** Electronic locks are explicitly stated to be "unpickable with conventional tools."
+*   **Extracting a Rotating Key:** Most cylinder locks prevent key extraction unless the plug is returned to the "Home" (neutral) position.
+
+---
+
+### 4. Edge Cases and Out-of-Scope
+
+**Edge Cases:**
+*   **The "Drunk Man’s" Lock:** Operation in low-visibility environments where the "Search" phase for the keyhole significantly increases the probability of "Surface Scratching" failure modes.
+*   **Environmental Fouling:** Outdoor locks (Tibet/India examples) subjected to dust/ice creating a state where the "Correct Key" is rejected due to internal volume displacement by debris.
+*   **Master Key Interoperability:** A state where a single lock must accept two different mechanical inputs (User Key vs. Master Key) through the "Master Pin" elevation.
+
+**Out of Scope (Deliberately Not Supported):**
+*   **Lock Picking:** The system is not designed to support opening without the key; this is defined as a bypass, not a system operation.
+*   **Structural Breaching:** The article focuses on the fastening device, not the strength of the door/wall it is attached to.
+*   **Key Design Longevity:** The article acknowledges that keys can be "dangerously sharp" if not deburred, implying the system does not inherently guarantee user safety during the "Duplication" operation.

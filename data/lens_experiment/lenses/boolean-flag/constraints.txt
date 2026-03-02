@@ -1,0 +1,28 @@
+A semaphore contains a natural number value that is an integer greater than or equal to zero.
+A semaphore tracks a list of tasks or threads waiting to access a specific resource.
+The system supports two primary atomic operations on a semaphore: wait (P) and release (V).
+A semaphore must be initialized with a specific number of available slots or permits.
+The wait (P) operation decreases the semaphore’s internal counter by one.
+The release (V) operation increases the semaphore’s internal counter by one.
+A task that calls the wait operation when the counter is zero must block and add itself to the waiting list.
+A blocked task remains suspended until the counter is no longer zero.
+When a release operation occurs and the counter was zero, one task from the waiting list is freed to proceed.
+The order in which blocked tasks are freed depends on the specific implementation, such as FIFO or priority-based queuing.
+A binary semaphore restricts its counter value logically between zero and one.
+A counting semaphore allows the counter to swing between zero and a designated upper limit (N).
+Multiple tasks can enter a critical section simultaneously if the semaphore is configured with multiple permits.
+The (N+1)th task attempting to enter a critical section is blocked if only N permits are available.
+Any thread or process can call the release operation on a semaphore regardless of which thread performed the wait operation.
+Semaphores can be used as a signaling mechanism where one task acts as a producer (signaling) and another as a consumer (waiting).
+A consumer task using a semaphore for signaling runs only when there is data or an event to be processed.
+Semaphores are used to limit the number of simultaneous callers to a resource, such as a database connection pool.
+Individual resources within a pool (like specific bathroom stalls) are not tracked by the semaphore itself.
+The system does not inherently prevent a process from ignoring the semaphore and accessing a resource without a permit.
+A semaphore used for resource protection in a Real-Time Operating System (RTOS) can lead to priority inversion.
+Unlike mutexes, semaphores do not track or enforce "ownership" of the lock by a specific thread.
+A binary semaphore acts as a mutex if it is configured to allow only one task at a time and is used for mutual exclusion.
+The system allows semaphores to be used for synchronization, ensuring one block of code executes only after another finishes.
+In a read/write lock implementation, a writer must consume all available permits to gain exclusive access.
+In a read/write lock implementation, multiple readers can each consume a single permit to gain shared access.
+The internal value of a semaphore cannot be decreased below zero.
+Atomic execution ensures that no other operation can occur simultaneously during a V or P transition.

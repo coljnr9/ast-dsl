@@ -1,0 +1,121 @@
+### Happy Paths (Normal Operations)
+
+**Scenario 1: Successful English Auction bid**
+Given an ongoing English auction for a "Rare Painting" with a current bid of $1,000
+When a bidder submits a higher bid of $1,100
+Then the system should accept the bid and update the current highest price to $1,100.
+
+**Scenario 2: Winning a No-Reserve auction**
+Given a No-Reserve auction with several active bidders
+When the auction ends and Bidder A has the highest bid of $500
+Then the item must be sold to Bidder A regardless of the final price.
+
+**Scenario 3: Successful Dutch Auction purchase**
+Given a Dutch auction starting at $5,000 for a lot of tulips
+When the auctioneer lowers the price to $4,000 and a bidder accepts
+Then the auction ends immediately with the bidder paying $4,000.
+
+**Scenario 4: First-Price Sealed-Bid winner determination**
+Given a First-Price Sealed-Bid auction where three bidders submitted $100, $150, and $200 respectively
+When the bids are opened after the deadline
+Then the bidder who submitted $200 wins and pays exactly $200.
+
+**Scenario 5: Vickrey Auction (Second-Price) payment**
+Given a Vickrey auction where the highest bid is $500 and the second-highest bid is $450
+When the auction concludes
+Then the highest bidder wins the item but pays the second-highest price of $450.
+
+---
+
+### Precondition Violations
+
+**Scenario 6: Rejecting a lower bid in an English Auction**
+Given an English auction where the current highest bid is $2,000
+When a bidder attempts to place a bid of $1,900
+Then the system should reject the bid for not exceeding the current price.
+
+**Scenario 7: Bid submitted after Candle Auction expiration**
+Given a Candle Auction is in progress
+When the candle flame expires and a bidder shouts a bid a second later
+Then the auctioneer must reject the bid as the auction is officially closed.
+
+**Scenario 8: Re-entry in a Japanese Auction**
+Given a Japanese Auction where a participant has already dropped out
+When the participant attempts to re-enter the bidding as the price increases
+Then the system must deny the entry according to the "no re-entry" rule.
+
+---
+
+### State Transitions
+
+**Scenario 9: Transition from Active to Sold (Reserve Met)**
+Given a Reserve Auction with a reserve price of $1,000
+When the bidding reaches $1,050 and the time expires
+Then the item state changes from "Active" to "Sold".
+
+**Scenario 10: Transition from Active to Unsold (Reserve Not Met)**
+Given a Reserve Auction with a hidden reserve of $5,000
+When the auction ends with a highest bid of $4,500
+Then the item state changes to "Unsold" and the seller retains the item.
+
+**Scenario 11: Japanese Auction price escalation**
+Given an active Japanese Auction with multiple participants
+When the price increments to the next level
+Then all participants must signal their intent to continue or be moved to the "Dropped Out" state.
+
+---
+
+### Edge Cases and Boundary Conditions
+
+**Scenario 12: Auction with only one bidder and one seller**
+Given a forum where only one buyer and one seller are present
+When the buyer makes an offer to the seller
+Then the system should classify this as a "trade" or "negotiation" rather than an "auction".
+
+**Scenario 13: Combinatorial Auction "All-or-Nothing" package**
+Given a combinatorial auction for Item A and Item B
+When a bidder places a package bid for both items
+Then the system must ensure the bidder receives both items if they win, or nothing if the package is outbid.
+
+**Scenario 14: Minimum bidding increment enforcement**
+Given an English auction with a current bid of $100 and a minimum increment of $10
+When a bidder attempts to bid $105
+Then the bid should be rejected for failing to meet the minimum increment.
+
+**Scenario 15: Empty bid pool in a No-Reserve Auction**
+Given a No-Reserve auction that reaches its time limit
+When no bids have been submitted
+Then the item state remains "Unsold" and the auction closes.
+
+---
+
+### Query Operations
+
+**Scenario 16: Checking Bidding History (Transparency)**
+Given an ongoing Reverse Auction
+When a supplier queries the current bidding status
+Then the system provides real-time visibility of competing offers to ensure information transparency.
+
+**Scenario 17: Verifying Highest Bid in English Auction**
+Given an English auction with multiple electronic bids
+When a potential bidder views the auction page
+Then the system must display the current highest bid to all participants.
+
+---
+
+### Error Handling
+
+**Scenario 18: Handling simultaneous identical bids in a Sealed-Bid auction**
+Given a First-Price Sealed-Bid auction
+When two bidders submit the exact same highest bid price
+Then the system should trigger a tie-breaking protocol (e.g., first-come-first-served or a re-bid).
+
+**Scenario 19: Handling seller withdrawal in an Absolute Auction**
+Given an auction advertised as "Absolute/No-Reserve"
+When the seller attempts to withdraw the item during the bidding process
+Then the system should notify the seller of potential legal/territorial restrictions on such an action.
+
+**Scenario 20: Recovery from interruption in a Candle Auction**
+Given a Candle Auction using a physical candle
+When the candle is accidentally extinguished by a draft rather than burning out
+Then the auctioneer must follow the protocol for a "void" event or restart the timing process.

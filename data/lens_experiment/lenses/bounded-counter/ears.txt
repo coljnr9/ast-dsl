@@ -1,0 +1,25 @@
+1. When RESET is TRUE, the CTUD shall set CV to 0.
+2. While RESET is TRUE, the CTUD shall maintain CV at 0.
+3. When LOAD is TRUE, the CTUD shall set CV to the value of PV.
+4. While LOAD is TRUE, the CTUD shall maintain CV at the value of PV.
+5. While RESET is TRUE, when LOAD is TRUE, the CTUD shall prioritize RESET and set CV to 0.
+6. When a rising edge occurs on CU, the CTUD shall increment CV by one.
+7. When a rising edge occurs on CD, the CTUD shall decrement CV by one.
+8. While RESET is TRUE, when a rising edge occurs on CU, the CTUD shall keep CV at 0.
+9. While LOAD is TRUE, when a rising edge occurs on CU, the CTUD shall keep CV at the value of PV.
+10. While CV is greater than or equal to PV, the CTUD shall set QU to TRUE.
+11. While CV is less than PV, the CTUD shall set QU to FALSE.
+12. While CV is equal to 0, the CTUD shall set QD to TRUE.
+13. While CV is not equal to 0, the CTUD shall set QD to FALSE.
+14. While CV is at the maximum limit of the WORD data type, when a rising edge occurs on CU, the CTUD shall maintain CV at the maximum limit.
+15. While CV is 0, when a rising edge occurs on CD, the CTUD shall maintain CV at 0.
+16. While no rising edge is detected on CU and CD, and RESET and LOAD are FALSE, the CTUD shall preserve the current value of CV.
+17. If a rising edge occurs on both CU and CD simultaneously, then the CTUD shall increment and then decrement CV, resulting in no net change.
+18. When PV changes, the CTUD shall update the state of QU based on the current CV.
+19. The CTUD shall use the WORD data type for the PV input.
+20. The CTUD shall use the WORD data type for the CV output.
+21. While RESET is FALSE and LOAD is FALSE, when a rising edge occurs on CU, the CTUD shall increment CV.
+22. While RESET is FALSE and LOAD is FALSE, when a rising edge occurs on CD, the CTUD shall decrement CV.
+23. The CTUD shall provide the current counter value via the CV output.
+24. The CTUD shall provide the upper limit status via the QU output.
+25. The CTUD shall provide the zero status via the QD output.

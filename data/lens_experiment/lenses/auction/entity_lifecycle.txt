@@ -1,0 +1,72 @@
+This analysis identifies the core architectural components of an auction system based on the provided text.
+
+### **ENTITIES**
+
+**1. Auction**
+*   **Data:** Type (English, Dutch, Sealed-bid, etc.), Context (Art, Spectrum, etc.), Start/End Time, Increment (optional), Reserve Price (optional), Status.
+*   **Lifecycle:** Created by a Seller or Auctioneer. Modified as Bids are received. Destroyed/Archived after settlement or if withdrawn.
+*   **States:** `Pending` (Announced via catalog) $\rightarrow$ `Active` (Bidding open) $\rightarrow$ `Completed` (Sold) OR `Passed` (Reserve not met) OR `Cancelled` (Withdrawn).
+
+**2. Item (Lot)**
+*   **Data:** Description, Provenance, Attributes (in Multi-attribute auctions), Quantity (in Multi-unit auctions).
+*   **Lifecycle:** Created when offered for sale. Modified if attributes change. Destroyed/Removed from system if sold or liquidated.
+*   **States:** `Available` $\rightarrow$ `Under Hammer` $\rightarrow$ `Sold` OR `Returned`.
+
+**3. Participant**
+*   **Data:** Identity, Role (Buyer or Seller), Satisfaction Vector (for Barter Double auctions), Budget/Credit.
+*   **Lifecycle:** Registered in the system. Modified via reputation or transaction history. 
+*   **States:** `Active`, `Sidelined` (in Japanese auctions after dropping out), `Winner`, `Loser`.
+
+**4. Bid**
+*   **Data:** Amount, Timestamp, Bidder ID, Conditions/Packages (in Combinatorial auctions).
+*   **Lifecycle:** **Immutable.** Created by a Buyer. Cannot be modified (only a new higher bid can be placed). Destroyed if the auction is cleared/purged.
+*   **States:** `Submitted` $\rightarrow$ `Leading` $\rightarrow$ `Outbid` OR `Winning`.
+
+---
+
+### **OPERATIONS**
+
+**1. Place Bid**
+*   **Involved:** Buyer, Auction, Bid.
+*   **Preconditions:** Auction is `Active`; Bid amount > Current Leading Bid + Increment (for English); Buyer has not "dropped out" (for Japanese).
+*   **Changes:** Current Leading Bid updates; Auction duration might extend (for Candle/Scottish types).
+*   **Stays Same:** Item attributes; Seller's reserve price.
+
+**2. Lower Asking Price**
+*   **Involved:** Auctioneer, Auction.
+*   **Preconditions:** Auction type is "Dutch"; No buyer has accepted the current price yet.
+*   **Changes:** Current asking price decreases.
+*   **Stays Same:** Item quantity; Number of participants.
+
+**3. Evaluate Combinatorial Bids**
+*   **Involved:** Auctioneer (Algorithm), Multiple Bids.
+*   **Preconditions:** Auction is "Sealed-bid" or "Clock" and bidding period has ended.
+*   **Changes:** Determines the combination of bids that maximizes total value.
+*   **Stays Same:** Individual bid amounts.
+
+**4. Close Auction**
+*   **Involved:** Auctioneer, Auction, Item.
+*   **Preconditions:** Signal received (Candle out, time elapsed, or only one bidder remains).
+*   **Changes:** State move to `Completed` or `Passed`. Ownership of Item transfers if `Sold`.
+*   **Stays Same:** History of all rejected bids.
+
+---
+
+### **RELATIONSHIPS**
+
+*   **Ownership:** A **Seller** owns the **Item** until the **Auction** reaches `Completed`.
+*   **Reference:** A **Bid** must reference exactly one **Participant** (Bidder) and one **Auction**.
+*   **Containment/Packaging:** In **Combinatorial Auctions**, a single **Bid** contains references to multiple **Items** (Packages).
+*   **Indexing:** **Catalogs** serve as a lookup relationship linking **Items** to upcoming **Auctions**.
+*   **Competitive:** **Participants** relate to each other as competitors within a single **Auction** instance.
+
+---
+
+### **INVARIANTS**
+
+1.  **Price Monotonicity (English):** In an English auction, the current bid must strictly increase over time.
+2.  **Price Monotonicity (Dutch):** In a Dutch auction, the asking price must strictly decrease over time until a bid is made.
+3.  **Single Winner Rule:** Unless defined as a Multi-unit/Slot auction, an auction can have at most one winning bidder per item.
+4.  **Reserve Constraint:** An item cannot be transitioned to `Sold` if the highest bid is less than the `Reserve Price` (unless it is a "No-Reserve" auction).
+5.  **Participant Minimum:** An auction must involve at least one seller and more than one buyer (otherwise it is a simple trade).
+6.  **Irreversibility (Japanese):** In a Japanese auction, once a participant drops out, they cannot re-enter the auction.

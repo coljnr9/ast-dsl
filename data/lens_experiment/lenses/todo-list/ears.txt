@@ -1,0 +1,40 @@
+Based on the documentation provided for the TodoMVC system, here are the behavioral requirements extracted using EARS notation:
+
+**Ubiquitous (Normal Operations)**
+1. The TodoMVC website shall organize framework implementations into JavaScript, Compile-to-JS, and Labs categories.
+2. The TodoMVC system shall provide metadata for each framework implementation via the learn.json file.
+3. Every framework implementation shall persist todo data using localStorage.
+4. Every framework implementation shall support routing for filtering todos.
+5. The Gulp build system shall lint JavaScript files using jshint.
+6. The test-runner.sh script shall report test results back to GitHub.
+
+**State-driven (State-dependent Behavior)**
+7. While the todo count is zero, the framework implementation shall hide the main section and the footer.
+8. While any todos are marked as completed, the framework implementation shall display the "Clear completed" button.
+9. While todos exist, the framework implementation shall display the number of active todos.
+10. While running on the master branch, the CI/CD pipeline shall deploy the build to GitHub Pages upon successful testing.
+
+**Event-driven (Triggers)**
+11. When a user creates a new todo, the framework implementation shall update the list and persist the data.
+12. When a user toggles the "Toggle all" checkbox, the framework implementation shall set all todos to the same complete/incomplete state.
+13. When a user selects a status filter, the framework implementation shall display only todos matching that status (all/active/completed).
+14. When the `gulp` command is executed, the system shall run the default build task.
+15. When a pull request is submitted, Travis CI shall execute the automated test suite.
+16. When the `server.js` is started, the system shall serve the TodoMVC website locally via Express.
+
+**Unwanted (Error/Rejection Cases)**
+17. If a framework implementation does not maintain compatibility with the app-spec.md, then the testing infrastructure shall fail the build.
+18. If a build task fails, then the CI/CD pipeline shall halt the deployment process.
+19. If the Selenium tests cannot locate an element via CSS selectors, then the page.js module shall return an error.
+
+**Complex (Preconditions + Triggers)**
+20. While in the development environment, when the `test-server` script is triggered, the system shall start the local development server for testing.
+21. While performing a build, when processing images, the system shall optimize the files using imagemin.
+22. While performing a build, when processing CSS, the system shall apply Autoprefixer to the styles.
+23. While performing a build, when processing HTML, the system shall execute useref and vulcanize.
+
+**Preservation & Scope (Boundaries)**
+24. The framework implementation shall maintain the standard HTML structure and CSS classes regardless of the internal framework patterns used.
+25. The TodoMVC system shall preserve identical user-facing functionality and UX across all different framework implementations.
+26. The testing infrastructure shall use the same test cases for both Selenium and Cypress runners to ensure consistency.
+27. The TodoMVC system shall not dictate framework-specific patterns, allowing implementations to follow their respective conventions.

@@ -1,0 +1,84 @@
+This domain analysis outlines the library circulation system based on the provided text, focusing on the movement of materials and the management of borrower interactions.
+
+### ENTITIES
+
+**1. Library Material (Item)**
+*   **Data:** Call number (Dewey or LC), condition status (damaged/intact), location (stacks/reserve), metadata (title/author).
+*   **Lifecycle:** Created when added to the inventory; Modified when checked out, returned, or marked for repair; Destroyed/Removed via "weeding" or replacement due to damage.
+*   **States:**
+    *   *Available:* On the stacks, ready for lending.
+    *   *On Loan:* Currently held by a patron; associated with a due date.
+    *   *Overdue:* Held by a patron past the return date.
+    *   *In Repair:* Withdrawn for maintenance due to damage.
+    *   *Returned/In-Transit:* At the desk or in the process of being re-shelved.
+
+**2. Borrower (Patron)**
+*   **Data:** Personally Identifiable Information (PII), origin/age/background (protected for privacy), current loans, financial records (unpaid fines).
+*   **Lifecycle:** Created upon registration; Modified during transactions; Typically persists unless records are purged.
+*   **States:**
+    *   *Good Standing:* No significant fines or overdue items.
+    *   *Blocked/Delinquent:* Has outstanding fines or overdues (implied by "charging fines" and "resolving issues").
+
+**3. Patron Transaction (Loan Record)**
+*   **Data:** Borrower ID, Material ID, Date Issued, Due Date.
+*   **Lifecycle:** Created at checkout; Updated during renewal; Terminated (archived) upon return/check-in.
+*   **States:** *Active*, *Renewed*, *Closed*.
+
+**4. Fine / Financial Report**
+*   **Data:** Amount, reason (overdue/damage), receipt status, patron reference.
+*   **Lifecycle:** Created when an item is overdue or damaged; Modified if partially paid; Destroyed/Closed upon full payment and receipting.
+
+---
+
+### OPERATIONS
+
+**1. Checkout (Lending)**
+*   **Entities:** Borrower, Library Material, Patron Transaction.
+*   **Preconditions:** Material must be *Available*; Borrower must be in *Good Standing*.
+*   **Changes:** Material state changes to *On Loan*; Transaction record is created; Due date is set.
+*   **Invariants:** The material must be identifiable by scanner or system.
+
+**2. Return (Check-in)**
+*   **Entities:** Library Material, Patron Transaction, Borrower.
+*   **Preconditions:** Material state is *On Loan* or *Overdue*.
+*   **Changes:** Transaction is closed; Material state changes to *Returned*; Monitoring for damage occurs.
+*   **Stays same:** Borrower PII remains confidential.
+
+**3. Renewal**
+*   **Entities:** Library Material, Patron Transaction.
+*   **Preconditions:** Material is *On Loan*; Item is not requested by another (implied by circulation norms).
+*   **Changes:** Due date is extended; Transaction status updated.
+
+**4. Fine Collection / Receipting**
+*   **Entities:** Borrower, Fine, Financial Report.
+*   **Preconditions:** Borrower has an outstanding debt record.
+*   **Changes:** Fine is marked as paid; Financial report is reconciled; Borrower standing updated.
+
+**5. Shelving (Maintenance)**
+*   **Entities:** Library Material.
+*   **Preconditions:** Material is in *Returned* state.
+*   **Changes:** Material state changes to *Available*; Physical location matches Call Number.
+
+---
+
+### RELATIONSHIPS
+
+*   **Ownership/Containment:**
+    *   The **Library** owns the **Materials** and the **Patron Data**.
+    *   **Circulation Desk** acts as the primary interface for all entities.
+*   **Reference:**
+    *   A **Transaction** references one **Borrower** and one **Material**.
+    *   A **Fine** references a specific **Borrower** and usually a specific **Transaction**.
+*   **Indexing:**
+    *   Materials are indexed by **Call Number** (Dewey or LC) for physical retrieval.
+    *   Borrowers are indexed by **Personally Identifiable Information** (protected by privacy laws).
+
+---
+
+### INVARIANTS
+
+*   **Privacy Guarantee:** Personally identifiable information and library use data must be protected and safeguarded (per ALA Library Bill of Rights VII).
+*   **Equitable Access:** A person’s right to use the library cannot be denied based on origin, age, background, or views (Bill of Rights V).
+*   **Material Integrity:** All returned materials must be monitored for damage before becoming available again.
+*   **Intellectual Freedom:** Materials cannot be proscribed or removed due to partisan or doctrinal disapproval.
+*   **Physical Constraint:** Staff must be able to handle physical materials up to 30 pounds to maintain the integrity of the stacks.

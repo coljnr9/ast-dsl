@@ -1,0 +1,55 @@
+This Failure Mode Analysis (FMA) evaluates the **CTU (Up-Counter) Function Block** based on the provided technical documentation.
+
+---
+
+### 1. Operation: Incrementing (CU Input)
+**Description:** The internal counter value (`CV`) is incremented by 1 on a rising edge of the `CU` signal.
+
+*   **Failure Modes & Boundary Violations:**
+    *   **Input Noise/Chatter:** If `CU` toggles rapidly due to signal noise, `CV` increments multiple times unexpectedly. *Result:* System should filter via hardware debouncing (outside FB scope) or accept every edge as valid.
+    *   **Arithmetic Overflow:** `CV` is of type `WORD` (0 to 65,535). If `CU` receives a rising edge when `CV = 65,535`. *Result:* In standard IEC 61131-3, `CV` typically wraps around to 0 or stalls at maximum. *Requirement:* Documentation implies it "increments," but safety-critical systems must treat max value as a boundary where further increments are ignored.
+    *   **Scan Cycle Frequency:** If the `CU` signal changes state faster than the Task Execution Time (Scan Cycle), the rising edge is missed. *Result:* Input is ignored.
+*   **System Must Preserve:** The integrity of the current `CV` during the logic transition. It must not increment by more than 1 per rising edge.
+
+### 2. Operation: Resetting (RESET Input)
+**Description:** When `RESET` is `TRUE`, the current value `CV` is set to 0.
+
+*   **Failure Modes & Boundary Violations:**
+    *   **Conflict with Increment (Dominance):** If `CU` has a rising edge and `RESET` is `TRUE` simultaneously. *Result:* In standard CTU logic, `RESET` is dominant. The increment should be rejected/overridden, and `CV` must remain 0.
+    *   **Stuck-at-High:** If the `RESET` signal is stuck at `TRUE` due to logic error or sensor failure. *Result:* All `CU` rising edges are ignored; `CV` remains 0; `Q` remains `FALSE` (unless `PV` is 0).
+*   **System Must Preserve:** Readiness to reset regardless of the current value of `CV`.
+
+### 3. Operation: Threshold Monitoring (Q Output)
+**Description:** `Q` becomes `TRUE` when `CV` >= `PV`.
+
+*   **Failure Modes & Boundary Violations:**
+    *   **Zero-Threshold Case:** `PV` is set to 0. *Result:* `Q` is `TRUE` immediately upon initialization or reset (0 >= 0). This may cause immediate downstream triggering.
+    *   **Value Jump:** `PV` is modified dynamically while the counter is running (e.g., changed from 10 to 5 while `CV` is 7). *Result:* `Q` must transition from `FALSE` to `TRUE` instantly upon the next evaluation.
+    *   **Large-Threshold Case:** `PV` is set higher than 65,535 (not possible via `WORD` type, but possible if using a larger type elsewhere). *Result:* `Q` can never be `TRUE`.
+*   **System Must Preserve:** The inequality logic (`CV >= PV`) rather than a simple equality check (`CV == PV`) to ensure that if `CV` exceeds `PV` by multiple increments, the signal remains active.
+
+---
+
+### States and Transitions
+
+#### Permanent Transitions (Irreversible)
+*   **There are no permanent transitions.** The CTU is a state machine that can always be returned to its initial state (`CV=0`, `Q=FALSE`) via the `RESET` input.
+
+#### Impossible Operations in Certain States
+*   **Incrementing while RESET is TRUE:** It is impossible to increase `CV` while the `RESET` pin is high.
+*   **Setting Q to FALSE when CV >= PV:** Unless `RESET` is triggered or `PV` is increased, the state of `Q` cannot be manually overridden to `FALSE` within the FB.
+
+#### Edge Case Combinations
+1.  **PV = 0:** Results in `Q` being permanently `TRUE` unless `CV` is somehow forced into an invalid negative state (not possible with `WORD`).
+2.  **PV = 65,535:** The counter can only trigger `Q` at the absolute limit of the variable type.
+3.  **Simultaneous CU and RESET:** If both occur in the same execution cycle, the `RESET` logic takes precedence, preventing the increment.
+4.  **Dynamic PV Change:** Redefining `PV` to be less than the current `CV` causes an immediate state change in `Q` without a `CU` pulse.
+
+---
+
+### Out of Scope (Deliberately Not Supported)
+*   **Decrementing:** This block is a `CTU` (Count Up). Decrementing logic is reserved for `CTD` or `CTUD` blocks.
+*   **Persistence/Retentivity:** The documentation does not specify if `CV` is stored in non-volatile memory. By default, `CV` is lost on power cycle unless the FB instance is declared as `RETAIN`.
+*   **Negative Values:** Since the inputs/outputs use `WORD` and `BOOL`, signed integers are not supported.
+*   **Time-based Counting:** This is a pulse counter, not a timer; it cannot increment based on duration without external pulse generation.
+*   **Preset Start Value:** The system does not support starting at a value other than 0 upon reset (No `LOAD` functionality).

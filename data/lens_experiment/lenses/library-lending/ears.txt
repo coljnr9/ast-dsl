@@ -1,0 +1,32 @@
+**Library Circulation System Requirements**
+
+1.  **Ubiquitous:** The Library Circulation System shall facilitate the lending of library materials to users.
+2.  **Ubiquitous:** The Library Circulation System shall provide facilities for the return of loaned items.
+3.  **Ubiquitous:** The Library Circulation System shall safeguard all library use data, including personally identifiable information.
+4.  **Ubiquitous:** The Library Circulation System shall maintain an automated filing and recovery system for library materials.
+5.  **Ubiquitous:** The Library Circulation System shall collect statistics on patron transactions and material checkouts.
+6.  **Event-driven:** When a user requests a loan, the Library Circulation System shall record the checkout activity on a date due slip.
+7.  **Event-driven:** When a user requests a renewal, the Library Circulation System shall extend the loan period for the specified materials.
+8.  **Event-driven:** When a user returns a book, the Library Circulation System shall check in the materials.
+9.  **Event-driven:** When a payment is submitted, the Library Circulation System shall process the receipting of overdue fines.
+10. **State-driven:** While a library item is returned, the Library Circulation System shall monitor the material for damage.
+11. **State-driven:** While materials are flagged as damaged, the Library Circulation System shall route them to the appropriate staff for repair or replacement.
+12. **State-driven:** While an item is identified as past its return date, the Library Circulation System shall send an overdue notice to the borrower.
+13. **Unwanted:** If a user’s origin, age, or views are identified, then the Library Circulation System shall not deny or abridge the person's right to use the library.
+14. **Unwanted:** If partisan or doctrinal disapproval is expressed, then the Library Circulation System shall not remove or proscribe materials.
+15. **Unwanted:** If a third party requests library use data, then the Library Circulation System shall protect the confidentiality of the individual's records unless legally obligated.
+16. **Complex:** While maintaining the stacks, when a call number is identified, the Library Circulation System shall facilitate the re-shelving of materials by the Dewey Decimal or Library of Congress system.
+17. **Complex:** While operating in an academic environment, when a new student employee is hired, the Library Circulation System shall provide training modules for the circulation supervisor.
+18. **Complex:** While managing meeting rooms or exhibit spaces, when a request is received, the Library Circulation System shall make facilities available on an equitable basis regardless of user beliefs.
+19. **Ubiquitous:** The Library Circulation System shall provide basic search and reference services to patrons.
+20. **Event-driven:** When a query exceeds basic reference capabilities, the Library Circulation System shall provide a referral to a reference librarian.
+21. **Ubiquitous:** The Library Circulation System shall generate financial reports for reconciliation.
+22. **State-driven:** While the system is in operation, the Library Circulation System shall allow staff to communicate via telephone and email.
+23. **Event-driven:** When inappropriate patron conduct (such as noise or open drinks) is detected, the Library Circulation System shall prompt for resolution/enforcement.
+24. **Ubiquitous:** The Library Circulation System shall integrate with scanners and printers for circulation processing.
+25. **Event-driven:** When the Browne Issue System is utilized, the Library Circulation System shall facilitate the creation of borrowers' pockets.
+26. **Ubiquitous:** The Library Circulation System shall allow for the adaptation to and integration of new circulation software and equipment.
+27. **State-driven:** While providing resources, the Library Circulation System shall include materials regardless of the origin or background of the contributors.
+28. **State-driven:** While fulfilling its responsibility for enlightenment, the Library Circulation System shall challenge the censorship of information.
+29. **Ubiquitous:** The Library Circulation System shall exclude the management of in-depth research questions as a primary function, referring them to the Reference Desk.
+30. **Ubiquitous:** The Library Circulation System shall maintain the status of library materials (available, on loan, or in repair) without alteration unless a specific transaction occurs.

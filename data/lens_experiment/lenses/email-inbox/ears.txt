@@ -1,0 +1,30 @@
+1. **Ubiquitous:** The Email System shall transmit and receive digital messages between electronic devices over a computer network.
+2. **Ubiquitous:** The Email System shall support a store-and-forward model where messages are accepted, forwarded, delivered, and stored.
+3. **Ubiquitous:** The Email System shall separate an Internet email into an envelope and content.
+4. **Ubiquitous:** The Email System shall structure email content into a header and a body separated by a blank line.
+5. **Ubiquitous:** The Email System shall restrict header field names to 7-bit ASCII characters.
+6. **State-driven:** While the system is operating under RFC 5322 without SMTPUTF8 extensions, the Email System shall restrict header field bodies to 7-bit ASCII characters.
+7. **State-driven:** While a message is being formatted for delivery, the MUA shall automatically include a "Date" field representing the local time and date.
+8. **State-driven:** While displaying an inbox, the MUA shall visibly distinguish "read" messages from "unread" messages.
+9. **State-driven:** While using the POP3 protocol, the Email System shall allow the user to read downloaded messages without an active internet connection.
+10. **State-driven:** While using a webmail interface, the Email System shall require an active internet connection to read messages.
+11. **Event-driven:** When a user activates a "mailto" URI, the MUA shall open a new message window with the "To" field populated by the address defined in the URL.
+12. **Event-driven:** When an MTA accepts a message, the MTA shall insert a "Received" trace record at the top of the header.
+13. **Event-driven:** When a delivery SMTP server performs final delivery, the system shall insert a "Return-Path" field at the top of the header.
+14. **Event-driven:** When a user opens an unread email, the MUA shall mark the message as "read".
+15. **Event-driven:** When a message is identified as containing non-ASCII data or multimedia, the Email System shall use MIME extensions to encode the content.
+16. **Event-driven:** When a message is addressed to multiple recipients, the MUA shall allow the use of "Cc" and "Bcc" fields for secondary recipients.
+17. **Event-driven:** When a server verifies authentication, the system shall save the results in the "Authentication-Results" header field.
+18. **Unwanted:** If a message cannot be delivered, then the MTA shall send a bounce message back to the sender indicating the problem.
+19. **Unwanted:** If a mail server is overloaded or down for maintenance, then the Email System shall queue the incoming mail for retry.
+20. **Unwanted:** If a permanent delivery failure occurs, then the Email System shall notify the sender after a maximum of five days of retries.
+21. **Unwanted:** If an email is classified as spam by a filter, then the MUA shall either sort the message into a separate folder or drop it entirely.
+22. **Unwanted:** If a header field length exceeds 998 characters, then the Email System shall identify it as a violation of the recommended limit.
+23. **Complex:** While a mailbox is managed via IMAP, when a user accesses the account, the MUA shall download only the message headers until a specific message is requested.
+24. **Complex:** While using a high-bandwidth network, when a message contains a "Precedence" field, the MTA may ignore delivery prioritization.
+25. **Complex:** While operating in a corporate environment, when a user sends an internal message, the Email System shall process the entire transaction within the local corporate server.
+26. **Complex:** While a message is being processed by a spam filter, when the "Precedence" field is set to "bulk" or "junk", the system shall suppress automated "vacation" responses.
+27. **Ubiquitous:** The Email System shall permit the "To" field to remain unrelated to the actual delivery addresses supplied to the SMTP transport protocol.
+28. **Ubiquitous:** The Email System shall preserve the message body as unstructured text or HTML as selected by the user.
+29. **Ubiquitous:** The Email System shall not require the sender and the recipient to be online simultaneously to transmit messages.
+30. **Ubiquitous:** The Email System shall allow the MUA to hide "read" emails from the inbox at the user's discretion.

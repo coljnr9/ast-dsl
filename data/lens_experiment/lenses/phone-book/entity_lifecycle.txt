@@ -1,0 +1,74 @@
+This domain analysis describes the system of a **Telephone Directory**, as derived from the provided text.
+
+### ENTITIES
+
+#### 1. Subscriber
+*   **Data**: Name (primary identifier), Postal/Street Address, Telephone Number, Classification (for businesses), Subscription Type (Personal, Business, Government).
+*   **Creation/Destruction**: Created when a person/business acquires a phone service; removed if they disconnect or requested to be "unlisted."
+*   **States**: 
+    *   **Listed**: Visible in directories.
+    *   **Unlisted/Private/Ex-directory**: Details exist in the telco system but are suppressed from the directory (often for a fee).
+*   **Transitions**: Listed $\leftrightarrow$ Unlisted (triggered by subscriber request).
+
+#### 2. Telephone Directory (The Book/System)
+*   **Data**: Geographical coverage area, Publisher identity, Medium (Print, CD-ROM, Online), Type (White, Yellow, Grey, Blue/Green pages).
+*   **Creation/Destruction**: Published at specific intervals (historically annual) or updated in real-time (online). Physical copies are eventually recycled/destroyed.
+*   **States**: 
+    *   **Draft/Current**: Being compiled or currently distributed.
+    *   **Obsolete/Outdated**: Replaced by a newer version; may be recycled or discarded.
+
+#### 3. Directory Listing (The Entry)
+*   **Data**: Subscriber Name, Subscriber Address, Telephone Number.
+*   **Creation/Destruction**: Generated during the compilation of a Directory.
+*   **States**: 
+    *   **Standard**: Basic name/number.
+    *   **Paid/Advertisement**: Enhanced listing (common in Yellow Pages).
+
+---
+
+### OPERATIONS
+
+#### 1. Lookup (Forward)
+*   **Entities**: Subscriber, Directory.
+*   **Preconditions**: Directory must be for the correct geographical area; Subscriber must be "Listed."
+*   **Changes**: None (Read-only).
+*   **Invariants**: The result must match the Subscriber's Name and Address.
+
+#### 2. Reverse Lookup (Grey Pages)
+*   **Entities**: Subscriber, Directory (specifically Grey Pages or electronic versions).
+*   **Preconditions**: Input is a Telephone Number; Directory must support reverse indexing.
+*   **Changes**: None (Read-only).
+
+#### 3. Opt-Out (Unlisting)
+*   **Entities**: Subscriber.
+*   **Preconditions**: Subscriber must be active; usually requires a fee payment.
+*   **Changes**: Subscriber state moves to "Unlisted."
+*   **Effect**: Relevant Listing is excluded from the next publication cycle.
+
+#### 4. Publication
+*   **Entities**: Directory, Listings.
+*   **Preconditions**: Data collection and alphabetization are complete.
+*   **Changes**: A new "current" Directory is instantiated.
+*   **Stays same**: The actual Subscriber phone numbers remain unchanged.
+
+---
+
+### RELATIONSHIPS
+
+*   **Referecing**: A **Listing** references a **Subscriber**.
+*   **Containment**: A **Directory** contains many **Listings**.
+*   **Ownership**: A **Publisher** or **Organization** owns/produces the **Directory**.
+*   **Indexing**:
+    *   **White Pages**: Alphabetical index by **Name**.
+    *   **Yellow Pages**: Categorical index by **Business Classification**.
+    *   **Grey Pages**: Numerical index by **Phone Number**.
+
+---
+
+### INVARIANTS
+
+1.  **Alphabetical Ordering**: In the White Pages, listings must be sorted alphabetically by name to ensure searchability.
+2.  **Unlisted Privacy**: If a subscriber is state "Unlisted," no listing corresponding to their identity may appear in a public directory.
+3.  **Geographical Bound**: A listing in a specific directory must correspond to a subscriber within that directory's defined geographical or organizational coverage area.
+4.  **Data Accuracy**: A listing must represent a valid, active telephone service at the time of publication (though the text notes this degrades over time).
+5.  **Exclusion**: (In the US) Mobile phone numbers and VoIP listings are generally excluded from standard directories by rule.

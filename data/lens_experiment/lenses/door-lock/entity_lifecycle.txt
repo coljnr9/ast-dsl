@@ -1,0 +1,79 @@
+This domain analysis identifies the core components of a lock-and-key security system based on the provided text.
+
+### ENTITIES
+
+**1. Lock**
+*   **Data:** Type (Pin tumbler, Lever, Electronic, etc.), Security Level, Keyway profile (shape), Internal Mechanism Configuration (pin lengths, lever slots, or electronic signature).
+*   **Creation/Destruction:** Manufactured via precision engineering; destroyed or replaced when "like-for-like" replacement is performed by a locksmith.
+*   **States:** 
+    *   *Locked:* Bolt/shackle is engaged; mechanism prevents rotation/movement.
+    *   *Unlocked:* Internal components are aligned; bolt/shackle can move.
+    *   *Interfered/Triggered:* (Specific to Chubb detector locks) A state indicating an unauthorized opening attempt.
+*   **Transitions:** Locked ↔ Unlocked (via Operation); Unlocked → Locked (via Operation).
+
+**2. Key**
+*   **Data:** Type (Physical, Keycard, RFID, Smart, Skeletal), Profile/Bitting (teeth, notches, or digital code), Material (Brass, Steel, etc.), Bow (handle), Blade/Bit.
+*   **Creation/Destruction:** Created via "Key Cutting" (subtractive process) or digital programming. Destroyed through physical wear or decommissioning.
+*   **States:**
+    *   *Blank:* Uncut; carries a profile but no bitting/code.
+    *   *Patterned:* Coded with specific bittings/signals to match a lock.
+    *   *Duplicate:* A copy of an original.
+
+**3. Keyway (Aperture)**
+*   **Data:** Shape/Profile, Dimensions.
+*   **Lifecycle:** Part of the lock's physical structure; defines which Key Blanks can be inserted.
+
+**4. Locksmith**
+*   **Data:** Certification level (Apprentice, Master, etc.), Specialization (Automotive, Safes).
+*   **Lifecycle:** Professional journey from training/apprenticeship to active practice.
+
+---
+
+### OPERATIONS
+
+**1. Unlock**
+*   **Entities:** Lock, Key (or Security Token/Code).
+*   **Preconditions:** Key must be "Correct" (bittings/notches must align with lock’s internal tumblers/wards; electronic signature must match). 
+*   **Changes:** Lock state changes from Locked to Unlocked.
+*   **Stays same:** Lock configuration and Key bitting remain unchanged.
+
+**2. Lock Picking**
+*   **Entities:** Lock, Picking Tools (not the Key).
+*   **Preconditions:** Lock is in Locked state.
+*   **Changes:** Lock state changes to Unlocked without the correct Key.
+*   **Stays same:** The lock's internal configuration (unless damaged).
+
+**3. Key Duplication (Traditional)**
+*   **Entities:** Original Key, Key Blank, Key Cutting Machine.
+*   **Preconditions:** Key Blank must match the profile/keyway of the Original.
+*   **Changes:** Key Blank becomes a "Patterned" Key (Duplicate).
+*   **Stays same:** The Original Key remains unchanged.
+
+**4. Key Duplication (Modern/Digital)**
+*   **Entities:** Original Key, Scanner, Software, Cutting Machine.
+*   **Preconditions:** Digital access to the stored key image/data.
+*   **Changes:** A new key is produced from a stored electronic record.
+
+**5. Mastering (Master Keying)**
+*   **Entities:** Lock, Master Key, Change Key.
+*   **Preconditions:** Insertion of a "Master Pin" in the lock cylinder.
+*   **Changes:** The lock is configured to transition states via two different keys (Master and Change).
+
+---
+
+### RELATIONSHIPS
+
+*   **Ownership:** A Lock and Key system "belongs" to an individual or institution; Locksmiths "manage" key control systems for owners.
+*   **Reference/Matching:** A Key references a Lock via its bitting pattern. A Keyway references a specific Key Blank profile.
+*   **Containment:** The Keyway is a physical part of the Lock. Pins/Levers/Wards are contained within the Lock.
+*   **Indexing:** In modern systems, electronic copies of key shapes are stored (indexed) in software for future retrieval.
+
+---
+
+### INVARIANTS
+
+*   **Authentication Guarantee:** A standard lock must only transition to "Unlocked" if the provided Key bitting matches the internal configuration (the "Correct" Key).
+*   **Mechanical Integrity (Shear Line):** In a pin-tumbler lock, the plug can only rotate if and only if all pins are aligned at the shear line simultaneously.
+*   **Exclusivity (High Security):** In a non-mastered system, one unique key pattern corresponds to one unique lock configuration.
+*   **Subtractive Logic:** Traditional key cutting can only remove material from a blank; it cannot add material back.
+*   **Detector Integrity:** For Chubb-style locks, any unauthorized lifting of levers beyond a specific height must trigger a state change that prevents further operation until reset.

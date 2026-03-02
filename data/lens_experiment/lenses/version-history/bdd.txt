@@ -1,0 +1,114 @@
+### Happy Paths (Normal Operations)
+
+**Scenario 1: Initializing a new repository**
+*   **Given** a project directory with source files not under version control
+*   **When** the user initializes a new repository
+*   **Then** a new version history is started and a root revision is created
+
+**Scenario 2: Creating a working copy (Checkout)**
+*   **Given** a centralized repository containing version 10 of a project
+*   **When** a developer performs a checkout of the project
+*   **Then** a local working copy is created on the developer's machine matching version 10
+
+**Scenario 3: Committing changes to the repository**
+*   **Given** a developer has modified files in their working copy
+*   **When** the developer executes a commit with a descriptive message
+*   **Then** a new revision is created in the repository with a unique version number, timestamp, and author ID
+
+**Scenario 4: Branching for new feature development**
+*   **Given** the project is currently at the "trunk" revision
+*   **When** a developer creates a new branch named "feature-x"
+*   **Then** a new line of development is started independent of the trunk
+
+**Scenario 5: Tagging a release milestone**
+*   **Given** the current state of the code is stable and ready for production
+*   **When** the administrator applies a "v1.0-release" tag to the current HEAD
+*   **Then** a permanent snapshot is recorded that can be retrieved by that label in the future
+
+---
+
+### Precondition Violations (Invalid State)
+
+**Scenario 6: Checking in a file without a working copy**
+*   **Given** a file exists on the local file system but is not part of a checked-out working copy
+*   **When** the user attempts to commit the file
+*   **Then** the operation is rejected with an error indicating the file is not under version control
+
+**Scenario 7: Accessing a locked file in a centralized system**
+*   **Given** a centralized system using the "File Locking" model
+*   **And** Developer A has already checked out "config.xml" with an exclusive lock
+*   **When** Developer B attempts to check out "config.xml" for editing
+*   **Then** the system denies write access to Developer B until Developer A checks the file back in
+
+---
+
+### State Transitions
+
+**Scenario 8: Reverting to a previous version**
+*   **Given** the current working copy is at version 5
+*   **When** the developer selects the "revert" action to version 3
+*   **Then** the local files are overwritten with the data from version 3
+*   **And** the system state transitions to reflect the older revision
+
+**Scenario 9: Moving from Working Copy to Repository (Commit)**
+*   **Given** changes exist only in the developer's volatile memory or local disk
+*   **When** the commit operation completes successfully
+*   **Then** the changes transition from "uncommitted" to "permanent record" in the repository
+
+---
+
+### Edge Cases (Boundary/Empty/Full)
+
+**Scenario 10: Committing an empty change set**
+*   **Given** a working copy that is identical to the latest repository HEAD
+*   **When** the user attempts to perform a commit
+*   **Then** the system should notify the user that there are no changes to save and create no new revision
+
+**Scenario 11: Merging two branches with no overlapping changes**
+*   **Given** "Branch A" modified File1 and "Branch B" modified File2
+*   **When** the user merges "Branch B" into "Branch A"
+*   **Then** the system performs an automatic merge without requiring manual intervention
+
+**Scenario 12: Handling very large binary files in game development**
+*   **Given** a repository configured for game development
+*   **When** a developer commits a 2GB 3D model file
+*   **Then** the system utilizes specialized storage logic to track the binary version without corrupting the file structure
+
+---
+
+### Query Operations (Checking State)
+
+**Scenario 13: Viewing file history**
+*   **Given** a file has been modified 5 times over the last month
+*   **When** the user requests the "log" or "history" of the file
+*   **Then** the system displays a list of 5 revisions including timestamps, authors, and commit messages
+
+**Scenario 14: Identifying authorship (Blame/Annotate)**
+*   **Given** a bug is found on line 42 of "engine.cpp"
+*   **When** the developer runs a "blame" command on that file
+*   **Then** the system displays the specific revision and user who last modified line 42
+
+**Scenario 15: Comparing differences (Diff)**
+*   **Given** version 1 and version 2 of a source file
+*   **When** the user requests a "diff" between these two versions
+*   **Then** the system highlights the exact lines of code that were added, deleted, or modified
+
+---
+
+### Error Handling
+
+**Scenario 16: Handling a merge conflict**
+*   **Given** Developer A and Developer B both modified line 10 of "index.html"
+*   **And** Developer A has already committed their changes
+*   **When** Developer B attempts to commit their changes
+*   **Then** the system rejects the commit and flags a "merge conflict" for manual resolution
+
+**Scenario 17: Interrupted commit (Atomic Operation)**
+*   **Given** an atomic commit process is updating 5 different files
+*   **When** the network connection fails after only 2 files are uploaded
+*   **Then** the system rolls back all partial changes to ensure the repository remains in a consistent state
+
+**Scenario 18: Attempting to pull from a non-existent remote repository**
+*   **Given** a distributed version control system
+*   **When** a user attempts to "pull" updates from an invalid URL
+*   **Then** the system returns a "Repository Not Found" error and leaves the local repository unchanged

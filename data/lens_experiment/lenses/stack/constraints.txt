@@ -1,0 +1,30 @@
+1. ChainMap searches underlying mappings successively from first to last until a requested key is found.
+2. ChainMap performs all writes, updates, and deletions exclusively on the first mapping in the chain.
+3. ChainMap incorporates underlying mappings by reference, ensuring updates to original mappings are reflected in the view.
+4. A new ChainMap initialized without arguments contains a single empty dictionary by default.
+5. The `maps` attribute of a ChainMap is a public, user-updateable list that serves as the system's only stored state.
+6. The `new_child()` method returns a new ChainMap where the first mapping is either a provided map or a new empty dictionary, followed by all maps from the original instance.
+7. The `parents` property returns a new ChainMap instance containing all mappings except for the first one.
+8. ChainMap determines iteration order by scanning the underlying mappings from the last mapping to the first.
+9. Counter objects return a zero count for missing items instead of raising a KeyError.
+10. Setting a Counter value to zero preserves the element in the mapping; the `del` statement must be used for actual removal.
+11. The `Counter.elements()` method ignores all elements with counts less than one.
+12. Counter math operations (addition, subtraction, intersection, union) exclude results with counts of zero or less from the output.
+13. Counter equality tests treat missing elements as having zero counts.
+14. The `Counter.fromkeys()` class method is explicitly not implemented and cannot be used.
+15. Counter math operations preserve the order of elements based on their first encounter in the left operand, then the right.
+16. Bounded deques discard items from the opposite end when new items are added to a full container.
+17. The `deque.appendleft()` and `deque.extendleft()` operations add data to the left side of the container.
+18. Extending a deque from the left results in the input iterable's elements appearing in reverse order within the deque.
+19. Deque indexed access is O(1) at both endpoints but degrades to O(n) for elements in the middle of the container.
+20. The `deque.insert(i, x)` method raises an IndexError if the operation would cause a bounded deque to exceed its `maxlen`.
+21. The `defaultdict.__getitem__()` method automatically calls `default_factory` to create and insert a missing key's value if the factory is not None.
+22. The `defaultdict.get()` method returns None for missing keys and does not trigger the `default_factory`.
+23. `namedtuple` field names cannot start with an underscore or a digit and cannot be Python keywords.
+24. If the `rename` parameter is set to True, `namedtuple` replaces invalid field names with positional names like `_1`.
+25. The `namedtuple._replace()` method returns a new instance rather than modifying the original object.
+26. OrderedDict equality tests are order-sensitive, requiring matching key-value pairs to appear in the same sequence.
+27. The `OrderedDict.popitem()` method accepts an optional `last` argument to toggle between LIFO and FIFO behavior.
+28. The `OrderedDict.move_to_end()` method moves an existing key to either the right or left endpoint of the dictionary.
+29. UserList subclasses must provide a constructor that accepts either zero arguments or a single sequence argument to support internal list operations.
+30. UserDict, UserList, and UserString store their underlying data in a public `data` attribute for easy access and modification.

@@ -1,0 +1,29 @@
+A version control system manages, organizes, and tracks different versions of computer files and their history over time.
+Only revisions that have been finalized through a check-in or commit operation are reflected in the repository.
+Every revision must be associated with a timestamp and the identity of the person making the change.
+A user must create a local working copy of files via a checkout or clone operation before modifying them.
+Users can view old versions of files and revert a file to any previous state in its history.
+A version control system can identify versions using a unique version number, revision level, or letter.
+Modified data in a working copy remains local and does not affect the repository until a commit occurs.
+An atomic commit ensures that a group of changes are either all made final or none are made if the operation is interrupted.
+In a file-locking model, only one developer at a time is granted write access to a specific file in the repository.
+Locked files may be read by other users, but they cannot be changed until the lock is released or checked in.
+In a version merging model, multiple developers are allowed to edit the same file simultaneously.
+The first developer to check in changes to a central repository always succeeds without needing to merge.
+Subsequent developers must merge their changes with existing repository versions if they overlap with previous commits.
+Automatic or semi-automatic merging is restricted to simple data structures such as text files unless a specific plugin is used.
+Merging results in a revision that is based on more than one previous parent revision.
+A project history forms a rooted directed acyclic graph where parents always exist earlier in time than their children.
+The trunk or mainline represents the unique, primary path of revisions from the start to the current HEAD.
+A branch allows a set of files to develop independently and at a different speed from the main line of development.
+In centralized systems, all revision control functions must take place on a single shared server.
+In distributed systems, every working copy functions as a bona-fide repository containing the full change history.
+Synchronization in distributed systems occurs by exchanging patches or change-sets between peers.
+Distributed systems do not require a central server for common operations like commits, history viewing, or reverting.
+A baseline, label, or tag identifies a specific snapshot of the project for milestones or releases.
+A "blame" operation identifies the specific author and revision that last modified a particular line of code.
+The system tracks changes either as modifications to individual files or as changes to the data set as a whole.
+Integrity of the repository is preserved during a merge by requiring the user to resolve logic errors or overlapping conflicts.
+Version control systems do not inherently manage "Change Control," which is a distinct process from revision management.
+Users can create a new repository by cloning all revisions from an existing repository.
+A revision can largely or completely replace an earlier revision by deleting old text and inserting new text.

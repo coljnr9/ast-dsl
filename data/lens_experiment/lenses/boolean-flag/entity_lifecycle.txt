@@ -1,0 +1,69 @@
+Based on the article provided, here is the domain analysis for the **Semaphore System**.
+
+### **ENTITIES**
+
+#### **1. Semaphore**
+*   **Data Carried:** 
+    *   `Counter`: A non-negative integer (natural number) representing available permits/slots.
+    *   `Max Capacity`: The upper limit defined at creation.
+    *   `Wait List`: A collection/queue of tasks/threads currently blocked and waiting for a permit.
+*   **Lifecycle:**
+    *   **Created:** Initialized with a specific count (e.g., `new Semaphore(3, 3)`).
+    *   **Modified:** The counter increments or decrements via operations; the wait list grows or shrinks.
+    *   **Destroyed:** Typically handled by the system's garbage collector or process termination.
+*   **States & Transitions:**
+    *   **Available (Count > 0):** Tasks can acquire permits without blocking.
+    *   **Full/Empty (Count = 0):** Further acquire attempts will cause the calling task to transition to a blocked state.
+
+#### **2. Task (Thread/Process)**
+*   **Data Carried:** ID/Name, Priority (relevant for priority inversion), and its current execution context.
+*   **Lifecycle:** Created by the program; exists until its code execution is complete.
+*   **States & Transitions:**
+    *   **Running:** Actively executing code.
+    *   **Waiting (Pending):** Blocked by a semaphore; holds a position in the semaphore's Wait List.
+    *   **Signaling:** The state of a task when it is performing a `Release` or `V` operation to wake others.
+
+#### **3. Protected Resource**
+*   **Data Carried:** The actual logic or data being limited (e.g., Database connection pool, "The Nightclub," "The Bathroom").
+*   **Lifecycle:** Independent of the semaphore, though access to it is governed by the semaphore.
+
+---
+
+### **OPERATIONS**
+
+#### **1. Wait (P / Acquire / WaitOne)**
+*   **Entities:** Task, Semaphore.
+*   **Preconditions:** The Task must be running.
+*   **Changes:** 
+    *   If `Counter > 0`: Decrements `Counter` by 1. Task continues.
+    *   If `Counter = 0`: Task is added to the `Wait List` and its execution is suspended (Blocked).
+*   **Stays the Same:** The `Max Capacity` of the semaphore.
+
+#### **2. Signal (V / Release / Post)**
+*   **Entities:** Task, Semaphore.
+*   **Preconditions:** None (In most semaphores, any task can signal, unlike a Mutex).
+*   **Changes:**
+    *   If the `Wait List` is not empty: A Task is removed from the list and resumed.
+    *   If the `Wait List` is empty: Increments `Counter` by 1.
+*   **Stays the Same:** The identity of the tasks still in the wait list.
+
+---
+
+### **RELATIONSHIPS**
+
+*   **Reference:** A **Task** holds a reference to a **Semaphore** to call its methods (passed by reference).
+*   **Containment:** A **Semaphore** contains a **Wait List** of **Tasks**.
+*   **Association:** A **Semaphore** is logically associated with a **Resource**, acting as a "gatekeeper" or "bouncer."
+*   **Ownership:** Unlike Mutexes, Semaphores generally **do not** have ownership; the task that signals does not have to be the task that waited.
+
+---
+
+### **INVARIANTS**
+
+*   **Non-Negativity:** The semaphore `Counter` must always be a natural number ( $\ge 0$ ).
+*   **Atomicity:** The `Wait` and `Signal` operations must be atomic; no two tasks can modify the `Counter` at the exact same micro-moment.
+*   **Boundary:** The `Counter` cannot exceed the `Max Capacity` (in most implementations).
+*   **Progress:** If the `Counter > 0` and there are tasks in the `Wait List`, a task must be released (preservation of liveness).
+*   **Signaling vs. Exclusion:** 
+    *   **Mutex:** Task 1 must Release what Task 1 Acquired.
+    *   **Semaphore:** Task 1 can Signal/Release to wake Task 2 (Signaling invariant).

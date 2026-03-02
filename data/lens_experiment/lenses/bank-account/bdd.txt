@@ -1,0 +1,96 @@
+### Happy Paths (Normal Operations)
+
+**Scenario 1: Successful account opening**
+*   **Given** a potential customer is at least 18 years old
+*   **When** the customer applies for a standard deposit account with valid identification
+*   **Then** the bank should create a new account with a unique account number and record the initial deposit.
+
+**Scenario 2: Successful deposit of funds**
+*   **Given** an existing active bank account
+*   **When** the customer deposits a sum of money into the account
+*   **Then** the bank should increase the account balance by that sum and record the transaction as a liability for the bank.
+
+**Scenario 3: Successful withdrawal from a deposit account**
+*   **Given** a deposit account has a positive credit balance of $500
+*   **When** the customer requests a withdrawal of $200
+*   **Then** the bank should provide the funds and update the account balance to $300.
+
+**Scenario 4: Periodic bank statement generation**
+*   **Given** several transactions have occurred on an account within the last month
+*   **When** the monthly reporting cycle ends
+*   **Then** the bank should generate a bank statement reporting all transactions and the final financial position.
+
+---
+
+### Precondition Violations (Invalid State)
+
+**Scenario 5: Opening an account with a false name**
+*   **Given** a customer provides identification documents that are verified as false
+*   **When** the customer attempts to open a new bank account
+*   **Then** the bank must reject the application as it is unlawful to open an account in a false name.
+
+**Scenario 6: Underage account opening without guardian**
+*   **Given** a minor is under the minimum age of 16/18 required by local law
+*   **When** the minor attempts to open and operate an account independently
+*   **Then** the system should prevent the account creation unless a parent or guardian is associated with the account.
+
+**Scenario 7: Withdrawal exceeding available balance (No credit limit)**
+*   **Given** a deposit account has a balance of $100 and no overdraft facility
+*   **When** the customer attempts to withdraw $150
+*   **Then** the transaction should be rejected due to insufficient funds.
+
+---
+
+### State Transitions
+
+**Scenario 8: Account balance switches from Credit to Debit**
+*   **Given** a flexible account has a positive balance of $50
+*   **When** a transaction of $100 is processed (under an agreed credit limit)
+*   **Then** the account state should transition from a "Deposit" nature (Credit) to a "Loan" nature (Debit).
+
+**Scenario 9: EMI Account Onboarding Speed**
+*   **Given** a business requires an account for international transactions
+*   **When** the business applies for an Electronic Money Institution (EMI) account
+*   **Then** the account setup state should transition to "Active" significantly faster than a traditional bank onboarding process.
+
+---
+
+### Edge Cases (Boundaries/Empty/Full)
+
+**Scenario 10: Zero balance account status**
+*   **Given** a new account is opened but no funds have been deposited yet
+*   **When** the customer queries the account status
+*   **Then** the account should be active but display a balance of zero.
+
+**Scenario 11: Transaction at the exact withdrawal limit**
+*   **Given** an account has a daily withdrawal limit of $1,000
+*   **When** the customer attempts to withdraw exactly $1,000
+*   **Then** the transaction should be approved and the remaining daily limit should be updated to $0.
+
+---
+
+### Query Operations (Checking State)
+
+**Scenario 12: Checking financial position**
+*   **Given** an account holder has multiple accounts including a loan and a savings account
+*   **When** the customer requests their current financial position
+*   **Then** the system should return the calculated balance across all identified account numbers.
+
+**Scenario 13: Verifying EMI Safeguarding**
+*   **Given** a customer holds funds in an EMI account
+*   **When** the customer audits how their funds are held
+*   **Then** the system should confirm the funds are safeguarded in a third-party credit institution and not used for lending.
+
+---
+
+### Error Handling
+
+**Scenario 14: System failure during funds transfer**
+*   **Given** a customer initiates a wire transfer between two accounts
+*   **When** a technical communication error occurs mid-transaction
+*   **Then** the system should ensure the balance is not deducted from the source account if it cannot be verified as reaching the destination.
+
+**Scenario 15: Transaction blocked by monitoring**
+*   **Given** a traditional bank account with strict transaction monitoring
+*   **When** an unusual or high-risk transfer is attempted
+*   **Then** the system should block the transaction and trigger a query to the account holder for verification.

@@ -1,0 +1,25 @@
+1. A telephone directory must list telephone subscribers within a specific geographical area or service organization.
+2. The primary function of the directory is to enable the discovery of a subscriber's telephone number using their name and address.
+3. Subscriber names must be listed in alphabetical order within the white pages.
+4. Each entry in the white pages must include the subscriber's name, postal or street address, and telephone number.
+5. Every subscriber in the coverage area is included in the directory by default.
+6. A subscriber may transition to an "unlisted," "ex-directory," or "private" state upon request.
+7. Publishers may charge a fee to grant a subscriber's request to remain unlisted.
+8. Unlisted subscribers must be excluded from the published directory.
+9. Organizations may include instructional content, such as how to use the telephone service or how to dial local and international numbers.
+10. The directory must provide access numbers for emergency services, utilities, and medical professionals.
+11. Mobile phone numbers and Voice over IP (VoIP) listings are excluded from standard telephone directories in the United States.
+12. White pages are designated specifically for personal or primary alphabetical listings.
+13. Yellow pages must group business listings alphabetically within specific industry classifications.
+14. Business listings in the yellow pages are typically supported by paid advertising.
+15. Grey pages (reverse directories) allow a user to find subscriber identity and address details by providing a telephone number.
+16. Blue or green pages are reserved for the categorization of government agency information.
+17. The directory may change its publication format from hard copy to electronic media or online services.
+18. Hard copy directories were traditionally distributed to subscribers free of charge.
+19. Electronic directories stored on physical media (CD-ROM) may require multiple discs to facilitate a full reverse lookup.
+20. Online directories may integrate phone number lookups with additional features like direct VoIP calling.
+21. Modern regulators may waive the requirement for publishers to print residential listings in hard copy.
+22. Municipalities are prohibited from banning the unsolicited distribution of phone books in certain jurisdictions despite environmental concerns.
+23. Compiling telephone listings does not grant the publisher a copyright over the data in the United States.
+24. Historical directory states existed where listings were not alphabetized and lacked individual telephone numbers.
+25. The inclusion of supplemental data, such as transit maps, zip code guides, and seating charts, is permitted but not required.

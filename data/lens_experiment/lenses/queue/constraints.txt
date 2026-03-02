@@ -1,0 +1,30 @@
+A `ChainMap` search lookups through underlying mappings successively until a key is found.
+A `ChainMap` write, update, or deletion operation only affects the first mapping in the internal list.
+A `ChainMap` reflects changes made to its underlying mappings because it incorporates them by reference.
+The `ChainMap.maps` attribute is a user-mutable list that serves as the system's only stored state.
+The `ChainMap.new_child()` method returns a new `ChainMap` where the new map is placed at the front of the list.
+The `ChainMap.parents` property returns a new `ChainMap` containing all underlying maps except for the first one.
+`ChainMap` iteration occurs by scanning mappings from the last mapping to the first mapping.
+A `Counter` returns a zero count for missing items instead of raising a `KeyError`.
+Setting a `Counter` value to zero does not remove the element from the container; only `del` can remove it.
+`Counter` math operations preserve the order in which elements were first encountered in the operands.
+The `Counter.elements()` method ignores any elements with a count less than one.
+The `Counter.most_common()` method requires that stored values be comparable/orderable.
+`Counter` multiset operations (addition, subtraction, intersection, union) exclude results with counts of zero or less.
+`Counter` equality and rich comparison tests treat missing elements as having a count of zero.
+The `Counter.fromkeys()` class method is explicitly not implemented and cannot be used.
+A `deque` with a specified `maxlen` will discard items from the opposite end when new items are added to a full container.
+`deque.appendleft()` and `deque.extendleft()` add items to the left side of the container.
+`deque.extendleft()` results in the input iterable's elements being added in reverse order.
+Performing an `insert()` on a `deque` that is at its `maxlen` raises an `IndexError`.
+A `deque` raises an `IndexError` if `pop()` or `popleft()` is called while the container is empty.
+`defaultdict` calls its `default_factory` without arguments to provide a value when a key is missing during a `__getitem__` call.
+`defaultdict.__missing__` is only triggered by `__getitem__` and is not called by the `get()` method.
+If a `defaultdict`'s `default_factory` is set to `None`, a `KeyError` is raised for missing keys.
+`namedtuple` field names cannot start with an underscore or a digit and cannot be a Python keyword.
+If `rename=True` is set in `namedtuple`, any invalid or duplicate field names are automatically replaced with positional names like `_1`.
+`namedtuple` instances are immutable and do not have a per-instance `__dict__` to hold attributes.
+The `namedtuple._replace()` method returns a new instance of the tuple rather than modifying the existing one.
+`OrderedDict` equality tests are order-sensitive, whereas regular dictionary equality tests are not.
+The `OrderedDict.popitem()` method accepts an optional boolean `last` argument to toggle between LIFO and FIFO behavior.
+`UserList` subclasses must provide a constructor that can be called with zero or one argument to support operations that return new sequences.

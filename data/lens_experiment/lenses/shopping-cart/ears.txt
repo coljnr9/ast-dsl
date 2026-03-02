@@ -1,0 +1,42 @@
+Based on the domain description provided, here are the behavioral requirements for the **Shopping Cart Software** using EARS notation:
+
+**Ubiquitous (Normal Operations)**
+1. The Shopping Cart Software shall allow visitors to select items for eventual purchase.
+2. The Shopping Cart Software shall accumulate a list of items for purchase in a shortlist.
+3. The Shopping Cart Software shall store product, category, and discount data in a database.
+4. The Shopping Cart Software shall dynamically generate storefront pages based on database information.
+5. The Shopping Cart Software shall calculate the total order cost including freight transport and postage.
+6. The Shopping Cart Software shall calculate packaging and labeling costs for the order.
+7. The Shopping Cart Software shall calculate applicable taxes for the purchase.
+8. The Shopping Cart Software shall provide an API for third-party integrations.
+
+**State-driven (State-dependent Behavior)**
+9. While in the Administration area, the Shopping Cart Software shall allow the merchant to add and edit products.
+10. While in the Administration area, the Shopping Cart Software shall allow the merchant to modify shipping and payment settings.
+11. While a session is active, the Shopping Cart Software shall maintain cart data in the session object.
+12. While using a Hosted Service model, the Shopping Cart Software shall provide predefined templates for website customization.
+13. While operating as Open Source software, the Shopping Cart Software shall allow the user to modify the source code.
+
+**Event-driven (Triggers)**
+14. When a user selects a different item, the Shopping Cart Software shall manipulate the session data on the fly.
+15. When a visitor performs a search, the Shopping Cart Software shall dynamically generate a search results page.
+16. When the point of sale is reached, the Shopping Cart Software shall provide a final review of the shortlisted purchase.
+17. When a user modifies a purchase during review, the Shopping Cart Software shall update the order total.
+18. When a transaction is finalized, the Shopping Cart Software shall generate a formal order against the selected items.
+19. When an order is generated, the Shopping Cart Software shall clear the shopping cart.
+20. When an order is placed, the Shopping Cart Software shall export the transaction as an invoice via the API.
+
+**Unwanted (Error/Rejection/Security)**
+21. If a credit card transaction is requested, then the Shopping Cart Software shall rely on a secure gateway provider module to conduct the transaction.
+22. If sensitive ordering information is accepted, then the Shopping Cart Software shall be hosted on a secure server.
+23. If payment account data is stored or transmitted, then the Shopping Cart Software shall comply with PCI security standards.
+24. If the software is non-compliant with Visa regulations, then the Shopping Cart Software shall be subject to liability from Visa Inc.
+
+**Complex (Preconditions + Triggers)**
+25. While in the Administration area, when a merchant updates a product category, the Shopping Cart Software shall update the storefront pages in real time.
+26. While using the Hosted Service model, when security patches are released, the Shopping Cart Software shall be automatically updated by the vendor.
+
+**Scope Boundaries (Preservation/Negative Requirements)**
+27. The Shopping Cart Software shall not process credit card transactions directly without a secure gateway provider.
+28. The Shopping Cart Software shall not restrict the store owner from changing the look of the storefront to merge with the rest of the website.
+29. When the merchant chooses licensed software, the Shopping Cart Software shall not restrict the merchant from hosting the software on any server meeting requirements.

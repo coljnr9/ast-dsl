@@ -1,0 +1,88 @@
+This Failure Mode Analysis (FMA) examines the `collections` module as a reliability engineer. The system comprises several data structures designed to extend or wrap Python's built-in containers.
+
+---
+
+### 1. ChainMap
+**Operation: Lookups (`__getitem__`, `get`, `in`)**
+*   **Failure Modes:**
+    *   **Empty Maps List:** The `maps` list is empty. *Should: Theoretically raise IndexError on access, though documentation states it should always containing at least one mapping.*
+    *   **Non-Mapping in `maps`:** One of the elements in the `maps` attribute is not a mapping (e.g., an integer). *Should: Raise TypeError/AttributeError when the lookup reaches that element.*
+    *   **Key Missing:** Key is not in any of the underlying maps. *Should: Raise `KeyError`.*
+*   **Operation: Writes/Deletions (`__setitem__`, `__delitem__`, `pop`)**
+    *   **Empty `maps` list:** `d.maps` is empty. *Should: Raise `IndexError` (cannot access index 0).*
+    *   **Read-only First Map:** The first mapping in `maps` is immutable (e.g., a MappingProxy). *Should: Raise `TypeError`.*
+    *   **Delete Missing Key:** Deleting a key that exists in `maps[1:]` but not in `maps[0]`. *Should: Raise `KeyError` (writes/deletes only target the first map).*
+
+### 2. Counter
+**Operation: `elements()`**
+*   **Failure Modes:**
+    *   **Non-Integer Counts:** Value is a float or string. *Should: Raise `TypeError` or `Decimal.InvalidOperation` because elements() must repeat indices integer-times.*
+    *   **Negative/Zero Counts:** Value is $\le 0$. *Should: Be ignored (filtered out).*
+*   **Operation: Math Operators (`+`, `-`, `&`, `|`)**
+    *   **Non-Numeric Values:** Values are strings or objects that don't support math/comparison. *Should: Raise `TypeError`.*
+*   **Operation: `most_common([n])`**
+    *   **Unorderable Values:** Dictionary values cannot be compared (e.g., a list of complex numbers vs strings). *Should: Raise `TypeError`.*
+
+### 3. deque (Double-Ended Queue)
+**Operation: `pop()` / `popleft()`**
+*   **Failure Modes:**
+    *   **Empty Deque:** Operation called on `len(d) == 0`. *Should: Raise `IndexError`.*
+*   **Operation: `insert(i, x)`**
+    *   **Bounded Overflow:** Inserting into a deque where `len(d) == maxlen`. *Should: Raise `IndexError`.*
+*   **Operation: `index(x)` / `remove(x)`**
+    *   **Missing Value:** `x` is not present in the deque. *Should: Raise `ValueError`.*
+*   **Operation: Bounded Append (`append` on full deque)**
+    *   **State:** `len(d) == maxlen`. *Should: Silently discard the element on the opposite end to maintain the bound (Expected behavior, not an error).*
+
+### 4. defaultdict
+**Operation: `__getitem__(key)`**
+*   **Failure Modes:**
+    *   **Non-Callable Factory:** `default_factory` is set to a non-callable object (e.g., an integer). *Should: Raise `TypeError`.*
+    *   **Factory Exception:** The factory function itself crashes. *Should: Propagate the exception unchanged.*
+    *   **Recursive Factory:** Factory attempts to access the same key. *Should: Potential `RecursionError`.*
+
+### 5. namedtuple
+**Operation: Factory Creation (`namedtuple()`)**
+*   **Failure Modes:**
+    *   **Invalid Identifiers:** Field name starts with a digit/underscore or is a keyword. *Should: Raise `ValueError` (unless `rename=True`).*
+    *   **Duplicate Names:** Multiple fields with the same name. *Should: Raise `ValueError` (unless `rename=True`).*
+    *   **Defaults Mismatch:** More defaults than fields, or non-iterable `defaults`. *Should: Raise `TypeError` or `ValueError`.*
+*   **Operation: `_replace()`**
+    *   **Invalid Field:** Keyword argument provided that is not a field name. *Should: Raise `TypeError`.*
+
+### 6. OrderedDict
+**Operation: `move_to_end(key)`**
+*   **Failure Modes:**
+    *   **Missing Key:** Key is not in the dictionary. *Should: Raise `KeyError`.*
+**Operation: `popitem(last=True/False)`**
+*   **Failure Modes:**
+    *   **Empty Dict:** Called on an empty OrderedDict. *Should: Raise `KeyError`.*
+
+---
+
+### System Constraints & Attributes
+
+#### States that cannot be reversed (Permanent Transitions)
+*   **`deque(maxlen=N)`:** Once a deque is created with a `maxlen`, the `maxlen` attribute is **read-only**. You cannot change the capacity of a bounded deque post-initialization.
+*   **`namedtuple` Structure:** Field names are fixed at class creation. You cannot add or remove fields from a `namedtuple` class; you must create a new class.
+
+#### Operations impossible in certain states
+*   **Iteration over `Counter.elements()`:** Impossible to complete if the Counter contains values representing infinity (though not usual, Python floats support `inf`).
+*   **`defaultdict.__missing__`**: Cannot be triggered by `.get(key)`. It only triggers on `d[key]`.
+*   **`ChainMap` Deletion:** Cannot delete a key that is present in the "parents" but not in the "child" (the first map).
+
+#### Edge Case Combinations
+*   **Counter with Negative Counts:** `+c` will remove negative counts, but `c.update()` will keep them. Using `elements()` ignores them, but `total()` includes them.
+*   **ChainMap with Duplicate References:** If `d = ChainMap(m, m)`, updating `d['x']` updates the first map, which immediately updates the second search target since they are the same object.
+*   **`UserList` Subclassing:** If the subclass does not support a single-argument constructor, methods like `+` (addition) will fail when trying to return a new instance of that subclass.
+
+#### What must be preserved even during failures
+1.  **Underlying Data Integrity:** If `ChainMap.get` fails due to a `TypeError` in one map, the other maps in the `maps` list must remain unchanged.
+2.  **Thread Safety of Deque:** Appends and pops must remain atomic even if the iterable provided to `extend` raises an exception halfway through.
+3.  **Order:** `OrderedDict` and `Counter` (since 3.7) must preserve insertion order even if a lookup or a `total()` calculation fails.
+
+#### Deliberately Out of Scope
+*   **Deep Writes in ChainMap:** Standard `ChainMap` does not support writing to any map other than the first.
+*   **Type Validation in Counter:** The system does not enforce that counts must be numbers (except in specific methods like `elements()`).
+*   **Mutable NamedTuples:** NamedTuples are tuples; they do not support item assignment (`p.x = 10` is a failure by design).
+*   **Automatic Synchronization:** `ChainMap` incorporates maps by reference. It does NOT manage locking or synchronization if the underlying maps are modified by other threads.

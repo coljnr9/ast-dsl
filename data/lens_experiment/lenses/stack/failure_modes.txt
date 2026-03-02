@@ -1,0 +1,139 @@
+This Reliability Engineering Failure Mode Analysis (FMA) examines the `collections` module as a system of data structures.
+
+---
+
+### 1. ChainMap
+**Operations:**
+*   **Initialization `ChainMap(*maps)`**:
+    *   *Failure Mode:* Input `maps` contains non-mapping objects.
+    *   *System Response:* Should raise `AttributeError` or `TypeError` during lookup/mutation (duck typing fails).
+    *   *Preservation:* Must preserve a default empty `dict` in `self.maps` if no arguments remain.
+*   **Mutation (`__setitem__`, `__delitem__`, `pop`, `clear`)**:
+    *   *Failure Mode:* First mapping is read-only (e.g., a mappingproxy or a custom read-only dict).
+    *   *System Response:* Raise `TypeError`.
+    *   *Failure Mode:* `del` or `pop` on a key that exists in `parents` but not in the first mapping.
+    *   *System Response:* Raise `KeyError`. (Deletions never propagate past the first map).
+*   **`new_child(m=None, **kwargs)`**:
+    *   *Failure Mode:* `m` provided is not a mapping.
+    *   *System Response:* The resulting ChainMap remains valid until a method is called on the invalid `m`.
+*   **`parents` Property**:
+    *   *Failure Mode:* Called on a ChainMap with only one map.
+    *   *System Response:* Returns a new ChainMap with a single empty dict (to satisfy the "at least one mapping" constraint).
+
+**System Must Preserve:** The `maps` list must never be empty. The identity of underlying mappings (reference-based updates).
+
+---
+
+### 2. Counter
+**Operations:**
+*   **`elements()`**:
+    *   *Failure Mode:* Count values are non-integers (e.g., floats, strings).
+    *   *System Response:* If float, may behave unpredictably or raise `TypeError`. If negative/zero, ignored.
+*   **`most_common([n])`**:
+    *   *Failure Mode:* Values are not comparable/orderable.
+    *   *System Response:* Raise `TypeError`.
+*   **Mathematical Ops (`+`, `-`, `&`, `|`)**:
+    *   *Failure Mode:* Values do not support addition/subtraction or comparison.
+    *   *System Response:* Raise `TypeError`.
+    *   *Resulting State:* Any result $\le 0$ is stripped from the output.
+
+**System Must Preserve:** Zero-count keys remain in the dictionary (non-discarding) unless a multiset mathematical operation or `+c` / `-c` is used.
+
+---
+
+### 3. deque (Double-Ended Queue)
+**Operations:**
+*   **Initialization `deque(maxlen=N)`**:
+    *   *Failure Mode:* `maxlen` is negative.
+    *   *System Response:* Raise `ValueError`.
+*   **`pop()` / `popleft()`**:
+    *   *Failure Mode:* Operation on an empty deque.
+    *   *System Response:* Raise `IndexError`.
+*   **`insert(i, x)`**:
+    *   *Failure Mode:* Bounded deque (maxlen set) is already at capacity.
+    *   *System Response:* Raise `IndexError`.
+*   **`index(x, start, stop)`**:
+    *   *Failure Mode:* `x` not present in the specified range.
+    *   *System Response:* Raise `ValueError`.
+*   **`remove(value)`**:
+    *   *Failure Mode:* `value` not present.
+    *   *System Response:* Raise `ValueError`.
+
+**System Must Preserve:** For bounded deques, the `maxlen` attribute is read-only and must remain constant.
+
+---
+
+### 4. defaultdict
+**Operations:**
+*   **`__getitem__(key)`**:
+    *   *Failure Mode:* `default_factory` is `None` and `key` is missing.
+    *   *System Response:* Raise `KeyError`.
+    *   *Failure Mode:* `default_factory` is not a callable.
+    *   *System Response:* Raise `TypeError` when the missing key is accessed.
+    *   *Failure Mode:* `default_factory` requires arguments.
+    *   *System Response:* Raise `TypeError` (it is called with zero arguments).
+
+**System Must Preserve:** The `default_factory` attribute must be writable to allow state changes during the object's lifetime.
+
+---
+
+### 5. namedtuple
+**Operations:**
+*   **Factory Creation**:
+    *   *Failure Mode:* `typename` or `field_names` contain Python keywords (e.g., `def`, `class`) and `rename=False`.
+    *   *System Response:* Raise `ValueError`.
+    *   *Failure Mode:* Duplicate field names provided and `rename=False`.
+    *   *System Response:* Raise `ValueError`.
+    *   *Failure Mode:* Field name starts with underscore and `rename=False`.
+    *   *System Response:* Raise `ValueError`.
+*   **`_replace(**kwargs)`**:
+    *   *Failure Mode:* Keyword argument does not match an existing field name.
+    *   *System Response:* Raise `TypeError`.
+*   **`_make(iterable)`**:
+    *   *Failure Mode:* Iterable length does not match the number of fields.
+    *   *System Response:* Raise `TypeError`.
+
+**System Must Preserve:** Immutability. Like standard tuples, namedtuples cannot be modified in-place.
+
+---
+
+### 6. OrderedDict
+**Operations:**
+*   **`move_to_end(key)`**:
+    *   *Failure Mode:* `key` does not exist in the mapping.
+    *   *System Response:* Raise `KeyError`.
+*   **`popitem(last=True/False)`**:
+    *   *Failure Mode:* Called on an empty OrderedDict.
+    *   *System Response:* Raise `KeyError`.
+
+**Edge Case:** Equality `==` between two `OrderedDict` objects is order-sensitive, but equality between an `OrderedDict` and a regular `dict` is order-insensitive. This can lead to non-transitive logic: `OD1 == D` and `D == OD2` does not imply `OD1 == OD2`.
+
+---
+
+### 7. UserDict/List/String
+*   **Failure Mode:** Direct modification of the `data` attribute in a way that violates the wrapper's assumptions (e.g., setting `UserList.data` to a non-list).
+*   **System Response:** Unexpected behavior/crashes in subsequent method calls.
+*   **Constraint:** `UserList` subclasses *must* support a single-argument constructor for slicing/copying operations.
+
+---
+
+### General System Analysis
+
+#### Permanent Transitions (Irreversible States)
+*   **`deque` maxlen:** Once a `deque` is created with a `maxlen`, it cannot be changed to a different `maxlen` or converted to unbounded (it is a read-only attribute).
+*   **`namedtuple` Schema:** The fields of a `namedtuple` class are fixed at creation. You cannot add fields to an instance; you must create a new class.
+
+#### Impossible Operations
+*   **Counter `fromkeys()`**: This is explicitly disabled/not implemented.
+*   **namedtuple Mutation**: Direct assignment (e.g., `p.x = 10`) is impossible as they inherit tuple immutability.
+*   **ChainMap Depth Write**: By default, deleting a key that exists only in `maps[1:]` is impossible using the standard `ChainMap` interface.
+
+#### Edge Cases
+*   **ChainMap Shadowing:** If `maps[0]` and `maps[1]` both have key `k`, the value in `maps[1]` is unreachable but still occupies memory and exists in `parents`.
+*   **Counter Comparison:** `Counter(a=1) == Counter(a=1, b=0)` is True. This breaks the standard dict behavior where keys must be identical.
+*   **Deque Rotation:** Rotating a deque of size 1 or 0 is a "no-op" that does not trigger errors.
+
+#### Out of Scope (Unsupported)
+*   **Thread-Safety for ChainMap/Counter/OrderedDict:** Unlike `deque.append`, these are not explicitly documented as thread-safe and may corrupt state if mutated across threads.
+*   **Deep Writes in ChainMap:** The base `ChainMap` does not support updating keys in nested scopes (requires subclassing).
+*   **Non-Integer `elements()`**: Counter's `elements()` method does not support fractional or negative repeats.

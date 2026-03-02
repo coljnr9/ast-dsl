@@ -1,0 +1,30 @@
+A bank or financial institution maintains financial accounts to record transactions with a customer.
+Financial institutions establish the specific terms and conditions for every account type they offer.
+A customer is permitted to hold multiple bank accounts simultaneously.
+An account is officially created (opened) by the bank in the name of the depositor or a party directed by the depositor.
+The acceptance of a customer’s application by a financial institution constitutes a legal contract between the two parties.
+Funds deposited into a bank account cease to be the property of the depositor and become the property of the bank.
+A depositor holds a legal claim against the bank for the total sum deposited rather than the specific physical currency handed over.
+A deposit account is recorded as a liability for the bank and an asset for the account holder.
+A loan account is recorded as an asset for the bank and a liability for the borrower.
+Funds may only be withdrawn from an account in accordance with its specific terms and conditions.
+Transactions occurring within a specific timeframe must be reported to the customer via a bank statement.
+The balance of a bank account at any specific point in time represents the customer's financial position with the institution.
+Each account must be identified by a unique account numbering scheme managed by the financial institution.
+Opening a bank account in a false name is strictly prohibited.
+The standard minimum age to open a bank account is 18 years, though some jurisdictions allow it at 16.
+Accounts for minors may be opened in the minor's name but must be operated by a parent or guardian.
+Banks are permitted to lend some or all deposited money to third parties.
+Loan accounts may be secured using collateral provided by the borrower.
+A third person may guarantee a loan account, with or without providing additional security.
+A credit balance occurs when the financial institution owes money to the customer.
+A debit balance occurs when the customer owes money to the financial institution.
+Specific account types, such as savings accounts, are categorized by their intended function rather than just the nature of their balance.
+Electronic Money Institutions (EMIs) are prohibited from using client funds for lending purposes.
+EMIs must safeguard client funds by keeping them separate or depositing them with third-party credit institutions.
+EMI accounts typically do not provide the deposit insurance schemes offered by traditional bank accounts.
+National laws specify the identification requirements for signatories during the account opening process.
+National laws may impose specific limits on the value of deposits and withdrawals allowed for an account.
+Certain accounts may transition between credit balances and debit balances depending on the transaction flow.
+Traditional bank accounts allow the bank to earn revenue from holding idle deposits, whereas EMIs typically earn from transaction fees.
+The system does not support a bailment relationship for deposits; the bank assumes ownership of the physical assets.

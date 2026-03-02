@@ -1,0 +1,84 @@
+This Reliability Engineering Failure Mode Analysis (FMA) decomposes the access control system described into its constituent operations, boundary constraints, and failure states.
+
+### 1. Operation: Credential Presentation & Identification
+**Preconditions:** Reader is powered; Credential is of a compatible technology (e.g., 125 kHz, NFC, Biometric); Credential is physically intact.
+
+*   **Failure Mode: Technology Mismatch** (e.g., using a Wiegand card on an NFC reader).
+    *   *Result:* Rejected/Ignored. The reader fails to energize/read the chip; no data is sent to the controller.
+*   **Failure Mode: Biometric False Non-Match** (e.g., dirty fingerprint, scarred iris).
+    *   *Result:* Rejected. The reader fails to produce a valid ID number; provides "Access Denied" feedback (Red LED).
+*   **Failure Mode: Credential Duplication/Theft** (e.g., Alice gives her fob to Bob).
+    *   *Result:* Invalid Grant (False Positive). System identifies "Alice" and grants access because the credential state is valid even if the carrier is not.
+*   **Failure Mode: Credential Exhaustion** (e.g., Magnetic stripe worn out).
+    *   *Result:* Ignored. System undergoes no state change as no input is received.
+
+**System Must Preserve:** The locked state of the resource.
+
+---
+
+### 2. Operation: Access Decision (Logic/Look-up)
+**Preconditions:** Controller/Server is online; Access Control List (ACL) is loaded; Time/Date/Location parameters are defined.
+
+*   **Failure Mode: Connectivity Loss (Hub-and-Spoke)** (Line between reader and controller or controller and host is severed).
+    *   *Result:* Dependent on Reader Type. 
+        *   *Basic/Semi-intelligent:* Total system failure; door remains locked. 
+        *   *Intelligent:* Fails over to "Degraded Mode" using local cache.
+*   **Failure Mode: "Least Privilege" Violation** (Subject is in the ACL but lacks specific "When" or "Where" permissions).
+    *   *Result:* Rejected. Transaction recorded; Red LED feedback; resource remains locked.
+*   **Failure Mode: Database Desynchronization** (Update to revoke a user hasn't reached an offline intelligent reader).
+    *   *Result:* Invalid Grant. System permits access based on stale data.
+*   **Failure Mode: Anti-Passback Failure** (Host PC is offline in a serial topology).
+    *   *Result:* Logic ignored. System cannot verify if the user is already "inside," allowing credential reuse.
+
+**System Must Preserve:** A local log of the attempt (if memory exists) and the physical security of the door.
+
+---
+
+### 3. Operation: Resource Actuation (Unlocking)
+**Preconditions:** Relay receives signal; Power supply to lock is active; Hardware is mechanically functional.
+
+*   **Failure Mode: Relay Spoofing** (Intruder accesses wiring of an IP reader to manually jump the lock relay).
+    *   *Result:* Security Breach. The door unlocks without a valid transaction log.
+*   **Failure Mode: Mechanical Jam/Brute Force** (Physical strike fails to retract or is levered open).
+    *   *Result:* Error State. Door Position Switch (DPS) detects "Open" without an "Authorized Open" signal, triggering a "Forced Door" alarm.
+*   **Failure Mode: Solenoid Spoofing** (External magnet used to trigger the internal locking solenoid).
+    *   *Result:* Invalid State Change. Hardware unlocks via external interference.
+
+**System Must Preserve:** Monitoring of the Door Position Switch to trigger alarms even if the lock is bypassed.
+
+---
+
+### 4. Operation: Egress (Request-to-Exit / RTE)
+**Preconditions:** Motion detector or Button is triggered; "Mechanical Free Egress" is available.
+
+*   **Failure Mode: Sensor Failure** (RTE motion detector fails to see person).
+    *   *Result:* System Trap. User cannot exit (unless mechanical free egress exists).
+*   **Failure Mode: "Door Prop" Violation** (Door held open past the allowed "predetermined time").
+    *   *Result:* Error State. System triggers local and/or host alarm.
+*   **Failure Mode: Emergency Override** (Fire alarm or power loss).
+    *   *Result:* Safety State. System must default to "Fail-Safe" (unlocked) for life safety, sacrificing security.
+
+**System Must Preserve:** Life safety (the ability to exit) takes precedence over the "restricted access" requirement.
+
+---
+
+### Boundary Analysis & Constraints
+
+#### States that cannot be reversed (Permanent Transitions)
+*   **Re-keying:** Once a mechanical lock is physically re-keyed, the old keys are permanently invalidated.
+*   **Logic Log Entry:** Once a transaction is recorded in a write-only database log, the record of the attempt (granted or denied) should be immutable.
+
+#### Impossible Operations
+*   **Time-Restricted Mechanical Keys:** A standard mechanical lock cannot reject a valid key based on the time of day.
+*   **Remote Revocation of Mechanical Keys:** Impossible without physical intervention (re-keying).
+*   **Serial Controller Initiation:** In a standard serial (RS-485) poll-response setup, a controller cannot initiate an alarm signal until the host asks for an update.
+
+#### Edge Cases / Combinations
+*   **Credential Combo (Three-Factor Scenario):** Alice has her password but lost her fob. Two cohorts provide their fobs/passwords. The system must handle a "3-of-3" or "Multi-person" logic gate which bypasses standard 1:1 matching.
+*   **Tailgating + Common Courtesy:** A valid "Grant" state for User A is physically utilized by User B. The system remains in a "Valid" state while the physical reality is "Breached."
+*   **Degraded Mode Conflict:** An intelligent reader is offline and allows access to a card that was revoked on the central server 5 minutes ago.
+
+#### Deliberately Out of Scope
+*   **Interior Room Navigation:** The system manages entry/exit points, not movement *within* a permitted zone (unless sub-zoned).
+*   **External Wall Integrity:** The system does not monitor if an intruder bypasses the door by breaking through a cinder block or drywall partition.
+*   **Authentication vs. Authorization:** While used interchangeably, the system assumes "Authorization" (the right to access) is a prerequisite managed by policy, whereas "Access Control" is the real-time enforcement of that right.

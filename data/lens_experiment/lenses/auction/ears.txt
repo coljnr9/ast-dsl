@@ -1,0 +1,30 @@
+1. **Ubiquitous:** The Auction System shall facilitate the buying and selling of goods or services by offering them up for bids.
+2. **Ubiquitous:** The Auction System shall identify a buyer as a participant who pays to acquire a good or service.
+3. **Ubiquitous:** The Auction System shall identify a seller as a participant who offers goods or services for money or barter.
+4. **State-driven:** While in an active auction state, the Auction System shall allow multiple participants to bid against one another.
+5. **State-driven:** While conducting a Forward Auction, the Auction System shall seek the highest price from buyers for the seller.
+6. **State-driven:** While conducting a Reverse Auction, the Auction System shall seek the lowest-price supplier for the buyer.
+7. **State-driven:** While conducting an English Auction, the Auction System shall publicly display the current highest bid to all potential bidders.
+8. **State-driven:** While conducting a Japanese Auction, when a participant drops out, the Auction System shall prevent that participant from re-entering the auction.
+9. **Event-driven:** When a new bid is submitted in an English Auction, the Auction System shall require the bid to be higher than the previous bid.
+10. **Event-driven:** When the bidding increment is defined, the Auction System shall require the next bid to exceed the current bid by at least that minimum amount.
+11. **Event-driven:** When no participant is willing to bid further in an English Auction, the Auction System shall end the auction.
+12. **Event-driven:** When a candle flame expires in a Candle Auction, the Auction System shall signal the end of the auction.
+13. **Event-driven:** When the set time interval expires in a Scottish Auction, the Auction System shall complete all bidding.
+14. **Event-driven:** When a participant accepts the current price in a Dutch Auction, the Auction System shall allocate the specified quantity of goods to that bidder.
+15. **Event-driven:** When only one participant remains in a Japanese Auction, the Auction System shall award the item to that participant at the current price.
+16. **Event-driven:** When bidders submit bids in a Sealed-bid Auction, the Auction System shall hide the bid values from all other participants.
+17. **Event-driven:** When a Vickrey Auction concludes, the Auction System shall charge the winning bidder the price of the second-highest bid.
+18. **Unwanted:** If the final bid does not reach the seller's reserve price, then the Auction System shall leave the item unsold.
+19. **Unwanted:** If only one seller and one buyer are participating, then the Auction System shall not classify the process as an auction.
+20. **Unwanted:** If a participant attempts to enter a Japanese Auction after it has already begun, then the Auction System shall reject the entry.
+21. **Complex:** While in a Dutch Auction, when the auctioneer lowers the price to the reserve price without a taker, the Auction System shall terminate the auction.
+22. **Complex:** While in a Combinatorial Auction, when multiple package bids are submitted, the Auction System shall determine the winner based on the highest combined value of non-overlapping packages.
+23. **Complex:** While in a Walrasian Auction, when supply and demand exactly balance, the Auction System shall conclude the auction at the current price.
+24. **Ubiquitous:** The Auction System shall allow bidders to place "all-or-nothing" bids on packages in Combinatorial Auctions.
+25. **Ubiquitous:** The Auction System shall support the sale of items via barter exchange where no money is involved.
+26. **Ubiquitous:** The Auction System shall treat identical items in a Multiunit Auction as a single sale event rather than separate auctions.
+27. **State-driven:** While conducting a No-reserve Auction, the Auction System shall sell the item to the highest bidder regardless of the final price.
+28. **Event-driven:** When a proxy bid is submitted, the Auction System shall bid on behalf of the bidder according to the bidder's pre-set instructions.
+29. **State-driven:** While in a Public Reserve Price Auction, the Auction System shall announce the reserve price to all bidders before or during the process.
+30. **Ubiquitous:** The Auction System shall preserve the record of the highest bidder to ensure the opportunity to purchase is awarded correctly.

@@ -1,0 +1,95 @@
+Here are the BDD scenarios based on the provided article regarding Semaphores.
+
+### Happy Paths (Normal Operations)
+**Scenario 1: Successful resource acquisition**
+*   **Given** a semaphore is initialized with 3 available slots
+*   **When** a guest attempts to acquire 1 slot
+*   **Then** the guest is granted access and the available slots decrease to 2
+
+**Scenario 2: Successful resource release**
+*   **Given** a guest has acquired a slot in a semaphore
+*   **When** the guest completes their task and releases the slot
+*   **Then** the semaphore count increments and the slot becomes available for others
+
+**Scenario 3: Sequential access within limits**
+*   **Given** a semaphore configured with a maximum of 2 slots
+*   **When** two concurrent threads request access
+*   **Then** both threads should be granted access simultaneously
+
+### Precondition Violations
+**Scenario 4: Releasing beyond initial capacity**
+*   **Given** a semaphore initialized with a maximum capacity of 3 slots
+*   **And** all 3 slots are currently available (count is 3)
+*   **When** a process attempts to release a slot
+*   **Then** the system should reject the operation or handle the overflow error (depending on implementation)
+
+**Scenario 5: Acquiring from an uninitialized semaphore**
+*   **Given** a semaphore has not been initialized with a counter
+*   **When** a thread attempts a "Wait" operation
+*   **Then** the system should throw an initialization error
+
+### State Transitions
+**Scenario 6: Transition from available to full**
+*   **Given** a semaphore with 1 remaining slot
+*   **When** a guest acquires the last slot
+*   **Then** the semaphore state changes to "Full" and the count becomes 0
+
+**Scenario 7: Transition from full to available**
+*   **Given** a semaphore is full (count is 0)
+*   **When** 1 guest releases their slot
+*   **Then** the semaphore state changes to "Available" and the count becomes 1
+
+### Edge Cases (Boundaries & Limits)
+**Scenario 8: Binary Semaphore behavior**
+*   **Given** a semaphore is initialized with a capacity of 1 (Binary Semaphore)
+*   **When** 2 threads attempt to acquire it
+*   **Then** the first thread succeeds and the second thread is immediately blocked
+
+**Scenario 9: Multiple releases at once**
+*   **Given** a guest is holding multiple slots (e.g., 2 slots)
+*   **When** they call `Release(2)`
+*   **Then** the semaphore count should increase by exactly 2 in a single atomic operation
+
+**Scenario 10: High contention at capacity**
+*   **Given** a nightclub (semaphore) with a capacity of 50 is currently full
+*   **When** 50 more guests arrive and wait
+*   **Then** all 50 new guests must be placed in a "Waiting" list
+
+### Query Operations
+**Scenario 11: Checking available slot count**
+*   **Given** a semaphore was initialized with 5 slots and 2 are currently taken
+*   **When** the system queries the current permit count
+*   **Then** the system returns 3
+
+**Scenario 12: Try-Acquire with timeout**
+*   **Given** a semaphore is currently full
+*   **When** a thread attempts to acquire a slot with a 1-second timeout
+*   **Then** the system waits for 1 second and returns "False" if no slot is freed
+
+### Error Handling
+**Scenario 13: Priority Inversion Handling**
+*   **Given** a system is using a standard semaphore for resource protection
+*   **And** a low-priority task holds the semaphore while a high-priority task waits
+*   **When** a medium-priority task starts running
+*   **Then** the high-priority task remains blocked indefinitely (Priority Inversion occurs)
+
+**Scenario 14: Thread interruption while waiting**
+*   **Given** a thread is blocked waiting for a semaphore slot
+*   **When** the thread is interrupted by the operating system
+*   **Then** the semaphore should catch the exception and remove the thread from the waiting list
+
+**Scenario 15: Signaling across different threads**
+*   **Given** Thread A is waiting on a semaphore for a signal
+*   **When** Thread B (the producer) performs a "Release" or "Signal" operation
+*   **Then** Thread A is unblocked and resumes execution
+
+### Distributed/Complex Logic
+**Scenario 16: Throttling database connections**
+*   **Given** a database pool wrapper using a semaphore(10)
+*   **When** 15 application threads attempt to query the database
+*   **Then** 10 threads proceed to the database and 5 threads are queued to prevent overloading
+
+**Scenario 17: Signaling between Producer and Consumer**
+*   **Given** an empty data queue and a consumer thread waiting on a semaphore
+*   **When** a producer thread adds data to the queue and signals the semaphore
+*   **Then** the consumer thread wakes up immediately to process the data

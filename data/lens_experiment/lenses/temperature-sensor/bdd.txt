@@ -1,0 +1,121 @@
+### Happy Paths (Normal Operations)
+
+**Scenario 1: Successful Temperature Conversion (External Power)**
+*   **Given** the DS18B20 is powered by an external VDD supply
+*   **When** the master issues a "Convert T [44h]" command
+*   **Then** the device should transmit '0' while converting and '1' when the conversion is complete.
+
+**Scenario 2: Reading Temperature from Scratchpad**
+*   **Given** a temperature conversion has just completed
+*   **When** the master issues a "Read Scratchpad [BEh]" command
+*   **Then** the DS18B20 should transmit 9 bytes of data, starting with the Temperature LSB.
+
+**Scenario 3: Single-Drop Device Identification**
+*   **Given** there is only one DS18B20 connected to the 1-Wire bus
+*   **When** the master issues the "Read ROM [33h]" command
+*   **Then** the device should return its unique 64-bit serial code.
+
+**Scenario 4: Updating Alarm Triggers**
+*   **Given** the master has addressed a specific DS18B20
+*   **When** the master issues "Write Scratchpad [4Eh]" followed by 3 bytes for TH, TL, and Configuration
+*   **Then** the values should be stored in the SRAM scratchpad registers.
+
+---
+
+### Precondition Violations (Invalid State Operations)
+
+**Scenario 5: Reading Scratchpad on Multidrop Bus after Skip ROM**
+*   **Given** there are multiple DS18B20 devices on the 1-Wire bus
+*   **When** the master issues a "Skip ROM [CCh]" followed by a "Read Scratchpad [BEh]"
+*   **Then** a data collision should occur as multiple devices attempt to transmit simultaneously.
+
+**Scenario 6: Writing to Scratchpad without Addressing**
+*   **Given** the master has performed a Reset but has not issued a ROM command
+*   **When** the master attempts to issue a "Write Scratchpad [4Eh]" command
+*   **Then** the DS18B20 should not respond or acknowledge the command.
+
+**Scenario 7: Insufficient Data during Write Scratchpad**
+*   **Given** the master starts a "Write Scratchpad [4Eh]" operation
+*   **When** the master issues a Reset pulse after only sending 1 byte of data
+*   **Then** the scratchpad data should be considered invalid or corrupted as all 3 bytes must be written.
+
+---
+
+### State Transitions
+
+**Scenario 8: Power-Up Initialization**
+*   **Given** the device is in a powered-off state
+*   **When** power is applied to the VDD or DQ pin
+*   **Then** the device should enter a low-power idle state and automatically load EEPROM data into the scratchpad.
+
+**Scenario 9: Returning to Idle after Conversion**
+*   **Given** the device is currently performing a temperature conversion
+*   **When** the conversion time (tCONV) expires
+*   **Then** the device should move the result to the temperature register and transition to the low-power idle state.
+
+**Scenario 10: Resetting from any Active State**
+*   **Given** the DS18B20 is in the middle of a data transmission or conversion
+*   **When** the master pulls the 1-Wire bus low for more than 480μs
+*   **Then** the device should reset and wait for a new initialization sequence.
+
+---
+
+### Edge Cases (Boundary Conditions)
+
+**Scenario 11: Maximum Temperature Measurement**
+*   **Given** the ambient temperature is exactly +125°C
+*   **When** a temperature conversion is performed at 12-bit resolution
+*   **Then** the temperature register should read 07D0h.
+
+**Scenario 12: Minimum Temperature Measurement**
+*   **Given** the ambient temperature is exactly -55°C
+*   **When** a temperature conversion is performed
+*   **Then** the temperature register should read FC90h.
+
+**Scenario 13: Lowest Temperature Resolution Setting**
+*   **Given** the configuration register is set to 9-bit resolution (R1=0, R0=0)
+*   **When** a "Convert T" command is issued
+*   **Then** the conversion should complete within a maximum of 93.75ms.
+
+---
+
+### Query Operations
+
+**Scenario 14: Checking Power Supply Mode**
+*   **Given** the master does not know the power configuration of the bus
+*   **When** the master issues a "Read Power Supply [B4h]" command
+*   **Then** parasite-powered devices should pull the bus low, while externally powered devices let it remain high.
+
+**Scenario 15: Identifying Alarming Devices**
+*   **Given** several devices are on the bus and one has exceeded its TH trigger
+*   **When** the master issues the "Alarm Search [ECh]" command
+*   **Then** only the device with the set alarm flag should respond to the search sequence.
+
+---
+
+### Error Handling & Reliability
+
+**Scenario 16: Data Validation via Scratchpad CRC**
+*   **Given** the master is reading the 9th byte of the scratchpad
+*   **When** the master calculates a CRC that does not match the 9th byte received
+*   **Then** the master should discard the data and repeat the read operation.
+
+**Scenario 17: Parasite Power Voltage Drop during Conversion**
+*   **Given** the DS18B20 is in parasite power mode
+*   **When** a "Convert T" command is issued but the master fails to provide a strong pullup within 10μs
+*   **Then** the device may fail the conversion due to insufficient operating current.
+
+**Scenario 18: High Temperature Parasite Power Failure**
+*   **Given** the device is in parasite power mode and the temperature is above +100°C
+*   **When** the master attempts to communicate
+*   **Then** communication may fail or become unreliable due to increased leakage currents.
+
+**Scenario 19: EEPROM Data Retention on Power Cycle**
+*   **Given** the user has saved TH and TL settings to EEPROM using "Copy Scratchpad [48h]"
+*   **When** the device is powered down and then powered back up
+*   **Then** the TH and TL registers in the scratchpad should contain the previously saved values.
+
+**Scenario 20: Presence Pulse Detection**
+*   **Given** the master issues a Reset pulse (480μs low)
+*   **When** the master releases the bus
+*   **Then** the DS18B20 should wait 15-60μs and then pull the bus low for 60-240μs to indicate it is functional.

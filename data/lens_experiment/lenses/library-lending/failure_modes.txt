@@ -1,0 +1,75 @@
+This Failure Mode Analysis (FMA) evaluates the **Library Circulation System** as described in the provided text.
+
+### 1. Operation: Lending Materials (Checkout)
+*   **Failure Modes:**
+    *   **Invalid Patron State:** Patron is not in the system, has an expired membership, or has exceeded loan limits.
+    *   **Invalid Item State:** Item is "Reference Only" (non-circulating), already checked out to another user, or marked as lost/missing.
+    *   **Privacy Breach:** Displaying a patron's previous borrowing history to a third party or staff member without cause (Violation of ALA Policy VII).
+    *   **Data Mismatch:** Scanning an item barcode that does not match the physical book.
+*   **Response:** Operation **Rejected**. System should trigger an alert/error code. Physical item remains in the library.
+*   **System Must Preserve:** Patron confidentiality and the integrity of the inventory count.
+
+### 2. Operation: Checking In Materials (Return)
+*   **Failure Modes:**
+    *   **System/Hardware Offline:** Scanner or software failure prevents digital logging of return.
+    *   **Incomplete Return:** Item returned is missing parts (e.g., a multi-disc set or accompanying media).
+    *   **Unrecognized Item:** Item belongs to a different library system (outside inter-library loan).
+*   **Response:** **Error State**. Item must be diverted to manual processing. System must NOT mark as "Available" until verified.
+*   **System Must Preserve:** Accurate "Last User" data (for damage liability) until the next successful checkout.
+
+### 3. Operation: Renewal of Materials
+*   **Failure Modes:**
+    *   **Hold/Reserve Conflict:** Another patron has requested the item (Item is "On Hold").
+    *   **Renewal Limit Reached:** Maximum allowable extensions reached.
+    *   **Block on Account:** Patron has unpaid fines or overdue items from other transactions.
+*   **Response:** **Rejected**. System provides the original due date or a "Must Return" notice.
+*   **System Must Preserve:** The original due date must not be lost if the renewal fails.
+
+### 4. Operation: Monitoring for Damage
+*   **Failure Modes:**
+    *   **Undetected Damage:** Staff fails to see water damage, torn pages, or markings.
+    *   **Misattribution:** Charging a returning patron for damage that existed prior to their checkout.
+*   **Response:** **Ignored** (Silent Failure). Leads to degradation of the collection. If detected, move to **Repair/Replacement State**.
+*   **System Must Preserve:** A record of the item's physical condition or "damage flags" to prevent future disputes.
+
+### 5. Operation: Collection of Fines / Receipting
+*   **Failure Modes:**
+    *   **Cash/Report Reconciliation Mismatch:** Physical cash doesn't match the digital "Receipted" log.
+    *   **Inaccurate Calculation:** System miscalculates overdue days based on library closures (holidays/weekends).
+*   **Response:** **Error State / Audit Flag**. Financial reports will fail to reconcile. 
+*   **System Must Preserve:** Transaction history for audit purposes.
+
+### 6. Operation: Overdue Notifications
+*   **Failure Modes:**
+    *   **Delivery Failure:** Incorrect email address or phone number in patron record.
+    *   **Privacy Violation:** Notice contains specific book titles visible to household members (Violation of Privacy Policy).
+*   **Response:** **Failed Transaction**. Staff must manually intervene via telephone or mail.
+*   **System Must Preserve:** A log of the notification attempt (timestamp and method).
+
+### 7. Operation: Stacks Maintenance (Re-shelving)
+*   **Failure Modes:**
+    *   **Mis-shelving:** Book placed in the wrong section (effectively "Lost" to the system).
+    *   **Physical Constraint:** Shelf is at 100% capacity; cannot accept more items.
+*   **Response:** **Silent Fail / Physical Rejection**.
+*   **System Must Preserve:** The "In Library" status (even if the book is physically unfindable).
+
+---
+
+### Permanent Transitions (Irreversible States)
+*   **Item Weeding/Removal:** Once an item is officially "weeded" or discarded from the collection, the record is typically purged or moved to a permanent archive.
+*   **Deliberate Privacy Deletion:** Once a transaction is completed and the record of who borrowed what is purged for privacy reasons, that data cannot be recovered.
+
+### Operations Impossible in Certain States
+*   **Checkout:** Impossible if the item status is "At Bindery," "Lost," or "Non-circulating."
+*   **Renewal:** Impossible if the item is currently "Checked In."
+*   **Fine Payment:** Impossible if the patron has a $0.00 balance.
+
+### Edge Case Combinations
+*   **The "Double Return":** An item is returned in the drop-box simultaneously as the system generates an "Overdue Fine." This creates a race condition for the staff to back-date the check-in.
+*   **System Downtime during Checkout:** Patrons take books during a power outage; the system has no record of the loan, leading to a permanent inventory discrepancy unless manual logs are perfectly transcribed.
+*   **Age-Restricted Content vs. Bill of Rights:** Policy V states rights shouldn't be denied due to age, but local laws might restrict certain materials. This creates a **Governance Failure Mode**.
+
+### Out of Scope (Deliberately Not Supported)
+*   **Censorship:** The system is explicitly designed NOT to support the removal of materials based on partisan or doctrinal disapproval (Policy II).
+*   **Third-Party Data Sharing:** The system is instructed NOT to provide identifiable user data to third parties without legal mandates (Policy VII).
+*   **In-depth Research:** The circulation desk refers in-depth reference questions to the Reference Desk.

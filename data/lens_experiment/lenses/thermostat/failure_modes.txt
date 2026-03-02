@@ -1,0 +1,42 @@
+This Failure Mode Analysis (FMA) evaluates the thermostat as a closed-loop temperature control system based on the provided technical documentation.
+
+### 1. Primary Operations & Failure Modes
+
+| Operation | Preconditions / Valid States | Invalid Inputs / Rejected States | Failure Mode / Result | System Must Preserve |
+| :--- | :--- | :--- | :--- | :--- |
+| **Sensing (Measurement)** | Sensor must be in thermal contact with medium; Power available (for electronic). | Temperature outside sensor's physical range; Damaged bimetallic coil. | **Error State:** Incorrect reading leads to "Overshoot" or "Short-cycling." | System safety (Thermal cutoff). |
+| **Setpoint Adjustment** | Device in "Operational" state; User interface intact. | Setting a temperature beyond system capability (e.g., 500°C in a house). | **Rejected/Ignored:** Mechanical stops or software bounds prevent input. | Current active setpoint. |
+| **Switching (On/Off)** | Hysteresis threshold met; Anticipator cooldown complete. | Requesting "On" while already "On"; Rapid fluctuates near setpoint. | **Ignored:** Hysteresis prevents "Bang-bang" rapid cycling to mitigate wear. | Compressor/Motor integrity. |
+| **Anticipation (Early Cutoff)** | Anticipator wire intact; Heating cycle active. | Calculation error; Short circuit in anticipator wire. | **Error:** Temperature exceeds range (Overshot) or fails to reach setpoint. | HVAC equipment protection. |
+| **Gas Valve Regulation** | Pilot light active (Millivolt); Diaphragm intact. | Blocked capillary tube; Leaking diaphragm. | **Rejection:** Burner fails to ignite or fails to modulate fuel flow. | Gas shut-off (Safety). |
+| **Mixing (Hydronic/Wax)** | Hot/Cold intake pressure present. | Wax pellet leakage; Scale buildup/calcification. | **Failure:** Output water too hot (Scald risk) or too cold. | Max temp limit (49°C). |
+
+---
+
+### 2. State-Based Constraints & Edge Cases
+
+#### Permanent (Irreversible) Transitions
+*   **Mercury Switch Rupture:** If the mercury bulb breaks, the device is permanently classified as "Chemical Waste" and cannot be repaired or returned to service.
+*   **Thermal Cutoff Activation:** Some safety-critical thermal cutoffs (mentioned in "See also") are one-time-use fuses that require physical replacement to restore the circuit.
+*   **Electronic Component Burn-out:** Applying "Line Voltage" (120/240V) to a "Low Voltage" (24V) thermostat results in permanent hardware destruction and a potential fire state.
+
+#### States Where Operations are Impossible
+*   **Mains Power Failure:** Modern 24V furnaces cannot ignite or blow air, rendering the thermostat's "Close Contact" command useless, even if the thermostat is battery-powered.
+*   **Low Battery (Digital):** In "power stealing" or battery-only digital models, a low-voltage state prevents the LCD from functioning and the relay/triac from switching.
+*   **Phase Change (Wax Pellets):** Below the wax's melting point, mechanical movement is impossible until the thermal threshold is reached (it is a physical state-gate).
+
+#### Edge Case Combinations
+*   **The "Millivolt" Trap:** A "power stealing" digital thermostat will fail when installed on a millivolt gas system because the thermopile does not provide enough current for energy harvesting.
+*   **Heat Pump "Emergency Heat" Confusion:** During a "Defrost" cycle (State B), the system may require simultaneous heating and compressor reversing, creating a conflict if wiring (O vs B) is mismatched.
+*   **The "Anticipator" Drift:** If a mechanical heat anticipator is set to a current (Amps) higher/lower than the actual circuit load, the thermostat will consistently "undershoot" or "overshoot," failing to maintain the Closed Loop.
+
+---
+
+### 3. Out of Scope (Deliberate Non-Support)
+*   **Continuously Variable Capacity:** Conventional "Bang-bang" thermostats specifically do not support variable output (they are 0% or 100% only).
+*   **Non-Thermal Input:** The system does not react to humidity (unless specified as a high-end enhancement), CO2 levels, or occupancy, focusing strictly on temperature.
+*   **High-Precision Industrial Control:** Standard residential bimetallic thermostats are explicitly described as "inaccurate and inefficient" for precision needs like semiconductor manufacturing.
+*   **Standardized Color Coding:** The system docs explicitly state there are **no standards** for wiring colors; relying on color instead of terminal codes is a documented "User Failure Mode."
+
+### 4. Summary of System Logic
+The system prioritizes **Equipment Protection** (via Hysteresis/Anticipators) and **Safety** (via Thermal Cutoffs/Mixing Valves) over **Precision**. Every failure—whether it be a broken bimetal strip or a drained battery—must result in a "Fail-Safe" state (usually the "Open" position for heating systems) to prevent uncontrolled temperature rises.

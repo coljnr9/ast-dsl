@@ -1,0 +1,32 @@
+The following behavioral requirements for the **Telephone Directory** system are defined using EARS notation based on the provided domain description.
+
+1. **Ubiquitous:** The Telephone Directory shall list telephone subscribers within a specific geographical area or service organization.
+2. **Ubiquitous:** The Telephone Directory shall provide the telephone number of a subscriber identified by name and address.
+3. **Ubiquitous:** The Telephone Directory shall list subscriber names in alphabetical order.
+4. **State-driven:** While operating as a White Pages directory, the Telephone Directory shall provide personal or alphabetic listings.
+5. **State-driven:** While operating as a Yellow Pages directory, the Telephone Directory shall list businesses alphabetically within specific service classifications.
+6. **State-driven:** While operating as a Grey Pages directory, the Telephone Directory shall provide subscriber details based on a provided telephone number.
+7. **State-driven:** While operating as a Blue or Green Pages section, the Telephone Directory shall provide information on government agencies.
+8. **Event-driven:** When a subscriber requests exclusion and pays the required fee, the Telephone Directory shall omit the subscriber's number from the listings.
+9. **Event-driven:** When requested by the publisher, the Telephone Directory shall include instructions on how to use telephone services and dial local or international numbers.
+10. **Event-driven:** When providing emergency information, the Telephone Directory shall list contact numbers for emergency services, utilities, and hospitals.
+11. **Event-driven:** When configured as a business directory, the Telephone Directory shall include paid advertising.
+12. **Unwanted:** If a subscriber is for a mobile phone or Voice over IP (VoIP) service, then the Telephone Directory shall not include the listing (US Jurisdiction).
+13. **Unwanted:** If a subscriber is marked as "unlisted," "ex-directory," or "private," then the Telephone Directory shall exclude their details from publication.
+14. **Complex:** While in a digital format, when a user performs a search, the Telephone Directory shall provide a clickable interface to retrieve subscriber data.
+15. **Complex:** While in an electronic CD-ROM format, when a reverse lookup is initiated, the Telephone Directory shall search across up to eight physical discs to find the subscriber details.
+16. **Ubiquitous:** The Telephone Directory shall include the postal or street address associated with each listed subscriber.
+17. **Ubiquitous:** The Telephone Directory shall provide international dialing codes and postal code guides.
+18. **Unwanted:** If a jurisdiction bans unsolicited distribution, then the Telephone Directory shall not be delivered to residents in that community.
+19. **Ubiquitous:** The Telephone Directory shall remain a non-copyrightable collection of facts (US Jurisdiction).
+20. **State-driven:** While printed on newsprint using small font sizes, the Telephone Directory shall utilize the Bell Gothic typeface to maintain readability.
+21. **Complex:** While operating as an online service, when a VoIP feature is enabled, the Telephone Directory shall allow users to initiate calls through the internet interface.
+22. **Ebvent-driven:** When a printed directory is no longer required by regulators, the Telephone Directory shall be published exclusively in electronic form.
+23. **Ubiquitous:** The Telephone Directory shall provide transit maps and stadium seating charts if required by the publisher.
+24. **Ubiquitous:** The Telephone Directory shall associate every entry with a unique telephone number.
+25. **Unwanted:** If a listing is for a person or business outside the designated geographical coverage area, then the Telephone Directory shall exclude the entry.
+26. **State-driven:** While in electronic form, the Telephone Directory shall be accessible via proprietary terminals or the Internet.
+27. **Ubiquitous:** The Telephone Directory shall preserve the alphabetical integrity of listings regardless of the medium (CD-ROM, Print, or Web).
+28. **Event-driven:** When a subscriber’s address changes, the Telephone Directory shall update the listing in the next publication cycle.
+29. **Unwanted:** If a search query does not match any name or address, then the Telephone Directory shall return a "no results found" response.
+30. **Ubiquitous:** The Telephone Directory shall provide specialized search categories for professionals such as lawyers or doctors in the classified section.

@@ -1,0 +1,77 @@
+This Failure Mode Analysis (FMA) evaluates the **CTUD (Count Up/Down)** Function Block as described in the CODESYS documentation.
+
+---
+
+### 1. Operation: Up-Count (`CU` Rising Edge)
+*   **Failure Mode: Upper Bound Saturation (Overflow)**
+    *   *Precondition/State:* `CV` = 65,535 (Maximum value for `WORD`).
+    *   *Input:* `CU` transitions from `FALSE` to `TRUE`.
+    *   *Result/What should happen:* The counter should not "wrap around" to 0. It must saturate at 65,535.
+*   **Failure Mode: Signal Chatter/Alias**
+    *   *Precondition/State:* High-frequency oscillation of the `CU` input within a single PLC scan cycle.
+    *   *Input:* `CU` toggles faster than the scan rate.
+    *   *Result/What should happen:* The operation is **ignored** or only processed once per cycle. The system must preserve the integrity of a single "rising edge" detection.
+*   **Failure Mode: Concurrent Up/Down Request**
+    *   *Precondition/State:* Both `CU` and `CD` receive a rising edge in the same scan.
+    *   *Result/What should happen:* The value should effectively remain unchanged (increment + decrement = 0 net change), provided no priorities override the logic.
+
+### 2. Operation: Down-Count (`CD` Rising Edge)
+*   **Failure Mode: Lower Bound Saturation (Underflow)**
+    *   *Precondition/State:* `CV` = 0.
+    *   *Input:* `CD` transitions from `FALSE` to `TRUE`.
+    *   *Result/What should happen:* The operation should be **rejected** internally. `CV` must remain 0; it cannot transition to 65,535 (preventing negative logic in an unsigned `WORD` context).
+*   **Failure Mode: Negative Logic Misalignment**
+    *   *Precondition/Input:* `PV` is set to 0.
+    *   *Result/What should happen:* If `CV` is 0 and `PV` is 0, `QD` (Down) and `QU` (Up) are both `TRUE`. This is a valid but potentially confusing state for logic.
+
+### 3. Operation: Reset (`RESET`)
+*   **Failure Mode: High-Priority Conflict**
+    *   *Precondition/Input:* `RESET` is `TRUE` while `CU` or `LOAD` are also active.
+    *   *Result/What should happen:* `RESET` typically has the highest priority in IEC 61131-3 counters. Incrementing/Loading should be **rejected** while `RESET` is high. `CV` must be forced to 0.
+*   **Failure Mode: Stuck-at-True**
+    *   *State:* `RESET` signal remains `TRUE` due to logic error or sensor failure.
+    *   *Result/What should happen:* All other operations (`CU`, `CD`, `LOAD`) are blocked. The system must preserve `CV = 0`.
+
+### 4. Operation: Load (`LOAD`)
+*   **Failure Mode: Priority Conflict with Reset**
+    *   *Input:* `LOAD` = `TRUE` and `RESET` = `TRUE`.
+    *   *Result/What should happen:* `LOAD` is **ignored**. `RESET` takes precedence, and `CV` becomes 0, not `PV`.
+*   **Failure Mode: Priority Conflict with Increment/Decrement**
+    *   *Input:* `LOAD` = `TRUE` and `CU` or `CD` rising edge occurs.
+    *   *Result/What should happen:* The Loading operation usually takes precedence over the edge-triggered increment/decrement. `CV` becomes `PV`.
+
+### 5. Operation: Set Upper Limit/Start Value (`PV`)
+*   **Failure Mode: Datatype Mismatch**
+    *   *Input:* `PV` provided as `INT` (per IEC standard) instead of `WORD` (per CODESYS spec).
+    *   *Result/What should happen:* An **Error State** during compilation or unexpected sign-bit interpretation if forced. The system must treat the input as an unsigned 16-bit value.
+*   **Failure Mode: Dynamic Upper Limit Change**
+    *   *State:* `PV` is changed to a value *lower* than the current `CV` (e.g., `CV` is 50, `PV` is changed from 100 to 20).
+    *   *Result/What should happen:* `QU` must immediately become `TRUE`. The operation is valid, but the output state changes instantly.
+
+---
+
+### System Invariants (What must be preserved)
+1.  **Value Range:** `CV` must always stay within `0` and `65,535`.
+2.  **Output Consistency:** 
+    *   `QU` must always be `TRUE` if `CV` ≥ `PV`.
+    *   `QD` must always be `TRUE` if `CV` = 0.
+3.  **Memory Persistence:** If the FB is not reset, the `CV` must persist between PLC scans.
+
+### Non-Reversible Transitions & State Impossibilities
+*   **Irreversible Transitions:** There are no strictly irreversible transitions; however, if `RESET` is high, no other state change is possible until it is lowered.
+*   **Impossible States:**
+    *   `CV < 0`: Impossible due to `WORD` datatype.
+    *   `QD = TRUE` when `CV > 0`: Impossible by definition.
+    *   `QU = FALSE` when `CV > PV`: Impossible by definition.
+
+### Edge Cases
+*   **PV = 0:** In this state, `QU` is always `TRUE` (because any `WORD` value is ≥ 0). Simultaneously, `QD` is `TRUE` whenever `CV` is 0.
+*   **Maximum PV:** If `PV = 65,535`, `QU` will only be `TRUE` when the counter reaches the absolute maximum of the datatype.
+*   **Simultaneous Reset and Load:** If both are TRUE, the counter typically defaults to 0 (Reset Priority).
+*   **Scan Cycle Overlap:** If `CU` stays `TRUE` for multiple scans, it only increments once (rising edge detection). If the PLC stops and restarts, the edge-detection memory must be handled (failure to do so may cause a double-count or missed count).
+
+### Out of Scope (Unsupported Operations)
+*   **Pre-loading a specific value other than PV:** The system only supports loading `0` (Reset) or `PV` (Load). It does not support `Set_CV(x)`.
+*   **Negative Counting:** The system does not support signed integers or values below 0.
+*   **Wrapping:** The system does not support rolling over from 65,535 to 0 or vice versa automatically.
+*   **Time-based Counting:** This is a logic counter, not a timer; incrementing is based on discrete events, not duration.

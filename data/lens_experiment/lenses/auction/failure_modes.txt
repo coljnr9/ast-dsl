@@ -1,0 +1,67 @@
+This Reliability Engineering Failure Mode Analysis (FMA) decomposes the auction system described in the article into its constituent operations, boundary constraints, and failure states.
+
+### 1. Operation: Participant Registration & Validation
+*   **Failure Modes:**
+    *   **Insufficient Participants:** System has <1 seller or <1 buyer (violates definition of auction).
+    *   **Single Pair:** Exactly 1 seller and 1 buyer (Article: "the process is not considered an auction").
+    *   **Invalid Participant Role:** Attempting to act as a buyer and seller on the same item in a non-double auction.
+*   **System Response:** Reject operation; transition to "Negotiation" or "Private Sale" state; prevent auction initialization.
+*   **Preservation Requirement:** Participant identity and legal capacity to contract must be preserved.
+
+### 2. Operation: Bid Submission (General)
+*   **Failure Modes:**
+    *   **Non-Increasing Bid (Forward):** Input bid $\le$ current highest bid.
+    *   **Non-Decreasing Bid (Reverse):** Input bid $\ge$ current lowest bid.
+    *   **Below Reserve:** Bid is valid but below the hidden "Reserve Price" state.
+    *   **Out-of-Turn Bidding (Japanese Auction):** Attempting to bid after having previously dropped out.
+    *   **Late Bidding (Candle/Clock):** Bid received after the flame expires or the clock reaches zero.
+    *   **Below Minimum Increment:** Bid is higher than the current, but the delta is less than the auctioneer’s set "Bidding Increment."
+*   **System Response:** **Rejected** (for non-increasing/out-of-turn); **Ignored** (for late bids); **Accepted but non-winning** (for below reserve).
+*   **Preservation Requirement:** The "Current Highest Bid" and the "High Bidder ID" must be immutable except by a valid higher bid.
+
+### 3. Operation: Auction Initialization & Cataloging
+*   **Failure Modes:**
+    *   **Asset Misdescription:** Metadata in the catalog does not match the physical asset.
+    *   **Illegal Asset:** Attempting to auction items prohibited by modern law (e.g., historical "Marriage Markets" or "Slave Auctions" mentioned in the text).
+    *   **Missing Starting Price:** System lacks a floor for the first bid.
+*   **System Response:** Error state; Administrative hold; Legal rejection.
+*   **Preservation Requirement:** Asset provenance and catalog integrity.
+
+### 4. Operation: Combinatorial / Package Bidding
+*   **Failure Modes:**
+    *   **Incomplete Package Fulfillment:** Bidder offers for A+B; system only allocates A.
+    *   **Deadlock/Computational Failure:** The "complex process" of determining winners fails to find the optimal value allocation.
+*   **System Response:** **Rejected** (All-or-nothing constraint violated); System triggers "Optimization Error" and reverts to last known valid state.
+*   **Preservation Requirement:** Atomicity of the package (A and B must stay linked).
+
+### 5. Operation: Auction Conclusion (Closing)
+*   **Failure Modes:**
+    *   **Sniping (English Auction):** High-velocity bids at $T-1$ second prevent others from responding.
+    *   **Premature Expiration (Candle):** The physical/random trigger ends the auction before fair market value is reached.
+    *   **Unmet Reserve:** Auction ends, but the highest bid < Reserve Price.
+*   **System Response:** **Item Unsold** (if reserve unmet); **Transition to Sale** (if successful).
+*   **Preservation Requirement:** Finality—once "Sold" is declared, no further bids can be accepted.
+
+---
+
+### Key Analysis Attributes
+
+#### States that cannot be reversed (Permanent Transitions)
+*   **"Hammer Fall":** Once the auctioneer signals the end (English) or the candle goes out, the window for competitive bidding is permanently closed.
+*   **Dropout (Japanese Auction):** Once a participant signals they are "out," they cannot re-enter the state of "Active Bidder."
+*   **Beheading/Execution:** As noted in the 193 AD Roman Empire auction, certain political/physical outcomes of auctions are irreversible.
+
+#### Operations impossible in certain states
+*   **Wait for Lower Price:** Impossible in an **English Auction** (price only increases).
+*   **Adjusting Bid:** Impossible in **First-Price Sealed-Bid** once the envelope is submitted/sealed.
+*   **Entering Late:** Impossible in a **Japanese Auction** once the price has begun to rise from the initial low.
+
+#### Edge Cases (Combinations of Conditions)
+*   **The "Candle Flare":** A bidder times a bid to the literal last micro-second of a dying candle flame (the "Pepys Hint").
+*   **The Identical Sealed Bid:** Two bidders submit the exact same price in a Vickrey or First-Price auction. (Article does not define the tie-breaker; system must default to a "Reject/Retry" or "Timestamp" rule).
+*   **Winner's Curse:** A successful bid that exceeds the actual common value of the item, leading to a financial failure post-transaction.
+
+#### Out of Scope (Deliberately Not Supported)
+*   **Post-Auction Renegotiation:** The system assumes the "Highest Bidder" is legally bound to the "Bid Price."
+*   **Two-Participant Auctions:** Explicitly excluded from the definition of an auction (requires $N \ge 3$ total participants across roles).
+*   **Non-Competitive Pricing:** Fixed-price retail is out of scope.

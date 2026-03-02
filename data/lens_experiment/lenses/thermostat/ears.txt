@@ -1,0 +1,32 @@
+Based on the domain description provided, here are the behavioral requirements for the **Thermostat Temperature Control System** using EARS notation:
+
+1.  **Ubiquitous:** The Thermostat shall perform actions to maintain the temperature of a physical system near a desired setpoint.
+2.  **Ubiquitous:** The Thermostat shall operate as a closed-loop control device to reduce the error between the desired and measured temperatures.
+3.  **State-driven:** While the measured temperature is below the setpoint, the NC (Normally Closed) Thermostat shall maintain the heating circuit in a closed state.
+4.  **State-driven:** While the measured temperature is above the setpoint, the NO (Normally Open) Thermostat shall maintain the cooling circuit (fan) in a closed state.
+5.  **State-driven:** While the heating appliance is operating, the heat anticipator shall generate a small amount of additional heat to the sensing element.
+6.  **State-driven:** While the cooling appliance is inactive, the cooling anticipator shall generate a small amount of additional heat to the sensing element.
+7.  **Event-driven:** When the measured temperature drops below the setpoint minus the hysteresis value, the Thermostat shall switch the heating device on.
+8.  **Event-driven:** When the measured temperature rises above the setpoint plus the hysteresis value, the Thermostat shall switch the heating device off.
+9.  **Event-driven:** When the wax pellet in an automotive thermostat melts and expands, the Thermostat shall operate a rod to open the coolant valve.
+10. **Event-driven:** When the gas in a gas-oven capillary tube expands due to heat, the Thermostat diaphragm shall reduce the flow of gas to the burner.
+11. **Event-driven:** When the "Normally Open" contact is activated by heat, the Thermostat shall start the fan.
+12. **Event-driven:** When a digital thermostat reaches a programmed time-of-day setting, the Thermostat shall update the current setpoint to the programmed value.
+13. **Unwanted:** If the thermostat is a low-voltage (24V) model and is connected to a line-voltage (120/240V) circuit, then the Thermostat shall fail or catch fire.
+14. **Unwanted:** If the mains power fails, then the 24-volt Thermostat shall cease to operate the furnace.
+15. **Unwanted:** If a "power stealing" digital thermostat is connected to a millivolt thermopile circuit, then the Thermostat shall remain powered off.
+16. **Complex:** While in "heat" mode, when the temperature reaches the anticipator-adjusted threshold, the Thermostat shall open the heating contacts early to prevent overshoot.
+17. **Complex:** While in "cool" mode, when the temperature reaches the cooling anticipator threshold, the Thermostat shall energize the cooling equipment early to prevent excessive temperature climb.
+18. **Complex:** While using adaptive algorithms, when a target time is approaching, the Thermostat shall activate the HVAC system at a calculated time to reach the setpoint exactly at the target time.
+19. **Complex:** While heating air, when the bimetal coil moves clockwise due to cooling, the Thermostat shall close the electrical contact.
+20. **Ubiquitous:** The Thermostat shall include hysteresis to prevent excessively rapid cycling of the equipment.
+21. **Ubiquitous:** The Thermostat shall provide a visual display of the current measured temperature and the current setpoint via an LCD screen.
+22. **State-driven:** While the engine is below its optimum operating temperature, the automotive Thermostat shall restrict the flow of coolant to the radiator.
+23. **State-driven:** While the engine cooling system is operating, the radiator bypass shall maintain coolant flow through the heater core regardless of thermostat state.
+24. **Ubiquitous:** The Thermostat shall utilize a thermistor or semiconductor sensor to process temperature changes as electronic signals.
+25. **Event-driven:** When a user moves the setpoint control lever to the right, the Thermostat shall increase the desired temperature setpoint.
+26. **Ubiquitous:** The Thermostat shall use an internal magnet or mercury switch to ensure firm contact closure and prevent short heating cycles.
+27. **State-driven:** While operating a wax-pellet-driven valve, the Thermostat shall maintain a specific hysteresis range based on the blended mix of hydrocarbons.
+28. **State-driven:** While configured as a PID controller, the Thermostat shall adjust the capacity of the heating or cooling system to eliminate temperature oscillations.
+29. **Ubiquitous:** The Thermostat shall not provide electrical power to the HVAC system if the device is a millivolt-only model relying on a thermopile.
+30. **Ubiquitous:** The Thermostat shall maintain the setpoint and programmed schedule during a power loss if batteries are installed.

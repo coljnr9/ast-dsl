@@ -1,0 +1,101 @@
+### Happy Paths (Normal Operations)
+
+**Scenario 1: Grant access with a single valid credential**
+*   **Given** the access control system is active and the user "Alice" is in the Access Control List
+*   **When** Alice presents her valid RFID credential to the reader
+*   **Then** the control panel should identify a match, operate the relay to unlock the door for a predetermined time, and log the successful transaction.
+
+**Scenario 2: Grant access using two-factor authentication**
+*   **Given** the server room requires two-factor authentication
+*   **When** Bob presents his valid access badge AND enters the correct PIN code
+*   **Then** the system should unlock the door and record the entry.
+
+**Scenario 3: Mechanical free egress for safety**
+*   **Given** a user is inside a locked room equipped with a Request-to-Exit (RTE) motion sensor
+*   **When** the user approaches the door to exit
+*   **Then** the system should temporarily ignore the door alarm and allow the user to open the door manually.
+
+**Scenario 4: Successful biometric identification**
+*   **Given** an intelligent reader with a stored fingerprint database
+*   **When** a registered user places their finger on the scanner
+*   **Then** the reader should independently verify the identity and trigger the electric door strike.
+
+---
+
+### Precondition Violations (Rejected Operations)
+
+**Scenario 5: Deny access for unauthorized credential**
+*   **Given** an unknown credential is presented to the reader
+*   **When** the control panel compares the credential number to the Access Control List
+*   **Then** the system should keep the door locked, flash a red LED on the reader, and log an "Access Denied" event.
+
+**Scenario 6: Deny access due to missing second factor**
+*   **Given** a door is configured for two-factor authentication
+*   **When** a user presents a valid badge but fails to enter a PIN within the timeout period
+*   **Then** the door must remain locked and the partial attempt should be recorded.
+
+**Scenario 7: Access denied due to time restrictions**
+*   **Given** a user credential that is only valid Monday through Friday
+*   **When** the user attempts to access the building on a Saturday
+*   **Then** the electronic access control system should deny access based on the "When" policy.
+
+---
+
+### State Transitions
+
+**Scenario 8: System moves from locked to unlocked state**
+*   **Given** the door locking hardware is currently in a "Secure/Locked" state
+*   **When** a valid credential is authenticated by the controller
+*   **Then** the relay should transition the electric strike to an "Unlocked" state for the duration of the entry timer.
+
+**Scenario 9: Reverting to degraded mode on connection loss**
+*   **Given** a semi-intelligent reader is connected to a main controller
+*   **When** the RS-485 communication link to the main controller is interrupted
+*   **Then** the reader should transition to a "Degraded Mode" where doors are either locked or unlocked according to fail-safe/fail-secure settings.
+
+---
+
+### Edge Cases (Boundary/Empty/Full)
+
+**Scenario 10: Exhausted capacity of serial controller**
+*   **Given** a main controller that supports a maximum of 32 sub-controllers
+*   **When** a technician attempts to register the 33rd sub-controller on the same RS-485 line
+*   **Then** the system should reject the addition and generate a capacity limit error.
+
+**Scenario 11: Door held open past permitted duration**
+*   **Given** a door has a "held open" threshold of 30 seconds
+*   **When** a user unlocks the door but props it open for 31 seconds
+*   **Then** the magnetic door switch should detect the position and the system must trigger a "Door Prop" alarm.
+
+**Scenario 12: Empty Access Control List (Lockout)**
+*   **Given** a new database with no users assigned to the Access Control List
+*   **When** any credential (previously valid or otherwise) is presented
+*   **Then** the system must default to a "Deny All" state to maintain security.
+
+---
+
+### Query Operations (State Checking)
+
+**Scenario 13: Audit trail retrieval**
+*   **Given** the system has recorded several days of entry and exit events
+*   **When** an administrator queries the database for "Alice's" activity
+*   **Then** the system should return a chronological log of every door Alice accessed and every denied attempt.
+
+**Scenario 14: Real-time door status monitoring**
+*   **Given** the host PC is polling serial controllers via RS-485
+*   **When** a door is forced open manually without a credential
+*   **Then** the host PC should immediately display a "Forced Entry" alarm on the monitoring dashboard.
+
+---
+
+### Error Handling
+
+**Scenario 15: Handling forced-entry events**
+*   **Given** the door is in a locked state and the lock relay is not active
+*   **When** the magnetic door switch detects that the door has been opened (forced)
+*   **Then** the control panel should activate a local alarm and send a high-priority alert to the host database.
+
+**Scenario 16: Host PC failure in IP Controller topology**
+*   **Given** a network of IP controllers dependent on a central host for global logic
+*   **When** the Host PC suffers a hardware failure
+*   **Then** the individual IP controllers must continue to make local access decisions using their internal cached databases, though inter-controller features like anti-passback may stop working.

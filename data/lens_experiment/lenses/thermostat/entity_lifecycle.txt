@@ -1,0 +1,76 @@
+This domain analysis defines the core framework of a temperature control system (Thermostat) based on the provided text.
+
+### ENTITIES
+
+**1. Thermostat (The Controller)**
+*   **Data:** Current Temperature (Measured), Setpoint (Desired), Hysteresis/Differential range, Mode (Heat/Cool/Auto/Off), Power Source (Millivolt, 24V, Line Voltage, or Battery).
+*   **Creation/Destruction:** Installed as a central control unit; decommissioned/replaced (noted: mercury versions must be treated as toxic waste).
+*   **States:** 
+    *   *Idle:* Temperature is within the acceptable range (Setpoint ± Hysteresis).
+    *   *Active (Heating/Cooling):* Acting upon the system to change temperature.
+    *   *Programmed/Manual:* Operating via a schedule or a fixed user override.
+
+**2. Sensor**
+*   **Data:** Physical state (Expansion of bimetal, Resistance of thermistor, Pressure of gas/wax).
+*   **Lifecycles:** Reacts continuously to environmental changes.
+*   **Types:** Bimetallic coil, Wax pellet, Thermistor, Thermocouple, Gas-filled bulb.
+
+**3. Setpoint**
+*   **Data:** Target temperature value.
+*   **Modification:** Changed by the user via a lever, dial, digital interface, or automated schedule.
+
+**4. HVAC Load (Heating/Cooling Apparatus)**
+*   **Data:** Device Type (Furnace, AC, Heat Pump, Valve), Stage (1st stage, 2nd stage/backup).
+*   **States:** 
+    *   *Off:* No energy consumption.
+    *   *Running:* Actively heating or cooling.
+    *   *Cycle Delay:* Prevented from starting (to protect compressors).
+
+**5. Anticipator**
+*   **Data:** Resistance value or offset timing.
+*   **Function:** Simulates heat to trick the sensor into shutting off early.
+*   **States:** *Active* (while the system is running) or *Inactive*.
+
+---
+
+### OPERATIONS
+
+**1. Sense Temperature**
+*   **Entities:** Sensor, Thermostat.
+*   **Preconditions:** Sensor must be exposed to the medium (air/fluid).
+*   **Changes:** Updates "Measured Temperature" data; triggers state transitions if the threshold is crossed.
+
+**2. Adjust Setpoint**
+*   **Entities:** User, Setpoint.
+*   **Changes:** Target temperature value is updated. The Thermostat immediately re-evaluates the "Error" (difference between setpoint and measured).
+
+**3. Actuate Control (The "Bang-Bang" Cycle)**
+*   **Entities:** Thermostat, HVAC Load.
+*   **Preconditions:** Measured Temperature is outside the Hysteresis bound (e.g., < Setpoint - Hysteresis).
+*   **Changes:** HVAC Load moves from *Off* to *Running*. 
+*   **Unchanged:** The Setpoint remains constant.
+
+**4. Anticipate (Overshoot Prevention)**
+*   **Entities:** Anticipator, Sensor.
+*   **Preconditions:** System is currently *Active*.
+*   **Changes:** Artificially raises the temperature at the sensor, causing the Thermostat to transition to *Idle* before the actual room reaches the Setpoint.
+
+---
+
+### RELATIONSHIPS
+
+*   **Closed-Loop Feedback:** The **Thermostat** references the **Sensor** to decide how to toggle the **HVAC Load**, which in turn changes the environment the **Sensor** measures.
+*   **Containment:** An **HVAC System** often contains the **Thermostat**, though a **Thermostat** may control multiple independent **Loads** (e.g., Fan, Valve, Burner).
+*   **Interface/Mapping:** Terminal Codes (R, W, Y, G) act as a lookup/addressing system between the **Thermostat** logic and the physical **HVAC Load** wires.
+*   **Ownership:** A **Setpoint** is owned by a specific **Thermostat** profile (e.g., "Monday Morning" profile).
+
+---
+
+### INVARIANTS
+
+*   **Hysteresis Buffer:** To prevent "short-cycling" (rapid on/off), the system must not switch states until the temperature moves a minimum defined distance (usually 1-2°C) from the setpoint.
+*   **Thermal Inertia:** The actual system temperature will always lag behind the heater/cooler status (addressed by the anticipation invariant).
+*   **Safety Interlocks:** Pneumatic and High-Voltage systems must maintain specific pressure/voltage ranges to prevent system failure or fire.
+*   **Contact Logic (Electrical):** 
+    *   *Normally Open (NO):* Closes on temperature rise (for cooling).
+    *   *Normally Closed (NC):* Opens on temperature rise (for heating).

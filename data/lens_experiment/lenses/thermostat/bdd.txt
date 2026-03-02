@@ -1,0 +1,101 @@
+### Happy Paths (Normal Operations)
+
+**Scenario 1: Heating system activates when temperature drops**
+*   **Given** the thermostat is set to "Heat" mode with a setpoint of 21°C
+*   **When** the measured ambient temperature drops to 19°C
+*   **Then** the thermostat should close the heating circuit (W terminal) to activate the furnace.
+
+**Scenario 2: Cooling system activates when temperature rises**
+*   **Given** the thermostat is set to "Cool" mode with a setpoint of 24°C
+*   **When** the measured ambient temperature rises to 26°C
+*   **Then** the thermostat should energize the cooling load (Y terminal) to start the air conditioner.
+
+**Scenario 3: Reaching the setpoint (Normal Shutdown)**
+*   **Given** the heating system is currently active and the setpoint is 20°C
+*   **When** the measured temperature reaches 21°C (accounting for hysteresis)
+*   **Then** the thermostat should open the circuit to deactivate the heating appliance.
+
+**Scenario 4: Manual setpoint adjustment**
+*   **Given** a digital thermostat is currently displaying a setpoint of 20°C
+*   **When** the user moves the setpoint control lever or presses the "Up" button to 22°C
+*   **Then** the new setpoint of 22°C should be saved and displayed on the LCD.
+
+---
+
+### Precondition Violations
+
+**Scenario 5: Improper voltage for low-voltage thermostat**
+*   **Given** a standard 24-volt AC thermostat
+*   **When** the user attempts to connect it directly to a 240-volt line-voltage baseboard heater circuit
+*   **Then** the system should fail and the thermostat should be prevented from operating to avoid fire hazards.
+
+**Scenario 6: Digital thermostat with depleted batteries**
+*   **Given** a battery-operated digital thermostat
+*   **When** the batteries are removed or completely depleted
+*   **Then** the LCD screen should go blank and all control signals to the HVAC unit should cease.
+
+---
+
+### State Transitions
+
+**Scenario 7: Switching from Heat to Cool mode**
+*   **Given** the thermostat is currently in "Heat" mode
+*   **When** the user selects "Cool" mode on the interface
+*   **Then** the thermostat should immediately deactivate the heat terminal (W) and prepare to monitor the cool setpoint.
+
+**Scenario 8: Heat Pump reversing valve transition**
+*   **Given** a heat pump system in heating mode
+*   **When** the system switches to cooling mode
+*   **Then** the thermostat should energize the reversing valve (O/B terminal) based on the manufacturer's logic.
+
+---
+
+### Edge Cases (Boundary Conditions)
+
+**Scenario 9: Rapid cycling prevention (Hysteresis)**
+*   **Given** the thermostat setpoint is 20°C and the current temperature is 20°C
+*   **When** the temperature fluctuates rapidly by only 0.1°C
+*   **Then** the "bang-bang" controller should delay switching to prevent mechanical wear on the compressor.
+
+**Scenario 10: Anticipator stopping heat early (Overshoot prevention)**
+*   **Given** a thermostat with a heat anticipator enabled
+*   **When** the temperature is 0.5°C below the setpoint while heating
+*   **Then** the thermostat should deactivate the heater before the setpoint is reached to account for residual heat in the system.
+
+**Scenario 11: Empty/Cold start for "On-Demand" water heater**
+*   **Given** a tankless water heater using a millivolt thermostat
+*   **When** a hot water tap is opened
+*   **Then** the pilot ignition should engage immediately as it is faster than hot-surface ignition.
+
+---
+
+### Query Operations
+
+**Scenario 12: Checking current ambient temperature**
+*   **Given** the thermostat is in an idle state
+*   **When** the user views the digital display
+*   **Then** the current sensed temperature from the thermistor should be displayed alongside the setpoint.
+
+**Scenario 13: Checking system status/faults**
+*   **Given** an advanced electronic thermostat with "L" terminal connectivity
+*   **When** the HVAC equipment experiences a service issue
+*   **Then** the thermostat should display a "System Fault" or service light indicator.
+
+---
+
+### Error Handling & Safety
+
+**Scenario 14: Failed Thermostat (Wax Pellet Engine)**
+*   **Given** an automotive wax pellet thermostat
+*   **When** the wax pellet fails to expand at the rated temperature
+*   **Then** the bypass through the radiator passenger side tank should allow minimal coolant flow to prevent immediate engine destruction.
+
+**Scenario 15: Scald protection in mixing valves**
+*   **Given** a thermostatic mixing valve receiving hot water at 60°C
+*   **When** the user requests water for a shower
+*   **Then** the wax pellet must automatically mix cold water to ensure the output does not exceed 49°C.
+
+**Scenario 16: Failure of "Control Air" in pneumatic systems**
+*   **Given** a pneumatic thermostat system
+*   **When** the main air pressure drops below 15 psi
+*   **Then** the connected damper actuators should move to their default "fail-safe" positions.

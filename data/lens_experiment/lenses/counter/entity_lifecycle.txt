@@ -1,0 +1,61 @@
+This domain analysis focuses on the **CTU (Up-Counter) Function Block** as defined by the IEC 61131-3 standard within the CODESYS environment.
+
+---
+
+### ENTITIES
+
+#### 1. CTU Instance (Function Block)
+The core logic unit that maintains state across execution cycles.
+*   **Data Carried (State):**
+    *   `CU` (Input, BOOL): Logic state for the count-up trigger.
+    *   `RESET` (Input, BOOL): Logic state for resetting the counter.
+    *   `PV` (Input, WORD): The preset value (threshold).
+    *   `Q` (Output, BOOL): The status flag indicating the limit is reached.
+    *   `CV` (Output, WORD): The current counter value.
+    *   *Internal State:* Previous state of `CU` (required for rising edge detection).
+*   **Lifecycle:**
+    *   **Created:** Defined in the declaration part of a program (e.g., `CTUInst : CTU;`).
+    *   **Modified:** Updated every time the block is "called" in the execution cycle.
+    *   **Destroyed:** When the parent program or PLC project is stopped/deallocated.
+*   **States & Transitions:**
+    *   `CV < PV`: The normal counting state; `Q` is FALSE.
+    *   `CV >= PV`: The threshold state; `Q` is TRUE.
+
+---
+
+### OPERATIONS
+
+#### 1. Increment (`CU` Rising Edge)
+*   **Entities:** CTU Instance.
+*   **Preconditions:** `RESET` must be FALSE; The `CU` input must transition from FALSE to TRUE since the last execution (Rising Edge).
+*   **Changes:** `CV` increases by 1 (unless it has reached the maximum value of the WORD data type).
+*   **Stays same:** `PV` remains unchanged.
+
+#### 2. Reset (`RESET` High)
+*   **Entities:** CTU Instance.
+*   **Preconditions:** `RESET` input is TRUE.
+*   **Changes:** `CV` is forced to 0. `Q` is updated to FALSE (unless `PV` is 0).
+*   **Stays same:** `PV` remains unchanged.
+
+#### 3. Evaluation (State Update)
+*   **Entities:** CTU Instance.
+*   **Preconditions:** None (happens every execution cycle).
+*   **Changes:** `Q` is set to TRUE if `CV >= PV`, otherwise FALSE.
+*   **Stays same:** `CV` and `PV` (unless modified by logic above).
+
+---
+
+### RELATIONSHIPS
+
+*   **Ownership:** A Program or Function holds an "Ownership" relationship with the CTU Instance. The Instance's memory is allocated as part of the parent's data area.
+*   **Input Mapping:** External variables (e.g., `VarBOOL1`, `VarWORD1`) are "linked" or passed to the CTU inputs during the call.
+*   **Output Referencing:** External variables (e.g., `VarBOOL3`, `VarWORD2`) reference the internal properties (`Q` and `CV`) of the CTU instance to drive downstream logic.
+
+---
+
+### INVARIANTS
+
+*   **Non-Negativity:** Since `CV` is of type `WORD` (unsigned), the counter value can never be less than 0.
+*   **Reset Priority:** If `RESET` is TRUE, the counter must be 0 regardless of the state of the `CU` input (Reset usually overrides Increment in IEC 61131-3 logic).
+*   **Threshold Consistency:** The output `Q` must always accurately reflect the mathematical comparison `CV >= PV` at the end of an execution cycle.
+*   **Type Constraint:** `CV` cannot exceed the maximum value of a `WORD` (65535). If it reaches this limit, further increments typically result in no change or an overflow depending on specific compiler implementation, but it cannot be "infinite."

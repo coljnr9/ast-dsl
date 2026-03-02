@@ -1,0 +1,57 @@
+As a Reliability Engineer, I have performed a Failure Mode Analysis on the **Telephone Directory System** based on the provided text.
+
+---
+
+### 1. Operations & Failure Modes
+
+| Operation | Potential Failure Mode (Preconditions/States/Inputs) | System Response (Expected Behavior) |
+| :--- | :--- | :--- |
+| **Lookup by Name (White Pages)** | **Missing Entry:** Subscriber is unlisted, ex-directory, or private. | **Rejected:** Entry must be omitted from the output. |
+| | **Out of Scope Entry:** Search for Mobile or VoIP numbers (in US). | **Ignored:** System does not contain these records; result is null. |
+| | **Ambiguity:** Multiple subscribers with the identical name. | **Multiple Returns:** System must provide addresses to differentiate. |
+| | **Technological Obsolescence:** Attempting to use a physical book for a modern subscriber. | **Failure to find:** System is out of sync with real-time reality. |
+| **Forward Lookup (Yellow Pages)** | **Category Misclassification:** Business is listed under the wrong heading (e.g., "Lawyer" vs "Attorney"). | **Search Failure:** Entry remains valid but unreachable by the user's logic. |
+| | **Invalid Input:** Searching for a person in the business-only Yellow Pages. | **Null Result:** Redirect to White Pages. |
+| **Reverse Lookup (Grey Pages)** | **Jurisdictional Restriction:** Operation attempted in a region where reverse lookup is prohibited. | **Rejection:** The service is unavailable/redacted for legal reasons. |
+| | **Unmatched Number:** Number exists but is not in the directory database (e.g., unlisted). | **Error State:** "Subscriber details unavailable." |
+| **Physical Distribution** | **Legal Injunction/Ban:** Community (e.g., San Francisco/Seattle) bans unsolicited distribution. | **Rejection:** Distribution halted; status becomes "By request only." |
+| | **Environmental Damage:** Physical degradation (ink blur, newsprint imperfections). | **Recovery:** Use of specialized typefaces (Bell Gothic) to maintain legibility. |
+| **Digital Access (CD-ROM)** | **Disc Mismanagement:** Required data spans 5-8 discs; incorrect disc inserted. | **State Error:** System must prompt for the correct volume/disc. |
+| | **Hardware Obsolescence:** Modern hardware lacks CD-ROM drives. | **System Failure:** Operation impossible on that hardware. |
+| **Digital Access (Minitel/Online)** | **Connectivity Loss:** Loss of "11" access number or Internet connection. | **Error State:** System becomes inaccessible. |
+
+---
+
+### 2. System Preservation Requirements
+Even when failures occur, the system must preserve:
+*   **Privacy Integrity:** Under no circumstances should an "unlisted/private" number be leaked through search or reverse lookup.
+*   **Alphabetical Integrity:** The sequence must be maintained to ensure the "Let your fingers do the walking" heuristic remains functional.
+*   **Emergency Access:** Critical numbers (hospitals, emergency services) must remain accessible even if residential listings are deprecated.
+
+---
+
+### 3. Permanent Transitions (Irreversible States)
+*   **Unlisted Status:** Once a subscriber pays/requests to be unlisted, the transition out of the public directory is effectively permanent for that publication cycle.
+*   **Historical Archive:** Once a directory is "preserved by BT Archives" or similar bodies, its contents become a permanent historical record that cannot be updated or corrected.
+*   **Transition to Digital:** Once a community ceases printing residential white pages (e.g., NY 2010), the system transitions to a "Digital-Only" state for that demographic.
+
+---
+
+### 4. Categorical Impossibilities
+*   **Cellular Lookup:** In the US system, it is currently impossible to find mobile or VoIP numbers in the primary directory due to privacy/telemarketing regulations.
+*   **Reverse Lookup in All Regions:** In certain jurisdictions, the "Grey Pages" functionality is natively disabled/impossible.
+*   **Real-Time Update (Print):** A hard-copy directory cannot be updated once the 600,000 tons of paper have been printed and distributed.
+
+---
+
+### 5. Edge Cases
+*   **The "Measles" Scenario (Operator Dependency):** Early historical systems relied on human memory/health. If operators are incapacitated, the "Directory" (as an interface) fails entirely until the transition to the "Parker Format" (alphabetical/numbered list).
+*   **Commonality Overload:** A subscriber with a common name and no provided address makes the directory unusable for that specific entity discovery.
+*   **Language Barrier:** Bilingual directories (e.g., Rafu Telephone Guide) create a failure mode where search fails if the user does not possess the secondary language's character set.
+
+---
+
+### 6. Out of Scope (Explicit Non-Support)
+*   **Copyright Protection (US):** The system does **not** support intellectual property claims on the data itself (per *Feist v. Rural*).
+*   **Real-Time Presence:** The directory does not indicate if a subscriber is currently "on the line" or available; it is a static registry, not a status indicator.
+*   **Global Single-Source:** There is no single "Phone Book"; the system is strictly partitioned by geographical area or specific service provider.

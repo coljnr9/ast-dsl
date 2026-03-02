@@ -1,0 +1,120 @@
+### Happy Paths (Normal Operations)
+
+**Scenario 1: Successfully receiving new inventory**
+*   **Given** a warehouse worker has a shipment of 50 units of "Product A"
+*   **When** the worker scans the product barcodes into the system
+*   **Then** the inventory level for "Product A" should increase by 50 units.
+
+**Scenario 2: Creating a Bill of Materials for manufacturing**
+*   **Given** the manufacturer needs to assemble a "Final Product"
+*   **When** the user creates a Bill of Materials (BOM) listing 3 "Bolts" and 1 "Steel Plate"
+*   **Then** the system should save the BOM to facilitate the creation of future work orders.
+
+**Scenario 3: Tracking inventory via RFID**
+*   **Given** a pallet of goods equipped with RFID tags enters the warehouse
+*   **When** the RFID reader detects the tags at the loading dock
+*   **Then** the system should automatically update the location status of those items to "In Warehouse."
+
+**Scenario 4: Fulfilling a customer order**
+*   **Given** there are 10 units of "Item X" in stock
+*   **When** a sales order for 2 units is processed through a linked eCommerce store
+*   **Then** the system should reduce the "Stock on Hand" to 8 units.
+
+---
+
+### Precondition Violations (Rejected Operations)
+
+**Scenario 5: Attempting to ship items with zero stock**
+*   **Given** the inventory level for "Product B" is 0
+*   **When** a user attempts to create a packing slip for "Product B"
+*   **Then** the system should reject the action and display an "Insufficient Stock" error.
+
+**Scenario 6: Accessing restricted administrative features**
+*   **Given** an employee has "Restricted User Rights" (Receiving only)
+*   **When** the employee attempts to delete a supplier from the database
+*   **Then** the system should deny access and display a "Permission Denied" message.
+
+---
+
+### State Transitions
+
+**Scenario 7: Reorder point triggered**
+*   **Given** a product has a reorder point threshold of 10 units and current stock is 11
+*   **When** 2 units are sold and stock drops to 9
+*   **Then** the system status for that product should change to "Needs Reordering" and notify the manager.
+
+**Scenario 8: Work order progression**
+*   **Given** an "Auto Work Order" is in "Pending" status
+*   **When** the user confirms all Bill of Materials parts are gathered
+*   **Then** the work order status should transition to "In Progress."
+
+---
+
+### Edge Cases (Boundaries & States)
+
+**Scenario 9: Reordering at the exact threshold**
+*   **Given** the reorder point for "Item Z" is set to exactly 5 units
+*   **When** the stock level reaches 5 units
+*   **Then** the system should trigger the reorder notification.
+
+**Scenario 10: Managing an empty inventory database**
+*   **Given** a new company has just deployed the cloud software
+*   **When** the manager views the "Inventory Optimization" dashboard
+*   **Then** the system should display 0 for all metrics without crashing.
+
+**Scenario 11: Inventory transfer between locations**
+*   **Given** "Warehouse A" has 10 units and "Warehouse B" has 0 units
+*   **When** a transfer of 10 units is initiated from A to B
+*   **Then** "Warehouse A" should show 0 units and "Warehouse B" should show 10 units.
+
+---
+
+### Query Operations (Checking State)
+
+**Scenario 12: Real-time stock level inquiry**
+*   **Given** a manager is traveling and using a mobile device
+*   **When** they query the "Stock on Hand" for "Product C"
+*   **Then** the system should return the most recent real-time data from the cloud database.
+
+**Scenario 13: Calculating "Stock Cover" metric**
+*   **Given** a product sells at a rate of 10 units per day and 100 units are in stock
+*   **When** the user views the Inventory Optimization report
+*   **Then** the system should display a "Stock Cover" value of 10 days.
+
+**Scenario 14: Checking Lead Demand**
+*   **Given** a product has a lead time of 5 days and an average daily sale of 2 units
+*   **When** the "Lead Demand" report is generated
+*   **Then** the system should calculate and display a demand of 10 units.
+
+---
+
+### Error Handling
+
+**Scenario 15: Handling failed cloud synchronization**
+*   **Given** the inventory software is being used on a mobile device in a warehouse with a dead zone
+*   **When** a barcode is scanned while the device is offline
+*   **Then** the system should cache the data locally and sync with the cloud once the connection is restored.
+
+**Scenario 16: Invalid barcode format**
+*   **Given** the system is configured to read UPC barcodes
+*   **When** a user scans an unsupported or corrupted QR code
+*   **Then** the system should emit an error tone and display "Invalid Format."
+
+**Scenario 17: Service provider downtime**
+*   **Given** the cloud service provider experiences an outage
+*   **When** a user attempts to log into the web-based inventory program
+*   **Then** the system should display a meaningful message regarding service unavailability rather than a generic code error.
+
+---
+
+### Integration & Coordination
+
+**Scenario 18: Inter-departmental data visibility**
+*   **Given** Department A has updated their cleaning supply stock levels
+*   **When** a manager from Department B views the centralized inventory report
+*   **Then** they should see Department A's updated numbers immediately without contacting them.
+
+**Scenario 19: Accounting integration (Cost of Service)**
+*   **Given** a cleaning service uses $20 worth of supplies recorded in the inventory software
+*   **When** the service is marked as "Complete"
+*   **Then** the total cost of materials should be pushed to the integrated accounting software.

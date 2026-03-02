@@ -1,0 +1,318 @@
+
+DeepWiki
+
+tastejs/todomvc
+Last indexed: 18 April 2025 (c8aedc)
+
+    Overview
+    Project Goals and Purpose
+    Architecture Overview
+    Framework Implementations
+    Core Implementation Specification
+    Modern JavaScript Frameworks
+    Vue Implementation
+    Preact Implementation
+    MVC Frameworks
+    Backbone Marionette Implementation
+    Ember.js Implementation
+    Other Implementations
+    TypeScript Angular Implementation
+    jQuery Implementation
+    Development and Testing
+    Contributing Guidelines
+    Test Architecture
+    Selenium Tests
+    Cypress Tests
+    CI/CD Pipeline
+    Build System
+    Package Configuration
+    Gulp Tasks
+    Deployment Process
+
+Architecture Overview
+Relevant source files
+
+This document provides a high-level understanding of the TodoMVC architecture, explaining how the different components are organized and interact with each other. It covers the project's structure, framework implementations, testing infrastructure, and build/deployment system.
+
+For information about the project's purpose and goals, see Project Goals and Purpose. For details about specific framework implementations, see Framework Implementations.
+System Overview
+High-Level Architecture
+
+TodoMVC consists of four main systems:
+
+    Core TodoMVC Project: The central hub containing the website and framework comparison functionality
+    Framework Implementations: Multiple implementations of the same Todo application using different frameworks
+    Testing Infrastructure: Test suites that validate each framework implementation
+    Build & CI/CD: Build process and continuous integration/deployment pipeline
+
+Sources:
+index.html1-452
+readme.md1-89
+package.json1-63
+Core Components
+
+The core project consists of several key files:
+Component	Description	Role
+index.html	Main entry point	Provides the browsable interface for comparing frameworks
+learn.json	Framework metadata	Contains details about each framework implementation
+readme.md	Project documentation	Explains project goals and team information
+app-spec.md	Todo application specification	Defines requirements for framework implementations
+server.js	Development server	Serves the application locally for development
+
+The TodoMVC website (index.html) organizes framework implementations into three categories:
+
+    JavaScript Frameworks: Pure JavaScript implementations (React, Vue, etc.)
+    Compile-to-JS: Languages that compile to JavaScript (TypeScript, Elm, etc.)
+    Labs: Experimental or less common implementations
+
+Sources:
+index.html73-322
+learn.json1-1100
+app-spec.md1-123
+Implementation Architecture
+Framework Implementation Structure
+
+All framework implementations follow the same specification (app-spec.md) but use their respective framework's patterns and practices.
+
+Sources:
+app-spec.md1-123
+examples/react/readme.md1-43
+Standard Application Structure
+
+Each framework implementation follows this recommended structure:
+
+examples/[framework-name]/
+├── index.html          # Main HTML entry point
+├── package.json        # Dependencies and scripts
+├── readme.md           # Implementation documentation
+├── css/                # Styling
+│   └── app.css         # Custom styles
+└── js/                 # Application code
+    ├── app.js          # Main application logic
+    ├── controllers/    # Controllers (if applicable)
+    └── models/         # Data models (if applicable)
+
+While frameworks can adapt this structure to their conventions, they must maintain compatibility with the application specification.
+
+Sources:
+app-spec.md9-44
+contributing.md8-76
+Common Requirements
+
+All implementations must include these core features:
+
+    Todo Management:
+        Create, read, update, and delete todos
+        Mark todos as complete/incomplete
+        Filter todos by status (all/active/completed)
+
+    UI Requirements:
+        Show/hide main section and footer based on todo count
+        Display number of active todos
+        Clear completed button
+        Toggle all checkbox
+
+    Technical Requirements:
+        Persistence using localStorage
+        Routing support
+        Standard HTML structure and CSS classes
+
+Sources:
+app-spec.md80-122
+Testing Architecture
+Test Framework Organization
+
+The testing infrastructure validates that all framework implementations conform to the TodoMVC specification through automated browser tests.
+
+Sources:
+tests/test.js1-402
+tests/page.js1-269
+tests/testOperations.js1-104
+Selenium Test Components
+
+The Selenium-based testing framework consists of three main modules:
+Component	Purpose	Key Functions
+page.js	Page object model	Locates elements via CSS selectors and provides interaction methods
+test.js	Test cases	Defines 27 test cases covering all specification requirements
+testOperations.js	Common assertions	Provides reusable test operations and assertions
+
+The tests validate key functionality such as:
+
+    Todo creation, editing, and deletion
+    Marking todos as complete/incomplete
+    Filtering todos by status
+    Persistence across page reloads
+    Routing functionality
+
+Sources:
+tests/page.js1-269
+tests/test.js93-398
+tests/testOperations.js1-104
+Cypress Test Integration
+
+Cypress provides a modern alternative to Selenium testing:
+
+    Integrated with the CI/CD pipeline
+    Configured in the package.json scripts
+    Runs the same test scenarios in a more reliable way
+
+Sources:
+package.json21-26
+.travis.yml60-229
+Test Automation
+
+The testing infrastructure is automated through:
+
+    Test Runner Script (test-runner.sh):
+        Determines which framework implementations to test
+        Sets up the test environment
+        Executes tests and reports results
+
+    CI Integration:
+        Travis CI and CircleCI run tests on pull requests and commits
+        Each framework implementation is tested individually
+        Results are reported back to GitHub
+
+Sources:
+test-runner.sh1-42
+.travis.yml42-229
+circle.yml1-215
+Build and Deployment System
+Build Pipeline Architecture
+
+The build and deployment system automates the process of preparing the TodoMVC website and examples for production.
+
+Sources:
+gulpfile.js1-115
+package.json1-63
+.travis.yml1-229
+Gulp Build System
+
+The Gulp build system (gulpfile.js) defines several tasks for processing assets:
+Task	Description
+jshint	Lints JavaScript files
+images	Optimizes images with imagemin
+copy	Copies necessary files to the build directory
+styles	Processes CSS with Autoprefixer
+html	Processes HTML with useref and vulcanize
+clean	Removes previous build files
+
+These tasks are combined in the default build task, which runs when executing gulp.
+
+Sources:
+gulpfile.js24-94
+CI/CD Integration
+
+The continuous integration and deployment pipeline is configured through:
+
+    Travis CI (.travis.yml):
+        Runs tests on Node.js 10.13
+        Tests all framework implementations
+        Deploys to GitHub Pages on successful master branch builds
+
+    CircleCI (circle.yml):
+        Provides additional CI capacity
+        Tests are organized by framework categories
+        Uses Docker containers with Chrome for browser testing
+
+Sources:
+.travis.yml1-229
+circle.yml1-215
+test-runner.sh11-25
+Development Environment
+
+For local development, TodoMVC provides:
+
+    Express Server (server.js):
+        Serves the TodoMVC website locally
+        Provides static file serving
+        Configured with minimal dependencies
+
+    NPM Scripts (package.json):
+        test: Run tests
+        test-server: Start test server
+        gulp: Run build tasks
+        cy:run: Run Cypress tests
+        test:all: Run all tests
+
+Sources:
+server.js1-23
+package.json17-26
+Data Flow and User Interaction
+
+The user interaction flow is consistent across all framework implementations:
+
+    Framework Selection:
+        User visits the TodoMVC website
+        User browses and selects a framework implementation
+
+    Todo Application Flow:
+        Framework loads and renders the Todo interface
+        User interacts with the application (create, toggle, filter, delete)
+        Framework handles these interactions using its specific patterns
+        Data is persisted to localStorage using the framework's mechanisms
+
+    Consistent Experience:
+        All implementations provide the same functionality and UX
+        Differences are in implementation details, not user-facing features
+        This enables meaningful framework comparison
+
+Sources:
+index.html44-50
+app-spec.md80-122
+Framework Comparison Infrastructure
+
+The core of the TodoMVC project is its ability to help developers compare frameworks. This is enabled by:
+
+    Categorized Framework List:
+        JavaScript frameworks (React, Vue, etc.)
+        Compile-to-JS languages (TypeScript, Elm, etc.)
+        Labs (experimental implementations)
+
+    Consistent Implementation Requirements:
+        All implementations follow the same specification
+        Same UI/UX patterns across implementations
+        Same functionality requirements
+
+    Learning Resources:
+        Each framework includes documentation and resources
+        learn.json provides structured metadata about each framework
+        Links to official resources, tutorials, and community sites
+
+    Framework Selection Guidance:
+        Implementation complexity and code size comparison
+        Performance characteristics (implicit through implementation)
+        Developer experience (through code organization)
+
+Sources:
+index.html73-322
+learn.json1-1100
+readme.md69-74
+
+By maintaining consistency across implementations while allowing framework-specific patterns, TodoMVC provides developers with a valuable tool for framework comparison and selection.
+
+Refresh this wiki
+On this page
+
+    Architecture Overview
+    System Overview
+    High-Level Architecture
+    Core Components
+    Implementation Architecture
+    Framework Implementation Structure
+    Standard Application Structure
+    Common Requirements
+    Testing Architecture
+    Test Framework Organization
+    Selenium Test Components
+    Cypress Test Integration
+    Test Automation
+    Build and Deployment System
+    Build Pipeline Architecture
+    Gulp Build System
+    CI/CD Integration
+    Development Environment
+    Data Flow and User Interaction
+    Framework Comparison Infrastructure
+
+Ask Devin about tastejs/todomvc

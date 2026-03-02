@@ -1,0 +1,61 @@
+This Reliability Engineering Failure Mode Analysis (FMA) focuses on the system described in the text, treating the "Electronic Shopping Cart" as a state-machine-driven data processor.
+
+### 1. Operation: Item Selection & Accumulation (Add to Cart)
+*   **Preconditions:** Active session (Cookie or Query String), product existence in database.
+*   **Failure Modes:**
+    *   **Expired/Blocked Session:** User adds item, but cookies are disabled or session has timed out. **Result:** Request rejected; item not saved.
+    *   **Inventory Exhaustion:** Item added to cart but database quantity is zero. **Result:** Reject operation with "Out of Stock" error.
+    *   **Database Desync:** Frontend shows product, but backend database cannot find the GUID/ID. **Result:** Error state; system must prevent "null" items from entering the list.
+*   **System Must Preserve:** Session integrity and the current list of already-validated items.
+
+### 2. Operation: Final Review & Modification
+*   **Preconditions:** Cart contains $\ge 1$ item; active session.
+*   **Failure Modes:**
+    *   **Negative Quantities:** User modifies item count to -1 or non-integer. **Result:** Input rejected; default to 1 or remove item.
+    *   **Stale Pricing:** Price changed in the database while the item was in the cart. **Result:** Force re-calculation/update before proceeding to checkout.
+    *   **Empty Cart State:** User removes all items and attempts to "Review." **Result:** Redirect to storefront; block checkout.
+*   **System Must Preserve:** Subtotal accuracy and the relationship between the item and its current metadata (discounts, categories).
+
+### 3. Operation: Totals Calculation (Freight, Tax, Packaging)
+*   **Preconditions:** Valid delivery address provided; tax/shipping logic available; item weights/dimensions defined.
+*   **Failure Modes:**
+    *   **Undefined Shipping Zone:** User provides an address the freight logic doesn't support. **Result:** Error state; block progress until valid address is provided.
+    *   **Zero-Value Calculation:** Tax engine fails to return a value. **Result:** System must fail-safe (block transaction) rather than charge 0% tax illegally.
+    *   **Lacking Packaging Metadata:** Items missing weight/dimensions for freight calculation. **Result:** Revert to flat-rate or error state requiring admin intervention.
+*   **System Must Preserve:** The integrity of the "Net Total" (Items + Taxes + Shipping = Total).
+
+### 4. Operation: Payment Capture (Gateway Integration)
+*   **Preconditions:** Secure Gateway connection; API keys active; PCI compliance standards met.
+*   **Failure Modes:**
+    *   **Gateway Timeout:** Payment sent but no response received (Handshake failure). **Result:** Transaction remains in "Pending" or "Unknown"; do NOT clear cart.
+    *   **Declined Authorization:** Valid card but insufficient funds. **Result:** Reject transition to "Order" state; keep items in cart.
+    *   **Non-Compliant Data Handling:** Attempting to store prohibited CVV/CC data on the local server. **Result:** System must reject data storage to maintain PCI DSS status.
+*   **System Must Preserve:** Transaction logs for audit and the security of sensitive cardholder data.
+
+### 5. Operation: Finalization (Order Generation & Cart Clearing)
+*   **Preconditions:** Payment "Success" signal received; stock reserved.
+*   **Failure Modes:**
+    *   **Race Condition:** Item sold to another user during the seconds between "Payment" and "Finalization." **Result:** Critical Error; requires immediate refund transition or backorder state.
+    *   **Database Commit Failure:** Payment processed, but order record fails to save to DB. **Result:** Critical Error; system must log orphaned payment for manual reconciliation.
+*   **System Must Preserve:** The "Order" record as the single source of truth; the cart MUST be cleared only after the order is confirmed as saved.
+
+---
+
+### Key Transitions and Constraints
+
+#### Permanent (Irreversible) Transitions
+*   **Cart to Order:** Once the software "generates an order against the selected item," the cart is cleared. This transition is usually permanent; you cannot revert an "Order" back into a "Cart" without a new session.
+*   **Payment Authorization:** Once the Gateway returns a "Success" token, funds are moved. The cart software cannot "undo" this without a separate "Refund" operation.
+
+#### Impossible Operations
+*   **Admin Modification of In-Transit Payments:** A merchant cannot modify the amount of a transaction once the client's information is submitted to the Secure Gateway.
+*   **Checkout without Session:** Because the system relies on cookies or query strings, an anonymous, state-less checkout is impossible.
+
+#### Edge Cases (Combinations of Conditions)
+*   **The Abandoned Cart Recovery:** If a user abandons a cart and an item is later deleted from the store database, the "Recovery" link may point to a non-existent object.
+*   **Discount Stacking:** Applying a category discount, a product discount, and a shipping discount simultaneously can lead to a negative total if the logic doesn't enforce a floor of $0.00.
+
+#### Deliberately Out of Scope
+*   **Physical Logistics:** The software calculates "freight transport," but the actual movement of goods is external.
+*   **Direct Credit Card Processing:** Per the text, the software relies on "the software module of the secure gateway provider." It does not process raw card data itself (to remain PCI compliant).
+*   **Offline Sales:** The system is defined as "web server" based; it does not support point-of-sale (POS) operations without an internet connection.

@@ -1,0 +1,41 @@
+Here are the behavioral requirements for the DS18B20 Digital Thermometer using EARS notation:
+
+**Normal Operations & Ubiquitous Requirements**
+1. The DS18B20 shall provide 9-bit to 12-bit Celsius temperature measurements.
+2. The DS18B20 shall communicate with a central microprocessor over a 1-Wire bus.
+3. The DS18B20 shall store a unique 64-bit serial code in on-board ROM.
+4. The DS18B20 shall follow the 1-Wire bus protocol for all data and command transmissions.
+5. The DS18B20 shall store temperature data as a 16-bit sign-extended two’s complement number.
+
+**State-Driven Behavior**
+6. While in the power-up state, the DS18B20 shall default to 12-bit resolution.
+7. While in the power-up state, the DS18B20 shall load 85°C into the temperature register.
+8. While in the power-up state, the DS18B20 shall automatically reload TH, TL, and configuration data from EEPROM to the scratchpad.
+9. While performing a temperature conversion, the DS18B20 shall return a "0" response to read time slots if powered by an external VDD.
+10. While a temperature conversion is complete, the DS18B20 shall return a "1" response to read time slots if powered by an external VDD.
+
+**Event-Driven Behavior**
+11. When the master issues a Convert T [44h] command, the DS18B20 shall initiate a temperature-to-digital conversion.
+12. When a temperature conversion is completed, the DS18B20 shall store the thermal data in the 2-byte temperature register.
+13. When a temperature conversion is completed, the DS18B20 shall return to a low-power idle state.
+14. When the master issues an Alarm Search [ECh] command, the DS18B20 shall respond only if the internal alarm flag is set.
+15. When the master issues a Write Scratchpad [4Eh] command, the DS18B20 shall update the TH, TL, and configuration registers.
+16. When the master issues a Copy Scratchpad [48h] command, the DS18B20 shall transfer TH, TL, and configuration data from SRAM to EEPROM.
+17. When the master issues a Read Power Supply [B4h] command, the DS18B20 shall pull the bus low if operating in parasite power mode.
+18. When the DS18B20 detects a rising edge after a reset pulse, the DS18B20 shall transmit a presence pulse after 15μs to 60μs.
+
+**Unwanted Behavior (Error & Rejection)**
+19. If the 1-Wire bus is held low for more than 480μs, then the DS18B20 shall perform a reset of all internal components.
+20. If the measured temperature is ≥ TH or ≤ TL, then the DS18B20 shall set the internal alarm flag.
+21. If the measured temperature returns to the programmed limits, then the DS18B20 shall clear the alarm flag after the next conversion.
+22. If the voltage on any pin is outside the range of -0.5V to +6.0V, then the DS18B20 shall consider this an absolute maximum rating violation.
+
+**Complex Requirements**
+23. While in parasite power mode, when the master issues a Convert T [44h] command, the DS18B20 shall derive operating current from the high-signaled DQ pin via an internal capacitor.
+24. While in parasite power mode, when the master performs a temperature conversion or EEPROM write, the DS18B20 shall require the bus to be held high by a strong pullup within 10μs.
+
+**Preservation & Scope Boundaries**
+25. The DS18B20 shall retain data in the TH, TL, and configuration registers during power-down using nonvolatile EEPROM.
+26. The DS18B20 shall preserve the 64-bit unique serial code as a read-only value in ROM.
+27. The DS18B20 shall not prevent command sequences from proceeding if the bus master's calculated CRC does not match the device CRC.
+28. The DS18B20 shall not perform Fahrenheit conversions internally.

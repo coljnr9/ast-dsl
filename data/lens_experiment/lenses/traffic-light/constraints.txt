@@ -1,0 +1,30 @@
+1. A standard vertical signal head must arrange colors from top to bottom as red, amber, and then green.
+2. A standard horizontal signal head must arrange colors from left to right as red, amber, and then green.
+3. Drivers must not proceed beyond the stop line or enter an intersection when a non-flashing red light is displayed.
+4. Drivers must not pass the stop line when an amber light is displayed unless they cannot stop safely.
+5. Drivers may proceed when a green light is displayed provided the intersection is clear and can be exited before the next phase change.
+6. A red and amber light displayed simultaneously indicates the signal is about to change to green but the requirement to stop remains in effect.
+7. A flashing red light requires traffic to stop before the intersection and then proceed according to standard stop sign rules.
+8. A flashing amber light indicates traffic may proceed through the intersection with caution.
+9. A green arrow allows traffic to proceed only in the specific direction indicated by the arrow.
+10. A green arrow displayed with a red light grants priority to turning traffic over oncoming traffic.
+11. A flashing amber arrow requires drivers to give way to other vehicles and pedestrians before turning in the direction of the arrow.
+12. A red arrow forbids traffic from making the specific movement indicated by the arrow.
+13. Pedestrians may only begin crossing a roadway when a "walk" symbol (green or white walking figure) is displayed.
+14. Pedestrians must not start to cross the road when a flashing red or orange "don't walk" symbol appears.
+15. Pedestrians already in the roadway when a "don't walk" signal begins flashing must continue to a place of safety.
+16. Pedestrians are forbidden from entering the intersection when a steady red or orange "don't walk" symbol is displayed.
+17. A countdown light must reach zero or one at the exact moment the main signal color changes.
+18. In South Korea, traffic is prohibited from entering an intersection on amber even if a safe stop is not possible.
+19. Transitions between signal phases must avoid the "yellow trap" where turning drivers mistakenly assume oncoming traffic has been signaled to stop.
+20. In the United Kingdom, vehicles are strictly prohibited from blocking an intersection or crossing even when the signal is green.
+21. Automated timers may be used to transition signal states without manual human intervention.
+22. Vehicle detection sensors may be used by the control system to trigger phase changes based on traffic volume.
+23. Emergency vehicle preemption may override normal signal cycles to grant priority to first responders.
+24. At a pedestrian scramble (all-red stage), all vehicular traffic must stop to allow pedestrians to cross in any direction, including diagonally.
+25. HAWK beacons must remain unlit until a pedestrian activates the system via a push button.
+26. A leading pedestrian interval must provide a "walk" signal to pedestrians shortly before the parallel vehicular traffic receives a green light.
+27. Traffic signals at railway level crossings or low-flying aircraft approaches may use flashing red lights combined with sirens or voice prompts.
+28. Speed signs may display recommended speeds to allow drivers to reach the next intersection during a green phase.
+29. In "parallel walk" configurations, turning vehicles must yield to pedestrians crossing in the same direction of travel.
+30. The system does not support the withdrawal of a pedestrian crossing request once the push button has been activated.

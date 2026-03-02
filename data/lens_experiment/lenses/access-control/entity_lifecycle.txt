@@ -1,0 +1,76 @@
+This domain analysis outlines the core components of an Access Control System (ACS) based on the provided text.
+
+### ENTITIES
+
+**1. Subject** (The "Who")
+*   **Data:** Identity, credentials, access rights (permissions), job role.
+*   **Lifecycle:** Created when a person is enrolled in the system. Modified when their "risk appetite" or job duties change. Destroyed/De-authorized when they leave the organization.
+*   **States:** Authorized, Unauthorized, Suspended (e.g., lost card).
+
+**2. Object/Resource** (The "Where")
+*   **Data:** Resource ID, location, security level, hardware type (door, turnstile, gate, elevator, database).
+*   **Lifecycle:** Created during facility design/software setup. Modified if hardware is upgraded (e.g., moving from mechanical to electronic).
+*   **States:** Locked, Unlocked, Forcefully Opened (Alarm), Held Open Too Long (Alarm), Shunted (Alarm ignored for authorized exit).
+
+**3. Credential** (The "Key")
+*   **Data:** Type (Know/Have/Are/Know), unique identifier (badge number, biometric template), expiration date.
+*   **Lifecycle:** Issued to a subject. Modified if re-keyed or updated. Destroyed if lost, stolen, or expired.
+*   **States:** Active, Lost/Stolen, Expired.
+
+**4. Access Control List (ACL) / Policy** (The "Rules")
+*   **Data:** Mapping of Subjects to Objects, time/date constraints (Schedules).
+*   **Lifecycle:** Defined by organizational security policy. Modified to reflect the "principle of least privilege."
+*   **States:** Active, Draft, Archived.
+
+**5. Controller / Control Panel** (The "Brain")
+*   **Data:** Internal memory, local ACL database, I/O port status (RS-485, IP).
+*   **Lifecycle:** Installed at the building "hub" or "edge." Modified via configuration updates from a Host PC.
+*   **States:** Online, Offline/Disconnected, Degraded Mode (limited decision-making).
+
+**6. Transaction / Log** (The "Record")
+*   **Data:** Timestamp, Subject ID, Object ID, Result (Grant/Deny), Factor used.
+*   **Lifecycle:** Created "on the fly" by the controller when a credential is presented. 
+*   **States:** Immutable (once recorded, it serves as an audit trail).
+
+---
+
+### OPERATIONS
+
+**1. Access Request/Presentation**
+*   **Entities:** Subject, Credential, Reader, Controller.
+*   **Preconditions:** Subject must possess a valid Credential; Reader must be functional.
+*   **Changes:** A Transaction Log is generated; Controller compares data against ACL.
+
+**2. Grant Access**
+*   **Entities:** Controller, Locking Hardware, Timer.
+*   **Preconditions:** Match found in ACL; Current time/date is within authorized schedule.
+*   **Changes:** Relay operates to unlock resource; Resource state moves from Locked to Unlocked for a "predetermined time."
+
+**3. Deny Access**
+*   **Entities:** Controller, Reader (LED feedback).
+*   **Preconditions:** No match in ACL or invalid/expired status.
+*   **Changes:** Resource remains Locked; Local alarm (Red LED) may trigger; "Attempted access" recorded.
+
+**4. Request-to-Exit (RTE)**
+*   **Entities:** Subject, RTE Device (Button/Motion Sensor), Controller.
+*   **Preconditions:** Sensor detects motion or button is pressed.
+*   **Changes:** "Opening signal" is ignored by the alarm monitor to prevent false alarms; Locking hardware is released (if not mechanical free egress).
+
+---
+
+### RELATIONSHIPS
+
+*   **Ownership:** An Organization *owns* the Access Policy. A Subject *owns* (is assigned) one or more Credentials.
+*   **Containment:** A Controller *contains* an Access Control List. An Access-Controlled Entry *contains* Readers and Locking Hardware.
+*   **References/Lookups:** The Controller *references* the ACL to validate a Credential. A Transaction Log *references* both Subject and Object.
+*   **Topology (Indexing):** Hub-and-Spoke (Central Panel to basic readers) vs. Peer-to-Peer (IP-enabled intelligent readers communicating directly).
+
+---
+
+### INVARIANTS
+
+*   **Principle of Least Privilege:** A subject must never have more access than required for their job.
+*   **Safety Override:** Mechanical free egress must always be available in the event of fire/emergency, regardless of electronic system state.
+*   **Auditability:** Every access attempt (granted or denied) must result in a recorded transaction log.
+*   **Integrity:** When a controller is in "Degraded Mode," it must default to its programmed fail-safe state (usually remaining locked in high-security areas).
+*   **Authentication Factors:** To maintain "Multi-factor" status, the factors used must belong to different categories (Know, Have, Are).

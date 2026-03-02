@@ -1,0 +1,92 @@
+Here are the BDD scenarios based on the provided article about telephone directories:
+
+### Happy Paths (Normal Operations)
+**Scenario 1: Find a subscriber's number in the White Pages**
+*   **Given** a White Pages directory for a specific geographical area
+*   **When** I search for a subscriber by their name and street address
+*   **Then** the system returns their listed telephone number
+
+**Scenario 2: Find a business by category in the Yellow Pages**
+*   **Given** a Yellow Pages directory
+*   **When** I navigate to a business classification, such as "lawyers"
+*   **Then** I see an alphabetical list of businesses within that category and their contact information
+
+**Scenario 3: Access emergency service information**
+*   **Given** a standard telephone directory
+*   **When** I look at the instructional or introductory pages
+*   **Then** I should find the numbers for emergency services, hospitals, and doctors
+
+**Scenario 4: Perform a reverse lookup on a CD-ROM directory**
+*   **Given** a "Grey Pages" or reverse lookup feature on a CD-ROM (e.g., PhoneDisc)
+*   **When** I input a specific telephone number
+*   **Then** the system returns the name and address of the subscriber associated with that number
+
+### Precondition Violations
+**Scenario 5: Search for an unlisted/private number**
+*   **Given** a subscriber has requested their number be "unlisted" or "private"
+*   **When** a user searches for that subscriber's name in the public directory
+*   **Then** no telephone number or address is returned for that individual
+
+**Scenario 6: Attempt to find a mobile phone number in a standard directory**
+*   **Given** the current US rules regarding mobile and VoIP listings
+*   **When** I search for a person's cellular phone number in a printed telephone directory
+*   **Then** the system does not return a result as mobile listings are excluded
+
+### State Transitions
+**Scenario 7: Transition from listed to unlisted status**
+*   **Given** a subscriber is currently listed in the directory
+*   **When** the subscriber pays the required fee and requests exclusion
+*   **Then** their details are removed from the next publication of the directory
+
+**Scenario 8: Transition from printed to electronic format**
+*   **Given** a traditional paper-based directory system
+*   **When** the publisher launches an online service (e.g., Infobel or Whitepages.com)
+*   **Then** the directory data becomes accessible via a web browser rather than physical media
+
+### Edge Cases
+**Scenario 9: Search a directory with no entries (Empty State)**
+*   **Given** a new geographical coverage area with no registered subscribers
+*   **When** a user opens the directory
+*   **Then** the system displays a message indicating no listings are available for this area
+
+**Scenario 10: Search for a common name with many entries**
+*   **Given** a directory for a large city
+*   **When** I search for a common name (e.g., "John Smith")
+*   **Then** I am presented with multiple listings sorted by street address to differentiate them
+
+**Scenario 11: Accessing the earliest directory format**
+*   **Given** a 1878-style directory (New Haven)
+*   **When** I look for a telephone number
+*   **Then** I see only a list of names and offices without any assigned digits
+
+**Scenario 12: Search across multiple CD-ROMs**
+*   **Given** a high-volume residential directory spread across eight CD-ROMs
+*   **When** I search for a subscriber not present on the current disc
+*   **Then** the system prompts me to insert the specific disc containing that alphabetical range
+
+### Query Operations
+**Scenario 13: Search for government agencies**
+*   **Given** a directory containing colored sections
+*   **When** I look in the blue or green pages
+*   **Then** the system provides contact information for government offices
+
+**Scenario 14: Check international dialing codes**
+*   **Given** a telephone directory
+*   **When** I query the instructional section for international calling
+*   **Then** the system displays the appropriate country and area codes
+
+### Error Handling
+**Scenario 15: Invalid reverse lookup search**
+*   **Given** a reverse directory service
+*   **When** I enter a phone number that does not exist in the database
+*   **Then** the system returns an "Entry Not Found" error message
+
+**Scenario 16: Attempting to browse a banned distribution area**
+*   **Given** a municipality like San Francisco that has banned unsolicited distribution
+*   **When** a distribution service attempts to deliver a book to a residence
+*   **Then** the delivery is rejected based on local environmental regulations
+
+**Scenario 17: Handling readability on low-quality newsprint**
+*   **Given** a directory printed on poor quality newsprint with small font
+*   **When** the system uses the "Bell Gothic" typeface
+*   **Then** the text remains legible despite ink bleed or paper imperfections

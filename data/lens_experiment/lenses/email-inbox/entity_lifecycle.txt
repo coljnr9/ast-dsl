@@ -1,0 +1,83 @@
+This domain analysis outlines the core entities, operations, and constraints of an email system based on the provided text.
+
+### ENTITIES
+
+**1. Message (The core unit of communication)**
+*   **Data**: 
+    *   **Envelope**: Delivery parameters (separate from content).
+    *   **Header**: Structured fields (From, To, CC, BCC, Subject, Date, Message-ID, Reply-To, etc.).
+    *   **Body**: Unstructured text/MIME content (Plain text, HTML, or Rich Text).
+    *   **Metadata**: Timestamps from servers, trace fields (Received, Return-Path), and authentication results (DKIM, SPF).
+*   **Lifecycle**: Created by a sender's MUA; Traverses MTAs; Stored by an MDA; Retreived/Deleted by a recipient's MUA.
+*   **States**: 
+    *   *Draft*: Being composed.
+    *   *Queued*: In an MTA waiting for transmission.
+    *   *Delivered*: Residing in the recipient's mailbox.
+    *   *Read/Unread*: Visual state in the MUA.
+    *   *Bounced*: Permanent delivery failure notification sent back to the sender.
+    *   *Spam*: Filtered into a separate folder or dropped.
+
+**2. Email Address**
+*   **Data**: Local-part, "@" symbol, and Domain Name (e.g., `user@example.com`). Supports UTF-8 (internationalized) or 7-bit ASCII.
+*   **Lifecycle**: Assigned to a user; used as a reference in headers.
+
+**3. Mailbox**
+*   **Data**: Collection of Messages, folder structures (Inbox, Spam, Trash).
+*   **Lifecycle**: Exists on a server (MDA) or local client; Modified when messages are added, moved, or deleted.
+
+**4. Mail Agents (The functional nodes)**
+*   **MUA (Mail User Agent)**: Client application (Thunderbird, Outlook, Webmail) used to read/write.
+*   **MSA (Mail Submission Agent)**: Receives mail from MUA and determines destination.
+*   **MTA (Mail Transfer Agent)**: Forwards messages across the network (the "routers" of email).
+*   **MDA (Mail Delivery Agent)**: Places the message into the specific user's mailbox.
+
+---
+
+### OPERATIONS
+
+**1. Send (Submit)**
+*   **Entities**: MUA $\rightarrow$ MSA.
+*   **Preconditions**: Valid recipient address; MUA connected to network/server.
+*   **Changes**: Message is formatted; SMTP handshaking occurs.
+*   **Invariants**: Header "From" and "Date" are typically auto-populated.
+
+**2. Transfer/Forward**
+*   **Entities**: MSA $\rightarrow$ MTA $\rightarrow$ MDA (potentially multiple MTAs).
+*   **Preconditions**: DNS resolution of destination domain (MX records); MTA availability.
+*   **Changes**: Trace fields ("Received") are prepended to the header; timestamps added.
+*   **Stays same**: The original Message Body and Message-ID.
+
+**3. Retrieve (Fetch)**
+*   **Entities**: MUA $\leftarrow$ MDA/Mailbox.
+*   **Preconditions**: User authentication via POP3, IMAP, or Webmail.
+*   **Changes**: 
+    *   *POP3*: Frequently deletes message from server after download.
+    *   *IMAP*: Syncs state; message usually stays on server.
+
+**4. Filter/Authenticate**
+*   **Entities**: MTA/MDA.
+*   **Changes**: Adds "Authentication-Results" or "Received-SPF" to headers; may move message to a "Spam" folder.
+
+---
+
+### RELATIONSHIPS
+
+*   **Ownership**: A **Mailbox** is owned by an **Email Address** (User). A **Message** is owned by a Mailbox once delivered.
+*   **Reference**: 
+    *   The **In-Reply-To** and **References** header fields point to the **Message-ID** of previous messages (Threading).
+    *   **MX Records** in the DNS link a **Domain Name** to a specific **MTA Server**.
+*   **Containment**: 
+    *   An **Envelope** contains delivery instructions.
+    *   A **Message** contains a **Header** and a **Body**.
+    *   A **Header** contains multiple **Fields**.
+
+---
+
+### INVARIANTS
+
+*   **Header/Body Separation**: The header and body must always be separated by exactly one blank line.
+*   **Store-and-Forward**: Neither the sender nor the recipient is required to be online simultaneously.
+*   **Reliability vs. Speed**: Delivery is prioritized over immediacy; messages can be queued and retried for up to five days before failing.
+*   **Immutability of Trace**: Every server the message passes through MUST prepend a "Received" trace record (preserving the path history in reverse chronological order).
+*   **Uniqueness**: The **Message-ID** should be globally unique to prevent multiple deliveries and allow for referencing.
+*   **Address Syntax**: An address must follow the `local-part + @ + domain` format.

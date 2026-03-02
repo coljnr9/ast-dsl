@@ -1,0 +1,25 @@
+1. The CTU Function Block increments a current counter value (CV).
+2. The input CU must be a Boolean data type.
+3. The input RESET must be a Boolean data type.
+4. The input PV (Preset Value) must be a WORD data type.
+5. The output Q must be a Boolean data type.
+6. The output CV (Current Value) must be a WORD data type.
+7. The value of CV increases by exactly one on every detected rising edge of the CU input.
+8. A rising edge is defined as a transition of the CU input from FALSE to TRUE.
+9. If the RESET input is TRUE, the CV output is set to 0.
+10. The RESET input takes precedence over the CU input for determining the value of CV.
+11. The output Q is TRUE if the current counter value (CV) is greater than or equal to the preset value (PV).
+12. The output Q is FALSE if the current counter value (CV) is less than the preset value (PV).
+13. The counter tracks and stores the current value (CV) internally between execution cycles.
+14. The PV input defines the upper limit threshold for the purpose of triggering the output Q.
+15. The counter does not stop incrementing CV even if it has reached or exceeded the PV threshold.
+16. The counter value CV is preserved as long as the RESET input remains FALSE and no rising edge occurs on CU.
+17. The system does not support decrementing the CV value within the CTU block.
+18. The counter value CV is constrained by the maximum value of the WORD data type.
+19. Transitioning RESET from TRUE to FALSE allows the counter to resume incrementing from 0 on the next rising edge of CU.
+20. The counter requires an explicit declaration of a CTU instance before it can be used in a program.
+21. Input values for CU, RESET, and PV must be provided to the function block instance during or before its execution.
+22. Results for Q and CV are updated and made available after each execution of the function block instance.
+23. The function block behavior is governed by the IEC 61131-3 standard for automation software.
+24. Negative values are not supported for the counter value CV as it uses the WORD data type.
+25. The counter does not automatically reset itself when CV reaches PV.

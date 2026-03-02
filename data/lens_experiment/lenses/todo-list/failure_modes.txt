@@ -1,0 +1,95 @@
+This Failure Mode Analysis (FMA) evaluates the TodoMVC system as described in the specification, covering the Application, the Testing Infrastructure, and the Build/CI/CD pipeline.
+
+---
+
+### 1. Application Operations (The Todo App)
+
+#### **Operation: Create Todo**
+*   **Failure Modes:**
+    *   **Empty Input:** User submits an empty string or whitespace-only string.
+    *   **Storage Full:** `localStorage` quota exceeded (QuotaExceededError).
+    *   **Concurrent Write Failure:** (Edge case) Rapid submission causing race conditions in non-atomic framework updates.
+*   **Response:**
+    *   Empty strings should be **ignored/rejected**; no todo created.
+    *   Full storage should trigger an **error state** or console warning (persistence fails).
+*   **Preservation:** The existing list of todos must remain intact; the UI must not crash.
+
+#### **Operation: Edit/Update Todo**
+*   **Failure Modes:**
+    *   **Invalid ID:** Attempting to update a todo that no longer exists in state (deleted in another tab).
+    *   **Empty Result:** If the user clears the text during an edit.
+    *   **Bluring without Save:** User clicks away without hitting Enter.
+*   **Response:**
+    *   Invalid ID: **Ignore** the operation.
+    *   Empty Result: Spec typically dictates the todo should be **deleted**.
+    *   Blur: Implementation dependent (usually **save** or **cancel**; must be consistent).
+*   **Preservation:** Integrity of other todos.
+
+#### **Operation: Toggle Complete (Single or All)**
+*   **Failure Modes:**
+    *   **State Mismatch:** Interaction occurs while the list is being filtered (e.g., toggling a "Completed" item while in the "Active" view).
+    *   **Empty List:** Triggering "Toggle All" when 0 items exist.
+*   **Response:**
+    *   State Mismatch: Item should immediately disappear from current filtered view.
+    *   Empty List: The button should be **hidden** or **ignored**.
+*   **Preservation:** The "Items Left" count must accurately reflect the new state.
+
+#### **Operation: Filter Todos (All/Active/Completed)**
+*   **Failure Modes:**
+    *   **Invalid Route:** User manually enters a URL hash not defined in the spec (e.g., `#/deleted`).
+    *   **Persistence Sync:** Reloading on a filtered route when `localStorage` is corrupted.
+*   **Response:**
+    *   Invalid Route: Default to **"All"** view.
+*   **Preservation:** The underlying data remains filtered-neutral (data doesn't change, only view).
+
+---
+
+### 2. Infrastructure Operations (Tests & Build)
+
+#### **Operation: Automated Testing (Selenium/Cypress)**
+*   **Failure Modes:**
+    *   **Selector Flakiness:** Framework-specific rendering delays causing "Element Not Found."
+    *   **Environment Mismatch:** Chrome version in CircleCI doesn't match Selenium driver.
+    *   **Server Down:** `server.js` fails to start before tests begin.
+*   **Response:** **Error/Fail Build.**
+*   **Preservation:** Test reports must be generated to identify which specific implementation failed.
+
+#### **Operation: Build Pipeline (Gulp Tasks)**
+*   **Failure Modes:**
+    *   **Lint Failure:** `jshint` finds errors in a framework implementation.
+    *   **Pathing Errors:** `copy` task fails because a framework doesn't follow the "Standard Structure."
+    *   **Dependency Conflict:** `npm install` fails due to Node version mismatch (e.g., requires 10.13, user has 20).
+*   **Response:** **Abort Build.**
+*   **Preservation:** The production deployment (GitHub Pages) must not be updated.
+
+---
+
+### 3. Systematic Constraints & Boundaries
+
+#### **Permanent/Irreversible Transitions**
+*   **Clear Completed:** Once triggered, the deletion of completed todos is permanent within `localStorage`. There is no "Undo" operation in the spec.
+*   **Gulp 'Clean':** The build directory is purged; data is lost if not backed up.
+
+#### **Impossible Operations (State-Locked)**
+*   **Clear Completed while 0 completed:** Operation is impossible because the button is programmatically hidden.
+*   **Toggling "Mark All" when list is empty:** The checkbox is hidden when the "Main Section" is hidden (triggered by 0 count).
+
+#### **Edge Cases (Combinations of Conditions)**
+*   **The "Final Todo" Deletion:** When the last todo is deleted, the system must simultaneously hide the "Main" and "Footer" sections. Failure to do so creates a UI "ghost" state.
+*   **Rapid Routing:** Rapidly clicking filters while `localStorage` is being written to; can lead to race conditions where the view and data are out of sync.
+*   **Cross-Tab Interference:** Two tabs of the same implementation open; `localStorage` changes in one are not automatically synced to the UI of the other (unless specifically implemented).
+
+#### **Out of Scope (Deliberately Not Supported)**
+*   **Server-Side Persistence:** The system only supports `localStorage`. Databases are out of scope.
+*   **Multi-User Support:** No login/accounts.
+*   **Bulk Edit:** Users cannot edit multiple titles at once.
+*   **Undo/Redo:** No history management for actions.
+*   **Image/File Attachments:** Todos are text-only.
+
+---
+
+### 4. Integrity Requirements
+Even in the event of failure, the system must preserve:
+1.  **Specification Compliance:** A failure in one framework (e.g., Vue) must not affect the validation or deployment of another (e.g., React).
+2.  **Data Safety:** A logic error should never result in the accidental deletion of the *entire* `localStorage` key, only the specific corrupted entries.
+3.  **Deployment Stability:** The CI/CD pipeline must ensure that a failing test suite blocks the `master` branch deployment to GitHub Pages.

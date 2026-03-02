@@ -1,0 +1,30 @@
+1. **While** RESET is TRUE, the **CTU** shall set CV to 0.
+2. **While** RESET is TRUE, the **CTU** shall set Q to FALSE.
+3. **When** CU has a rising edge, the **CTU** shall increment CV by one.
+4. **When** RESET changes from FALSE to TRUE, the **CTU** shall set CV to 0.
+5. **Whenever** CV is greater than or equal to PV, the **CTU** shall set Q to TRUE.
+6. **Whenever** CV is less than PV, the **CTU** shall set Q to FALSE.
+7. **Complex:** While RESET is FALSE, when CU has a rising edge, the **CTU** shall increment CV.
+8. **Complex:** While RESET is TRUE, when CU has a rising edge, the **CTU** shall maintain CV at 0.
+9. **Unwanted:** If RESET is TRUE and CU has a rising edge, then the **CTU** shall ignore the increment command.
+10. **State-driven:** While CV is equal to or greater than PV, the **CTU** shall maintain Q at TRUE.
+11. **Event-driven:** When PV is modified, the **CTU** shall update the status of Q based on the current CV.
+12. **Ubiquitous:** The **CTU** shall provide CV as an output of type WORD.
+13. **Ubiquitous:** The **CTU** shall provide Q as an output of type BOOL.
+14. **Ubiquitous:** The **CTU** shall accept CU as a BOOL input.
+15. **Ubiquitous:** The **CTU** shall accept RESET as a BOOL input.
+16. **Ubiquitous:** The **CTU** shall accept PV as a WORD input.
+17. **State-driven:** While CU is constant TRUE, the **CTU** shall maintain the current value of CV.
+18. **State-driven:** While CU is constant FALSE, the **CTU** shall maintain the current value of CV.
+19. **Unwanted:** If CV reaches the maximum value of the WORD data type, then the **CTU** shall prevent further incrementation (overflow protection).
+20. **Complex:** While RESET is FALSE, when CV increments to a value equal to PV, the **CTU** shall set Q to TRUE.
+21. **Complex:** While RESET is FALSE, when CV increments to a value less than PV, the **CTU** shall maintain Q at FALSE.
+22. **Unwanted:** If any input is of an invalid data type, then the **CTU** shall report a compilation error.
+23. **Ubiquitous:** The **CTU** shall store the current state of the counter in the CV variable.
+24. **State-driven:** While the function block is not called, the **CTU** shall maintain all current output values.
+25. **Event-driven:** When the system initializes the function block, the **CTU** shall set CV to 0.
+26. **Ubiquitous:** The **CTU** shall only increment CV on the transition from FALSE to TRUE of the CU input.
+27. **Ubiquitous:** The **CTU** shall prioritize the RESET command over the CU increment command.
+28. **Ubiquitous:** The **CTU** shall not decrement the CV value under any operational condition.
+29. **Ubiquitous:** The **CTU** shall only perform operations defined by the IEC 61131-3 standard for up-counters.
+30. **Ubiquitous:** The **CTU** shall maintain the CV value after Q becomes TRUE until a RESET occurs.

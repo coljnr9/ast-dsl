@@ -1,0 +1,79 @@
+This domain analysis describes the **DS18B20 Digital Thermometer** system based on the provided technical datasheet.
+
+---
+
+### 1. ENTITIES
+
+#### **DS18B20 Device (Physical/Logical Unit)**
+*   **Data:** 64-bit unique ROM code (8-bit Family Code `28h`, 48-bit Serial Number, 8-bit CRC).
+*   **Lifecycle:**
+    *   **Created:** At manufacture (ROM is "lasered").
+    *   **Modified:** Settings in Scratchpad/EEPROM are user-programmable.
+    *   **Destroyed:** N/A (Hardware entity).
+*   **States:**
+    *   **Powered down:** No energy.
+    *   **Low-Power Idle:** Default state after power-up or command completion.
+    *   **Converting:** Actively performing temperature-to-digital transformation.
+    *   **Busy (Memory/EEPROM):** Copying data to/from nonvolatile memory.
+*   **Transitions:**
+    *   `Idle` → `Converting` via *Convert T* command.
+    *   `Converting` → `Idle` upon completion.
+    *   `Idle` → `Busy` via *Copy Scratchpad* or *Recall E2*.
+
+#### **Scratchpad (Volatile Memory)**
+*   **Data:** 9 bytes of SRAM:
+    1.  Temperature LSB (Byte 0) - *Read-only*
+    2.  Temperature MSB (Byte 1) - *Read-only*
+    3.  $T_H$ Register (Byte 2) - *Read/Write*
+    4.  $T_L$ Register (Byte 3) - *Read/Write*
+    5.  Configuration Register (Byte 4) - *Read/Write*
+    6.  Reserved (Bytes 5-7)
+    7.  CRC (Byte 8) - *Read-only*
+*   **Lifecycle:**
+    *   **Created:** Initialized at power-up (values loaded from EEPROM).
+    *   **Modified:** Updated by *Convert T* (bytes 0-1) or *Write Scratchpad* (bytes 2-4).
+
+#### **EEPROM (Nonvolatile Memory)**
+*   **Data:** $T_H$ trigger, $T_L$ trigger, and Configuration Register settings.
+*   **Lifecycle:**
+    *   **Modified:** Updated by *Copy Scratchpad* command.
+    *   **Persisted:** Retains data without power for at least 10 years.
+
+#### **Alarm Flag**
+*   **Data:** Boolean state (Active/Inactive).
+*   **Lifecycle:**
+    *   **Updated:** After every *Convert T* command.
+    *   **Transitions:** Set to `Active` if Temperature $\ge T_H$ or $\le T_L$. Reset to `Inactive` if temperature returns within range.
+
+---
+
+### 2. OPERATIONS
+
+| Operation | Involved Entities | Preconditions | Postconditions |
+| :--- | :--- | :--- | :--- |
+| **Initialization** | Master, Slave(s) | Bus is in Idle (High). | All devices reset and ready for ROM command. |
+| **Convert T** | Device, Scratchpad | Initialization + ROM selection. | Temperature Reg updated; Alarm Flag updated; returns to Idle. |
+| **Write Scratchpad** | Scratchpad | Initialization + ROM selection. | Bytes 2, 3, 4 of Scratchpad are updated. |
+| **Read Scratchpad** | Scratchpad, Master | Initialization + ROM selection. | No change to entities; data transmitted to Master. |
+| **Copy Scratchpad** | Scratchpad, EEPROM | Initialization + ROM selection. | EEPROM matches Scratchpad (bytes 2-4). |
+| **Recall E2** | EEPROM, Scratchpad | Power-up OR command issued. | Scratchpad (bytes 2-4) updated from EEPROM. |
+| **Alarm Search** | Master, Device(s) | Alarm Flag is Set. | Only flagged devices respond to the Master. |
+
+---
+
+### 3. RELATIONSHIPS
+
+*   **Ownership:** A **Device** owns one **64-bit ROM**, one **Scratchpad**, and one **EEPROM**.
+*   **Containment:** The **Scratchpad** contains the **Temperature Register**, **Alarm Registers**, and **Configuration Register**.
+*   **1-Wire Bus Membership (Multidrop):** A single **Bus Master** (microprocessor) controls zero-to-many **DS18B20 Devices** via the 1-Wire protocol.
+*   **Indexing:** The **Master** uses the **64-bit ROM Code** as a unique index to address specific devices in a multidrop environment.
+
+---
+
+### 4. INVARIANTS
+
+*   **Unique Identification:** No two devices on the same bus may have the same 64-bit ROM code.
+*   **Sequence Integrity:** Every communication must follow the strict order: *Initialization* → *ROM Command* → *Function Command*.
+*   **Data Validation:** The 9th byte of the scratchpad must always represent the CRC-8 value calculated from the preceding 8 bytes.
+*   **Power Mode Constraint:** In **Parasite Power** mode, the $V_{DD}$ pin must be grounded, and the master must provide a strong pullup during conversion/EEPROM writes.
+*   **Resolution Tradeoff:** As the **Resolution** bit-width (9–12 bits) in the Configuration Register increases, the maximum **Conversion Time** ($t_{CONV}$) must increase proportionally ($93.75\text{ms}$ to $750\text{ms}$).

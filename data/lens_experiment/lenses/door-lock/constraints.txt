@@ -1,0 +1,30 @@
+A lock is a mechanical or electronic fastening device released by a physical object, secret information, or a combination of both.
+A key is a device used specifically to operate a lock for the purposes of locking or unlocking it.
+A lock may be configured to be opened from only one side.
+A key traditionally consists of a blade that enters the keyway and a bow for the user to apply torque.
+In a keyed-alike system, a single unique key operates one lock or a specific set of matching locks.
+A master key can be used to open a lock that also accepts its own specific unique key.
+Mechanical locks prevent the bolt from moving unless internal components (pins, levers, or wafers) are aligned.
+Electronic locks require an electric current and an actuator to connect the bolt or cylinder to a motor.
+A warded lock denies rotation unless the key shape matches the internal obstructions (wards).
+In a pin tumbler lock, the plug is prevented from rotating by driver pins until a key with the correct bitting aligns them at the shear line.
+A wafer tumbler lock uses single-piece wafers that must be aligned with a groove to allow the plug to rotate.
+A disc tumbler lock uses slotted rotating detainer discs to impede the turning of the bolt.
+A lever tumbler lock requires a set of levers to be lifted to a specific height to allow the bolt to slide.
+A double-acting lever lock forbids movement if a lever is lifted too far or not far enough.
+A magnetic keyed lock uses the orientation of magnets to push or pull internal tumblers into a released state.
+A smart lock accepts instructions to lock or unlock from authorized devices via cryptographic keys and wireless protocols.
+Keycard locks require a successful match of the digital signature within the card to grant access.
+Remote keyless systems utilize a rolling code where each valid code is usually accepted only once.
+A transponder car key must both provide a physical bitting match and transmit a valid radio code to operate the ignition.
+A Chubb detector lock transitions to a secure, "interfered with" state if an unauthorized opening is attempted.
+An electronic lock cannot be picked using conventional mechanical tools.
+Keyholes are designed as unique profiles to restrict the insertion of incorrect key blanks.
+The act of lock picking allows a lock to be transitioned to an open state without the use of the intended key.
+Traditional key duplication is a subtractive process where a blank is ground to match the shape of a template key.
+Modern key duplication allows a key shape to be scanned electronically and stored for later production.
+Locksmiths may perform "like-for-like" replacements to repair mass-produced locks.
+A key serves as a security token that grants access to a locked area only to the person possessing it.
+Master pins allow a lock cylinder to rotate at multiple different pin elevations to support master keying.
+Mechanical locks and keys cannot function without physical contact and torque application.
+Locks do not change their fundamental security state when a key is simply inserted; the torque or electronic signal triggers the state transition.

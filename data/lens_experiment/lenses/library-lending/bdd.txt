@@ -1,0 +1,101 @@
+### Happy Paths (Normal Operations)
+
+**Scenario 1: Successful book checkout**
+*   **Given** a registered patron and an available book in the library collection
+*   **When** the circulation staff processes the lending transaction at the circulation desk
+*   **Then** the book's status is updated to "loaned" and a due date is assigned.
+
+**Scenario 2: Successful book return**
+*   **Given** a book that is currently checked out to a patron
+*   **When** the patron returns the book to the circulation desk
+*   **Then** the book is checked back in and removed from the patron's active loans.
+
+**Scenario 3: Renewal of library materials**
+*   **Given** a patron has a book currently checked out that is not requested by others
+*   **When** the patron requests a renewal at the circulation desk
+*   **Then** the system extends the due date for the material.
+
+**Scenario 4: Payment of overdue fines**
+*   **Given** a patron has an outstanding fine for a late return
+*   **When** the patron pays the fine at the circulation desk
+*   **Then** the circulation staff issues a receipt and the fine is cleared from the patron's record.
+
+---
+
+### Precondition Violations (Rejected Operations)
+
+**Scenario 5: Checkout rejected due to patron age (Violation of Bill of Rights)**
+*   **Given** a library policy that adheres to the ALA Library Bill of Rights
+*   **When** a staff member attempts to deny a checkout based solely on the patron's age
+*   **Then** the system should flag this as a violation of the right to use the library regardless of age.
+
+**Scenario 6: Loan rejected for damaged material**
+*   **Given** a book is identified as having significant physical damage
+*   **When** a checkout is attempted
+*   **Then** the circulation staff routes the material for repair and prevents the loan.
+
+---
+
+### State Transitions
+
+**Scenario 7: From "Checked Out" to "In Transit/Shelving"**
+*   **Given** a book status is "On Loan"
+*   **When** the material is checked in at the desk
+*   **Then** the status changes to "To be Shelved" and the staff is prompted to re-shelve it by call number.
+
+**Scenario 8: Transition to "Overdue" status**
+*   **Given** a book is on loan and the current date passes the due date slip date
+*   **When** the system runs a daily status update
+*   **Then** the status of the item changes to "Overdue" and an overdue notice is sent to the borrower.
+
+---
+
+### Edge Cases (Boundaries & Limits)
+
+**Scenario 9: Handling maximum weight for physical tasks**
+*   **Given** a circulation staff member is tasked with moving materials
+*   **When** a cart or box exceeds 30 pounds
+*   **Then** the staff member must seek assistance or divide the load to remain within the 30-pound physical limit requirement.
+
+**Scenario 10: Empty search results for basic reference**
+*   **Given** a patron asks for a book that is not in the library’s collection
+*   **When** basic search services are performed at the circulation desk
+*   **Then** the staff should refer the patron to a reference librarian or suggest an interlibrary loan.
+
+**Scenario 11: Processing a return for an item already checked in**
+*   **Given** a book has already been processed as returned
+*   **When** the barcode is accidentally scanned again at the desk
+*   **Then** the system should display an alert indicating the item is already "In Library."
+
+---
+
+### Query Operations
+
+**Scenario 12: Checking current patron transaction statistics**
+*   **Given** the library is currently operating
+*   **When** a supervisor requests a report on material checkouts
+*   **Then** the circulation staff provides a report reconciling financial and transaction data for that period.
+
+**Scenario 13: Verifying privacy of patron data**
+*   **Given** a third party requests information on a specific patron's reading history
+*   **When** the librarian reviews the request against privacy laws and ALA policies
+*   **Then** the request is denied to protect the confidentiality of the individual’s library use.
+
+---
+
+### Error Handling & Workplace Resolving
+
+**Scenario 14: Circulation technology failure**
+*   **Given** the library circulation software or scanner stops responding
+*   **When** a checkout is in progress
+*   **Then** the circulation staff performs troubleshooting steps or utilizes backup manual filing (e.g., Browne Issue System) to continue service.
+
+**Scenario 15: Resolving inappropriate patron conduct (Noise)**
+*   **Given** a patron is using a cell phone at a high volume in the library
+*   **When** the circulation staff identifies the disturbance
+*   **Then** the staff follows the protocol to resolve the inappropriate noise level to maintain library standards.
+
+**Scenario 16: Handling mismatched call numbers during shelving**
+*   **Given** a book is being re-shelved
+*   **When** the staff member finds the book does not match the Dewey Decimal or Library of Congress sequence on the shelf
+*   **Then** the staff member must correct the placement to ensure the stack's integrity.

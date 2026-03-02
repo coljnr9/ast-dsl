@@ -1,0 +1,91 @@
+### Feature: Lock and Key System Operations
+
+**Scenario 1: Successfully unlocking a pin tumbler lock (Happy Path)**
+*   **Given** a pin tumbler lock is in a "Locked" state
+*   **And** the user has the correct physical key with matching bittings
+*   **When** the user inserts the key and applies torque to the bow
+*   **Then** the pins align at the shear line
+*   **And** the plug rotates to the "Unlocked" state
+
+**Scenario 2: Rejecting an incorrect key (Precondition Violation)**
+*   **Given** a warded lock is in a "Locked" state
+*   **When** a key with an incompatible notch pattern is inserted
+*   **Then** the internal wards obstruct the rotation of the key
+*   **And** the lock remains in a "Locked" state
+
+**Scenario 3: Locking a door with a physical key (State Transition)**
+*   **Given** a door lock is currently "Unlocked"
+*   **When** the user inserts the correct key and rotates it in the locking direction
+*   **Then** the bolt moves into the door fixture
+*   **And** the system state changes to "Locked"
+
+**Scenario 4: Using a master key (Happy Path)**
+*   **Given** a complex mechanical lock system with a master pin
+*   **When** a designated Master Key is inserted into the cylinder
+*   **Then** the plug rotates at the secondary pin elevation
+*   **And** the lock opens despite not being the unique individual key
+
+**Scenario 5: Attempting to lift a lever too high in a Barron lock (Edge Case/Error Handling)**
+*   **Given** a Robert Barron double-acting lever lock
+*   **When** a user attempts to lift the lever significantly past its specific slot height
+*   **Then** the lever prevents the bolt from moving
+*   **And** the lock remains securely fastened
+
+**Scenario 6: Resetting a Chubb detector lock after interference (State Transition)**
+*   **Given** a Chubb detector lock has been tampered with and is in "Interfered" status
+*   **When** the owner inserts the correct key (or regulator key for older models)
+*   **Then** the internal detector mechanism resets
+*   **And** the lock returns to a normal "Locked" state
+
+**Scenario 7: Accessing via a Keycard (Happy Path)**
+*   **Given** an electronic door lock connected to an access control system
+*   **When** a user swipes a keycard with a matching digital signature
+*   **Then** the actuator engages the motor
+*   **And** the bolt is retracted to allow entry
+
+**Scenario 8: Smart lock access via Smartphone (Happy Path)**
+*   **Given** a smart lock is configured with a wireless protocol
+*   **When** an authorized smartphone sends a command using a cryptographic key
+*   **Then** the electromechanical lock executes the "Unlock" instruction
+
+**Scenario 9: Rolling code mismatch in remote keyless system (Error Handling)**
+*   **Given** a vehicle remote keyless system
+*   **When** the smart key transmits a code that does not match the expected rolling code
+*   **Then** the car door remains locked
+*   **And** the system rejects the radio transmission
+
+**Scenario 10: Using a "Drunk Man's Lock" in low light (Edge Case)**
+*   **Given** a Gothic lock with V-shaped foliage ornaments around the keyhole
+*   **When** a user attempts to insert a key in the dark
+*   **Then** the foliage ornaments guide the key tip into the keyway
+*   **And** the key is successfully seated for operation
+
+**Scenario 11: Duplicating a key using the subtractive process (Query/State Change)**
+*   **Given** an original key and a blank key of the same mill profile
+*   **When** the machine scans the template and grinds the blank key
+*   **Then** a new key is produced with the same bitting heights as the original
+*   **And** the new key must be deburred before it is functional
+
+**Scenario 12: Querying the status of a Yale Pin Tumbler Lock (Query Operation)**
+*   **Given** a Pin Tumbler lock without a key inserted
+*   **When** the driver pins are inspected
+*   **Then** the system returns that the driver pins are pushed downward by springs
+*   **And** the plug is prevented from rotating
+
+**Scenario 13: Attempting to use a skeleton key on a warded lock (Edge Case)**
+*   **Given** a low-security warded lock
+*   **When** a skeleton key designed to bypass standard wards is inserted and turned
+*   **Then** the key avoids the obstructions
+*   **And** the lock transition to "Unlocked"
+
+**Scenario 14: Magnetic key polarity alignment (Precondition Violation)**
+*   **Given** a magnetic keyed lock
+*   **When** a magnetic key with the incorrect North/South pole orientation is applied
+*   **Then** the internal tumblers are not pushed or pulled into the release position
+*   **And** the lock fails to release
+
+**Scenario 15: Identifying a lock-picking attempt on a Chubb detector lock (Error Handling)**
+*   **Given** a Chubb detector lock in a "Locked" state
+*   **When** an unauthorized tool attempts to move the levers without the correct key
+*   **Then** the detector features are triggered
+*   **And** the lock enters a "Disabled/Triggered" state to signal interference to the owner

@@ -1,0 +1,118 @@
+Here are the BDD scenarios for the **CTUD (Up-Down Counter)** function block based on the provided technical specification.
+
+### Happy Paths (Normal Operations)
+**Scenario 1: Incrementing the counter on a rising edge**
+- **Given** the current counter value (CV) is 5
+- **When** the CU (Count Up) input transitions from FALSE to TRUE
+- **Then** the value of CV should be 6
+
+**Scenario 2: Decrementing the counter on a rising edge**
+- **Given** the current counter value (CV) is 5
+- **When** the CD (Count Down) input transitions from FALSE to TRUE
+- **Then** the value of CV should be 4
+
+**Scenario 3: Loading the preset value**
+- **Given** the PV (Preset Value) is set to 50 and CV is 10
+- **When** the LOAD input is set to TRUE
+- **Then** the value of CV should be 50
+
+**Scenario 4: Resetting the counter**
+- **Given** the current counter value (CV) is 25
+- **When** the RESET input is set to TRUE
+- **Then** the value of CV should be 0
+
+---
+
+### State Transitions
+**Scenario 5: QU output transitions to TRUE when CV reaches PV**
+- **Given** the PV is set to 10 and CV is 9
+- **When** the CU input transitions from FALSE to TRUE
+- **Then** CV should be 10 and QU should be TRUE
+
+**Scenario 6: QU output transitions to FALSE when CV drops below PV**
+- **Given** the PV is 10 and CV is 10 (QU is TRUE)
+- **When** the CD input transitions from FALSE to TRUE
+- **Then** CV should be 9 and QU should be FALSE
+
+**Scenario 7: QD output transitions to TRUE when CV reaches zero**
+- **Given** the current counter value (CV) is 1
+- **When** the CD input transitions from FALSE to TRUE
+- **Then** CV should be 0 and QD should be TRUE
+
+**Scenario 8: QD output transitions to FALSE when CV increases from zero**
+- **Given** the current counter value (CV) is 0 (QD is TRUE)
+- **When** the CU input transitions from FALSE to TRUE
+- **Then** CV should be 1 and QD should be FALSE
+
+---
+
+### Precondition Violations & Priority
+**Scenario 9: RESET takes priority over CU increment**
+- **Given** the RESET input is TRUE
+- **When** the CU input transitions from FALSE to TRUE
+- **Then** CV should remain 0
+
+**Scenario 10: LOAD takes priority over CD decrement**
+- **Given** the LOAD input is TRUE and PV is 100
+- **When** the CD input transitions from FALSE to TRUE
+- **Then** CV should remain 100
+
+**Scenario 11: RESET takes priority over LOAD**
+- **Given** the RESET input is TRUE and LOAD input is TRUE
+- **When** the function block is executed
+- **Then** CV should be 0 (Reset wins)
+
+---
+
+### Edge Cases (Boundary Conditions)
+**Scenario 12: Upper boundary of WORD (Overflow prevention)**
+- **Given** the current counter value (CV) is 65535 (Max WORD)
+- **When** the CU input transitions from FALSE to TRUE
+- **Then** the value of CV should remain 65535 (or wrap according to WORD logic, typically stops at max in standard FBs)
+
+**Scenario 13: Lower boundary of WORD (Underflow prevention)**
+- **Given** the current counter value (CV) is 0
+- **When** the CD input transitions from FALSE to TRUE
+- **Then** the value of CV should remain 0 (cannot be negative)
+
+**Scenario 14: PV set to zero**
+- **Given** the PV is set to 0 and CV is 0
+- **When** the function block is executed
+- **Then** both QU and QD should be TRUE
+
+**Scenario 15: CU steady TRUE does not increment (Edge detection)**
+- **Given** the CU input is already TRUE and CV is 5
+- **When** the function block executes again with CU remaining TRUE
+- **Then** CV should remain 5
+
+---
+
+### Query Operations (State Checking)
+**Scenario 16: Checking QU when CV is greater than PV**
+- **Given** the PV is 10
+- **And** the CV is 15
+- **When** the state is queried
+- **Then** QU should be TRUE
+
+**Scenario 17: Checking QD when CV is zero**
+- **Given** the CV is 0
+- **When** the state is queried
+- **Then** QD should be TRUE
+
+---
+
+### Error Handling & Complex Logic
+**Scenario 18: Simultaneous CU and CD rising edges**
+- **Given** CV is 10
+- **When** both CU and CD transition from FALSE to TRUE simultaneously
+- **Then** CV should remain 10 (Increment and Decrement cancel out)
+
+**Scenario 19: Changing PV does not immediately change CV**
+- **Given** CV is 20 and PV is 20 (QU is TRUE)
+- **When** the PV is changed to 30
+- **Then** CV should remain 20 and QU should become FALSE
+
+**Scenario 20: LOAD with 0 PV acts as Reset for CV but affects QD**
+- **Given** the PV is 0 and CV is 50
+- **When** the LOAD input is set to TRUE
+- **Then** CV should be 0 and both QU and QD should be TRUE

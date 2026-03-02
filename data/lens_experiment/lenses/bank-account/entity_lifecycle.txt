@@ -1,0 +1,85 @@
+This domain analysis is based on the provided text detailing the structure, operation, and types of bank accounts.
+
+### ENTITIES
+
+**1. Financial Institution (Bank / EMI)**
+*   **Data:** Name, regulatory framework (e.g., EU EMD2), internal onboarding policies, account numbering scheme, lending risk appetite.
+*   **Lifecycle:** Created via licensing; exists as a perpetual entity until liquidation or "debanking" occurs.
+*   **States:** Licensed/Regulated, Active, Insolvent.
+
+**2. Customer (Account Holder)**
+*   **Data:** Legal Name, Identity markers (Signatories), Age, Eligibility status (Minor/Adult).
+*   **Lifecycle:** Onboarded via an application process; terminated through account closure or death.
+*   **States:** Applicant -> Active -> Closed/Terminated.
+
+**3. Bank Account**
+*   **Data:** Unique Account Number (IBAN/SWIFT/Internal), Currency, Current Balance (Credit/Debit), Terms and Conditions (Contract), Account Type.
+*   **Lifecycle:** Opened (created) after application acceptance; Balance modified by transactions; Closed (destroyed/deactivated) according to bank or legal terms.
+*   **States:** 
+    *   *Application*: Preliminary data collection.
+    *   *Open/Active*: Capable of receiving and sending funds.
+    *   *Overdrawn*: Specific state where balance is negative (primarily for loan/current accounts).
+    *   *Closed*: No longer accepts transactions.
+
+**4. Financial Transaction**
+*   **Data:** Amount, Date, Time, Type (Deposit, Withdrawal, Transfer), Involved Parties (Sender/Receiver), Reference.
+*   **Lifecycle:** Created upon initiation of fund movement; immutable once recorded (per accounting principles).
+*   **States:** Pending (implied in EMI section), Executed, Reported (recorded on a statement).
+
+**5. Bank Statement**
+*   **Data:** Reporting Period, Opening Balance, List of Transactions, Closing Balance.
+*   **Lifecycle:** Generated periodically to report on current account state.
+*   **States:** Generated -> Dispatched to Customer.
+
+---
+
+### OPERATIONS
+
+**1. Open Account**
+*   **Entities:** Customer, Financial Institution, Bank Account.
+*   **Preconditions:** Customer meet age requirements (usually 18, 16 in some cases); identity verified; application accepted by the institution.
+*   **Changes:** A new Bank Account entity is created with a unique number; a contract is established.
+*   **Stays same:** Regulatory framework; the Bank’s general terms for that "Type" of account.
+
+**2. Deposit Funds**
+*   **Entities:** Bank Account, Transaction.
+*   **Preconditions:** Account must be Active.
+*   **Changes:** Balance increases; a Transaction record is created; the Bank's liability (to the customer) increases.
+*   **Stays same:** Account Number; Terms and Conditions.
+
+**3. Withdraw / Transfer Funds**
+*   **Entities:** Bank Account, Transaction.
+*   **Preconditions:** Account must be Active; must follow specific account terms/limits; must pass transaction monitoring (especially in EMIs).
+*   **Changes:** Balance decreases; Transaction record created.
+*   **Stays same:** Account Number.
+
+**4. Generate Statement**
+*   **Entities:** Bank Account, Bank Statement.
+*   **Preconditions:** A "given period of time" has elapsed.
+*   **Changes:** A report is produced summarizing transactions.
+*   **Stays same:** The actual balances in the ledger (statements are historical snapshots).
+
+---
+
+### RELATIONSHIPS
+
+*   **Ownership:** A Customer "owns" one or more Bank Accounts (though legally, the bank owns the cash and the customer owns a "claim").
+*   **Reference:** 
+    *   A **Transaction** references one or more **Bank Accounts**.
+    *   An **Account** references a **Financial Institution**.
+*   **Containment:** A **Bank Statement** contains multiple **Transactions**.
+*   **Association:** **Loan Accounts** may be associated with **Guarantors** (third persons) or **Collateral**.
+*   **Joint Relationship:** A **Joint Account** is associated with multiple **Customers**.
+
+---
+
+### INVARIANTS
+
+*   **Uniqueness:** Every bank account must have a unique identifier (Account Number/IBAN) within the system.
+*   **Naming:** It is unlawful to open an account in a false name.
+*   **Accounting Identity:** The account balance at any time $T$ must equal the sum of all transactions from the opening date up to $T$.
+*   **Balance Nature:**
+    *   Deposit Account = Liability for the bank / Asset for the depositor.
+    *   Loan Account = Asset for the bank / Liability for the borrower.
+*   **Safeguarding (EMI Specific):** Electronic Money Institutions must safeguard client funds by keeping them separate from the institution's own working capital; EMIs cannot use client funds for lending.
+*   **Ownership Transition:** Once deposited, the physical money becomes the property of the bank; the customer receives a legal claim for the amount.

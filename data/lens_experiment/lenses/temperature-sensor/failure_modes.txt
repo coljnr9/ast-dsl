@@ -1,0 +1,78 @@
+This Reliability Engineering Failure Mode Analysis (FMA) focuses on the DS18B20 Digital Thermometer.
+
+### 1. Operation: Power-On and Initialization
+*   **Failure Mode 1: Insufficient Voltage/Power.** 
+    *   *Preconditions:* $V_{DD} < 3.0V$ (Local) or $V_{PU} < 3.0V$ (Parasite).
+    *   *Failure State:* Device may fail to generate a Presence Pulse or may provide undefined data.
+    *   *Response:* System must be rejected; master should detect absence of Presence Pulse and retry or enter error state.
+*   **Failure Mode 2: Improper Grounding (Parasite Mode).**
+    *   *Preconditions:* $V_{DD}$ pin left floating instead of tied to GND.
+    *   *Failure State:* Erroneous operation or inability to charge internal capacitor ($C_{PP}$).
+    *   *Response:* Should be treated as a hardware fault; device will likely fail to respond.
+*   **Failure Mode 3: Reset Pulse Duration Violation.**
+    *   *Preconditions:* Master pulls DQ low for $< 480\mu s$.
+    *   *Failure State:* Device does not reset internal logic.
+    *   *Response:* Ignore; device continues in previous state, leading to command desynchronization.
+
+### 2. Operation: Temperature Conversion (Convert T [44h])
+*   **Failure Mode 1: Conversion Time Violation.**
+    *   *Preconditions:* Master attempts to read scratchpad before $t_{CONV}$ (up to $750ms$ for 12-bit).
+    *   *Failure State:* Data read is from the *previous* conversion or the power-on default ($+85^\circ C$).
+    *   *Response:* Master must poll status (External Power) or wait for a fixed timer (Parasite Power).
+*   **Failure Mode 2: Strong Pullup Failure (Parasite Mode).**
+    *   *Preconditions:* Master fails to provide strong pullup within $10\mu s$ of command or fails to maintain it for $t_{CONV}$.
+    *   *Failure State:* Voltage on DQ drops below functional levels; device may reset or provide corrupted data.
+    *   *Response:* Error state; CRC check on subsequent read will likely fail.
+*   **Failure Mode 3: High-Temperature Parasite Leakage.**
+    *   *Preconditions:* Operating in Parasite Power mode at $T > +100^\circ C$.
+    *   *Failure State:* Communications become unsustainable due to increased leakage.
+    *   *Response:* Rejected; system design must use External Power for high-temp environments.
+
+### 3. Operation: Memory Access (Write/Read/Copy Scratchpad)
+*   **Failure Mode 1: Incomplete Write Sequence.**
+    *   *Preconditions:* Master issues a reset before all 3 bytes (TH, TL, Config) are written.
+    *   *Failure State:* Data corruption in scratchpad.
+    *   *Response:* Rejected; master must reread scratchpad to verify integrity. 
+*   **Failure Mode 2: EEPROM Wear-out.**
+    *   *Preconditions:* Exceeding 50,000 writes to EEPROM.
+    *   *Failure State:* Nonvolatile registers (TH, TL, Config) fail to retain data.
+    *   *Response:* Error state; device must be decommissioned.
+*   **Failure Mode 3: Scratchpad CRC Mismatch.**
+    *   *Preconditions:* Bit flip during transmission or incomplete conversion.
+    *   *Failure State:* Byte 8 does not match the master-calculated CRC.
+    *   *Response:* Rejected; master must discard data and repeat the read/conversion.
+
+### 4. Operation: ROM/Bus Commands
+*   **Failure Mode 1: Multi-drop Data Collision.**
+    *   *Preconditions:* Master issues Read ROM [33h] or Skip ROM [CCh] followed by a Read command while multiple devices are on the bus.
+    *   *Failure State:* Multiple devices drive DQ simultaneously; bit-wise ANDing occurs.
+    *   *Response:* Error state; CRC will fail.
+*   **Failure Mode 2: Search ROM Desynchronization.**
+    *   *Preconditions:* Master fails to return to the Initialization step after a Search/Alarm Search cycle.
+    *   *Failure State:* Slaves will not respond to follow-up commands.
+    *   *Response:* Rejected; device remains in an idle/waiting state.
+
+---
+
+### System Preservation Requirements
+*   **ROM Identity:** The unique 64-bit lasered ROM code must remain immutable and accessible regardless of scratchpad or EEPROM failures.
+*   **EEPROM Integrity:** TH, TL, and Configuration settings must be preserved during power-down cycles.
+*   **Safety Limits:** The device must withstand voltages up to $+6.0V$ (relative to GND) without immediate physical destruction.
+
+### Permanent (Irreversible) Transitions
+*   **EEPROM Aging:** Once a cell fails after 50k+ writes, it cannot be recovered.
+*   **Absolute Maximum Exposure:** Exceeding $+6.0V$ or $125^\circ C$ (ambient) may cause permanent degradation of accuracy or functional failure.
+
+### Impossible Operations in Specific States
+*   **Status Polling in Parasite Mode:** It is impossible to poll the "Conversion Done" status bit (0/1) while using parasite power, as the bus is required to be held high by a strong pullup.
+*   **Bus Activity during Copy/Convert:** No other 1-Wire activity can occur while a parasite-powered device is utilizing the strong pullup for EEPROM writes or temperature conversions.
+
+### Edge Case Combinations
+*   **Power-up Alarm Search:** After power-up, the temperature register defaults to $+85^\circ C$. If the EEPROM-stored TH is $< 85^\circ C$, an Alarm Search [ECh] immediately after power-up will return a "False Positive" alarm before a real temperature conversion is even performed.
+*   **9-bit vs 12-bit Data Interpretation:** If the master assumes 12-bit resolution but the device is in 9-bit mode, the lower 3 bits are undefined, potentially leading to significant noise/error in calculation if not masked/filtered.
+
+### Out-of-Scope (Operations NOT supported)
+*   **Fahrenheit output:** The device only outputs Celsius; conversion is the master's responsibility.
+*   **Simultaneous Read/Write:** Half-duplex communication only.
+*   **Voltage measurements:** The device cannot measure $V_{DD}$ levels; it only signals if power is Parasite or External.
+*   **Continuous Conversion:** The device only performs single conversions upon command ([44h]).

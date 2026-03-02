@@ -1,0 +1,30 @@
+"Email" is a method of transmitting and receiving digital messages using electronic devices over a computer network.
+The system operates on a store-and-forward model where servers accept, forward, deliver, and store messages.
+Users and their computers are not required to be online simultaneously to transmit or receive messages.
+An email address must consist of a local-part, the "@" symbol, and a domain name.
+An Internet email must consist of an envelope and content, with the content further divided into a header and a body.
+The header must be separated from the message body by a single blank line.
+Every email header must include at least a "From" field and a "Date" field.
+The "From" field identifies the author's email address, while the "Sender" field identifies the address of the agent acting on behalf of the author.
+The "To" field identifies primary recipients, the "Cc" field identifies secondary recipients, and the "Bcc" field identifies recipients whose addresses are not usually listed in the header.
+The "In-Reply-To" and "References" fields are used specifically to link related messages together in a thread.
+The message header is structured into fields consisting of a name, a colon separator, and a value.
+Header field names must start at the beginning of a new line and begin with a non-whitespace printable character.
+Header field bodies are recommended to be no more than 78 characters and must not exceed a limit of 998 characters.
+The system uses the Simple Mail Transfer Protocol (SMTP) to communicate delivery parameters and transport messages between systems.
+A Mail Submission Agent (MSA) determines the destination address from the SMTP protocol rather than the message header.
+A Mail Transfer Agent (MTA) is obliged to deliver a message once it has been accepted.
+If a message cannot be delivered, the MTA must send a bounce message back to the sender indicating the problem.
+A message can be queued and retried for delivery for up to five days before a permanent delivery failure notice is issued.
+SMTP servers must insert a "Received" trace record at the top of the header upon accepting a message.
+The final delivery SMTP server must insert a "Return-Path" field at the top of the header upon delivery.
+The Post Office Protocol (POP3) allows a client to download messages to a local computer and typically deletes them from the server.
+The Internet Message Access Protocol (IMAP) allows a user to manage a mailbox from multiple devices while leaving messages stored on the server.
+Messages can be retrieved, read, and managed by a user through a Mail User Agent (MUA).
+An email is transitioned from "unread" to "read" state when it is opened by a user.
+MIME extensions allow the system to carry non-ASCII text and multimedia content such as images and attachments.
+Binary data in a message body must be encoded using base64 or quoted-printable unless the 8BITMIME or BINARY extensions are supported.
+Spam filters may automatically move messages to a separate folder or drop them entirely based on classification.
+HTML email bodies often include an automatically generated plain text copy to ensure compatibility with text-based clients.
+Hyperlinks using the "mailto:" URI scheme must open a new message window in the user's mail client with the specified address in the "To" field.
+Proprietary corporate systems may use internal formats and protocols but must use an Internet mail gateway to communicate with external SMTP systems.

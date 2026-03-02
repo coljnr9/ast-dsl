@@ -1,0 +1,72 @@
+This Failure Mode Analysis (FMA) evaluates the systemic operations of a Version Control System (VCS) based on the provided text, focusing on both centralized (CVCS) and distributed (DVCS) models.
+
+### 1. Operation: Checkout (Create Working Copy)
+*   **Failure Modes:**
+    *   *Target directory inaccessible/non-existent:* System lacks write permissions or storage space.
+    *   *Network failure (Centralized):* Cannot reach the authoritative repository.
+    *   *Revision identifier invalid:* Requesting a version number/tag that does not exist.
+    *   *File already locked (Locking Model):* Another user has exclusive write access.
+*   **Response:**
+    *   The operation must be **rejected** with an error message. No partial files should be created (to maintain atomicity).
+    *   If locked, the system should return the identity of the lock holder.
+*   **System Must Preserve:** The integrity of the repository and the original state of the target local directory.
+
+### 2. Operation: Commit / Check-in (Save Changes to Repository)
+*   **Failure Modes:**
+    *   *Stale Baseline (Out-of-date):* The working copy is based on version $N$, but the repository is already at $N+1$.
+    *   *Empty Commit:* No changes detected in the working copy.
+    *   *Missing Metadata:* Required fields (author, commit message) are null or malformed.
+    *   *Collision (Locking Model):* Attempting to check in a file that was not checked out (locked) by the user.
+    *   *Interrupted Transfer:* Power or network failure mid-operation.
+*   **Response:**
+    *   *Stale Baseline:* **Reject** and require a "Merge" or "Pull" first.
+    *   *Interrupted Transfer:* If the system supports **Atomic Commits**, it must roll back to the pre-commit state. If it lacks atomicity (like CVS), it enters an **Error State** requiring manual recovery.
+*   **System Must Preserve:** The "Root" or "HEAD" must remain at a consistent, previous valid state if the new commit fails.
+
+### 3. Operation: Merge (Combining Branches/Changes)
+*   **Failure Modes:**
+    *   *Logic Conflicts:* Two changes are technically compatible (different lines) but break the program logic.
+    *   *Overlapping Changes (Merge Conflict):* Two users edited the same line of code.
+    *   *Incompatible File Types:* Attempting to merge binary files (e.g., images, CAD files) without a specific plugin.
+*   **Response:**
+    *   *Overlapping:* Suspend automatic merge; move to **Manual Intervention** state.
+    *   *Incompatible types:* **Reject** automatic merge; treat as "overwrite" or "keep both" options.
+*   **System Must Preserve:** The history of both parent branches (the DAG structure).
+
+### 4. Operation: File Locking (Reserved Edit)
+*   **Failure Modes:**
+    *   *Orphaned Lock:* A developer locks a file and leaves the project or forgets it.
+    *   *Lock Contention:* Multiple users request a lock simultaneously.
+*   **Response:**
+    *   *Orphaned Lock:* Admin must have a "Break Lock" override capability.
+    *   *Contention:* Requests must be queued or **rejected** on a first-come, first-served basis.
+*   **System Must Preserve:** Strict mutual exclusion; only one "Write" token can exist at a time.
+
+### 5. Operation: Revert (Undo to Previous Version)
+*   **Failure Modes:**
+    *   *Target Version Irretrievable:* Metadata exists, but the physical delta/data for that specific revision is corrupted or missing.
+    *   *Unsaved Work:* Reverting will overwrite current uncommitted changes.
+*   **Response:**
+    *   *Unsaved Work:* **Reject** or Warn; require a "Force" flag or "Stash" of current changes.
+*   **System Must Preserve:** The forward history (the revert itself should be a new commit, not a deletion of the past).
+
+---
+
+### Non-Reversible States (Permanent Transitions)
+*   **Repository Deletion:** Unless a backup exists, deleting the central repository (CVCS) or all clones (DVCS) is a terminal failure.
+*   **History Erasure (in strict VCS):** Commits are intended to be permanent "records in history." While some tools allow history rewrites, the standard model treats a commit ID as a permanent transition.
+
+### States where Operations are Impossible
+*   **"Disconnected" State (CVCS):** Commit, Update, and History Log operations are impossible.
+*   **"Conflict" State:** In most systems, you cannot "Commit" a file that is currently in a "Merge Conflict" status until the conflict markers are resolved.
+*   **"Read-Only" Permissions:** All write operations (Commit, Tag, Branch) are blocked.
+
+### Edge Case Combinations
+*   **The "Split-Brain" Root:** Two developers start a project independently (two roots) and later attempt to merge them into one repository.
+*   **Renaming + Editing:** User A renames `File.txt` to `Data.txt`; User B edits `File.txt` simultaneously. The system may lose the connection between the changes (Identity change problem).
+*   **Binary Merges:** Merging two non-text files that result in a file that is no longer a valid format for its intended application.
+
+### Deliberately Out of Scope
+*   **Change Control:** The system manages *versions*, not the *decision-making process* of why a change is approved (this is a separate management practice).
+*   **Automatic Logic Validation:** The VCS generally does not check if the code *works* (compiles/runs), only that it is *tracked*.
+*   **Permission Management (Internal):** While some systems track "who," the article notes that external discipline or manual permission management is often required to prevent the codebase from being "compromised."

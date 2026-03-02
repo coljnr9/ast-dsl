@@ -1,0 +1,30 @@
+Based on the provided article, here are the behavioral requirements for the **Access Control System (ACS)** using EARS notation:
+
+1. **Ubiquitous:** The ACS shall decide whether a subject is granted or denied access to an object.
+2. **Ubiquitous:** The ACS shall record the transaction when access is granted.
+3. **Ubiquitous:** The ACS shall record the attempted access when access is refused.
+4. **State-driven:** While a resource is locked, the ACS shall prevent unauthorized entry.
+5. **State-driven:** While in "mechanical free egress" mode, the ACS shall allow exiting without an electrical unlock for safety.
+6. **State-driven:** While the door is unlocked, the ACS shall ignore the door opening signal to prevent false alarms.
+7. **Event-driven:** When a credential is presented to a reader, the ACS shall send the credential information to the control panel.
+8. **Event-driven:** When the control panel receives a credential number, the ACS shall compare the number to an access control list.
+9.  **Event-driven:** When a match is found between the credential and the access control list, the ACS shall operate a relay to unlock the resource.
+10. **Event-driven:** When access is granted, the ACS shall unlock the resource for a predetermined time.
+11. **Event-driven:** When access is granted, the reader shall provide feedback via a flashing green LED.
+12. **Event-driven:** When access is refused, the reader shall provide feedback via a flashing red LED.
+13. **Event-driven:** When a "request-to-exit" (RTE) button is pushed, the ACS shall temporarily ignore the door alarm while the door is opened.
+14. **Event-driven:** When a transaction occurs, the control panel shall send a transaction log to a database.
+15. **Unwanted:** If a resource is forcefully unlocked, then the ACS shall trigger an alarm.
+16. **Unwanted:** If a resource is held open longer than a specified length of time, then the ACS shall trigger a "door prop" alarm.
+17. **Unwanted:** If a credential is presented but does not match the access control list, then the ACS shall maintain the lock in a secured state.
+18. **Unwanted:** If a main controller fails, then sub-controllers shall enter a degraded mode where doors are either completely locked or completely unlocked.
+19. **Unwanted:** If the host PC fails, then the ACS shall stop retrieving events from controllers.
+20. **Unwanted:** If the host PC fails, then the ACS shall disable functions requiring inter-controller interaction such as anti-passback.
+21. **Complex:** While configured for two-factor authentication, when a credential is presented, the ACS shall require a second factor (PIN, biometric, or second card) before granting access.
+22. **Complex:** While a reader is in "semi-intelligent" mode, when a connection to the main controller is lost, the ACS shall stop processing access requests.
+23. **Complex:** While a reader is in "intelligent" mode, when the connection to the main controller is unavailable, the ACS shall use an internal database to make access decisions.
+24. **Complex:** While the system uses a serial RS-485 topology, when a controller has an alarm, the ACS shall wait for the host PC to poll the controller before initiating communication.
+25. **Ubiquitous:** The ACS shall support credentials including something the user knows, has, or is.
+26. **State-driven:** While an IP controller is active, the ACS shall utilize industry-standard data encryption for network communications.
+27. **Ubiquitous:** The ACS shall not rely on mechanical locks to restrict access to specific times or dates.
+28. **State-driven:** While a secondary host PC is available, when the primary host PC fails, the secondary host PC shall start polling the network controllers.

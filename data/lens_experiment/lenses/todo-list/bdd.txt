@@ -1,0 +1,108 @@
+Here are the BDD scenarios for the TodoMVC system specification based on the provided architecture and requirements.
+
+### Happy Paths (Normal Operations)
+**Scenario 1: Successfully create a new todo**
+*   **Given** the Todo application is loaded and the input field is empty
+*   **When** I enter "Buy milk" into the todo input and press Enter
+*   **Then** a new item "Buy milk" should be added to the todo list
+
+**Scenario 2: Complete a todo item**
+*   **Given** a todo item "Wash the car" exists in the list
+*   **When** I click the completion checkbox next to "Wash the car"
+*   **Then** the item should be marked as completed and have a strikethrough style
+
+**Scenario 3: Filter todos by status**
+*   **Given** there is one active todo "Task A" and one completed todo "Task B"
+*   **When** I click the "Completed" filter button
+*   **Then** only "Task B" should be visible in the list
+
+**Scenario 4: Clear all completed todos**
+*   **Given** the list contains three completed items and one active item
+*   **When** I click the "Clear completed" button
+*   **Then** all three completed items should be removed from the list
+
+**Scenario 5: Persist data across page reloads**
+*   **Given** I have added "Task 1" to the todo list
+*   **When** I refresh the browser page
+*   **Then** "Task 1" should still be visible in the list (loaded from localStorage)
+
+### Precondition Violations
+**Scenario 6: Reject empty todo creation**
+*   **Given** the todo input field is empty
+*   **When** I press the Enter key
+*   **Then** no new todo item should be created in the list
+
+**Scenario 7: Reject todo creation with only whitespace**
+*   **Given** I have typed "   " (multiple spaces) into the todo input
+*   **When** I press the Enter key
+*   **Then** the application should ignore the input and not add an item
+
+### State Transitions
+**Scenario 8: Toggle all todos to completed state**
+*   **Given** the list has multiple active todos
+*   **When** I click the "Toggle all" chevron/checkbox
+*   **Then** all items in the list should transition to the completed state
+
+**Scenario 9: Revert completed todo to active**
+*   **Given** a todo item is currently in the "completed" state
+*   **When** I click its checkbox again
+*   **Then** its state should change back to "active" and the active count should increase by one
+
+**Scenario 10: Routing state change via URL**
+*   **Given** the application is on the main page
+*   **When** I manually change the URL fragment to `#/active`
+*   **Then** the filter state should update to show only active todos
+
+### Edge Cases (Boundary Conditions)
+**Scenario 11: Hide footer when list is empty**
+*   **Given** there are no items in the todo list
+*   **When** the application renders
+*   **Then** the footer and the "Clear completed" button should be hidden from the UI
+
+**Scenario 12: Show footer when first todo is added**
+*   **Given** the todo list is currently empty
+*   **When** I add one new todo item
+*   **Then** the main section and footer should become visible
+
+**Scenario 13: Handle very long todo text**
+*   **Given** I have a string of 500 characters
+*   **When** I add this string as a new todo
+*   **Then** the item should be created and the UI should handle the text without breaking the layout
+
+### Query Operations
+**Scenario 14: Correct count of active items**
+*   **Given** I have 2 completed items and 3 active items
+*   **When** I view the footer
+*   **Then** the "items left" counter should display "3 items left"
+
+**Scenario 15: Singular/Plural count labels**
+*   **Given** I have exactly 1 active item left
+*   **When** I view the footer
+*   **Then** the counter label should say "1 item left" (singular)
+
+### Error Handling & Build/Test Failures
+**Scenario 16: Automated test failure for non-compliant implementation**
+*   **Given** a framework implementation does not use the required CSS classes for the "Clear completed" button
+*   **When** the Selenium/Cypress test suite is executed
+*   **Then** the test runner should report a failure for that specific implementation
+
+**Scenario 17: CI/CD rejection on linting errors**
+*   **Given** a developer has introduced syntax errors in a JavaScript file
+*   **When** the `gulp jshint` task is triggered in the CI pipeline
+*   **Then** the build should fail and the deployment to GitHub Pages should be blocked
+
+**Scenario 18: Build cleanup**
+*   **Given** a previous build left temporary files in the build directory
+*   **When** I run the `gulp clean` task
+*   **Then** all files in the production build directory should be deleted
+
+### Framework Infrastructure
+**Scenario 19: Framework metadata retrieval**
+*   **Given** the main website index is loading
+*   **When** the system queries `learn.json`
+*   **Then** it should retrieve the correct metadata (source links, descriptions) for all categorized frameworks
+
+**Scenario 20: Development server accessibility**
+*   **Given** I am in the project root directory
+*   **When** I execute `node server.js`
+*   **Then** the application should be accessible via a local web browser on the specified port

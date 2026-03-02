@@ -1,0 +1,30 @@
+The following EARS requirements define the behavioral expectations for a **Version Control System (VCS)**:
+
+1.  **Ubiquitous:** The VCS shall track different versions in the history of computer files.
+2.  **Ubiquitous:** The VCS shall associate each revision with a timestamp and the person making the change.
+3.  **Ubiquitous:** The VCS shall identify the version of a file using a unique version number, letter, or revision level.
+4.  **Ubiquitous:** The VCS shall provide options to view previous versions of a file.
+5.  **Ubiquitous:** The VCS shall store meta-information including “what,” “why,” and “how” within commit descriptions.
+6.  **Event-driven:** When a user initiates a checkout, the VCS shall create a local working copy from the repository.
+7.  **Event-driven:** When a user commits a changeset, the VCS shall make the group of changes final and available to other users.
+8.  **Event-driven:** When a user initiates a revert, the VCS shall restore a file to a specified previous version.
+9.  **Event-driven:** When a "blame" command is executed on a specific line of code, the VCS shall display the author and revision of the last modification.
+10. **State-driven:** While a file is in a "checked out" state in a centralized locking system, the VCS shall prevent other users from gaining write access to that file.
+11. **State-driven:** While a file is locked by a developer, the VCS shall allow other users to have read-only access to that file.
+12. **State-driven:** While in a distributed environment, the VCS shall allow common operations such as commits and history viewing to be performed without communication with a central server.
+13. **Unwanted:** If a commit operation is interrupted, then the VCS shall ensure the system is left in a consistent (atomic) state.
+14. **Unwanted:** If changes from multiple branches overlap during a merge, then the VCS shall flag a conflict for manual intervention.
+15. **Unwanted:** If a developer attempts to commit changes to a file that has been updated by another user first, then the VCS shall reject the commit until the changes are merged.
+16. **Complex:** While using a distributed model, when a user pushes or pulls, the VCS shall synchronize data by exchanging patches between peers.
+17. **Complex:** While a merging capability exists, when a user requests a "reserved edit," the VCS shall explicitly lock the file for exclusive write access.
+18. **Complex:** When a user initiates a merge of two branches, the VCS shall incorporate the changes from both into a single branch.
+19. **Ubiquitous:** The VCS shall allow the creation of branches to develop different versions of the software concurrently.
+20. **Ubiquitous:** The VCS shall allow the labeling or tagging of specific snapshots as baselines for milestones or releases.
+21. **Ubiquitous:** The VCS shall maintain the integrity of the trunk (mainline) as the primary path of development.
+22. **State-driven:** While in a "cloned" state, the VCS shall ensure the local repository contains the same revision history as the source repository.
+23. **Ubiquitous:** The VCS shall support the tracking of changes to both source code text files and large binary files.
+24. **Ubiquitous:** The VCS shall represent the relationship between versions as a directed acyclic graph (DAG).
+25. **Event-driven:** When a new revision is based on the HEAD, the VCS shall identify the new revision as the new HEAD.
+26. **Ubiquitous:** The VCS shall NOT automatically resolve logic errors introduced by a merge of compatible data structures.
+27. **Ubiquitous:** The VCS shall NOT reflect changes made in a "working copy" to the repository until a commit or check-in is performed.
+28. **State-driven:** While a project is active, the VCS shall preserve the complete history of all committed changes for audit and recovery purposes.

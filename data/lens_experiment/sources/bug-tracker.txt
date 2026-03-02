@@ -1,0 +1,96 @@
+Bug tracking system Software application that records software bugs 
+ Tracking system or defect tracking system is a software application that keeps track of reported software bugs in software development projects. It may be regarded as a type of issue tracking system . 
+
+ Many bug tracking systems, such as those used by most open-source software projects, allow end-users to enter bug reports directly. [ 1 ] Other systems are used only internally in a company or organization doing software development . Typically bug tracking systems are integrated with other project management software . 
+
+ A bug tracking system is usually a necessary component of a professional software development infrastructure, and consistent use of a bug or issue tracking system is considered one of the "hallmarks of a good software team". [ 2 ] 
+
+ Making 
+
+ A major component of a bug tracking system is a database that records facts about known bugs. Facts may include the time a bug was reported, its severity, the erroneous program behavior, and details on how to reproduce the bug; as well as the identity of the person who reported it and any programmers who may be working on fixing it. [ 3 ] 
+
+ Typical bug tracking systems support the concept of the life cycle for a bug which is tracked through the status assigned to the bug. A bug tracking system should allow administrators to configure permissions based on status, move the bug to another status, or delete the bug. The system should also allow administrators to configure the bug statuses and to what extent a bug in a particular status can be moved. Some systems will e-mail interested parties, such as the submitter and assigned programmers, when new records are added or the status changes. 
+
+ Usage 
+
+ The main benefit of a bug-tracking system is to provide a clear centralized overview of development requests (including both bugs and improvements; the boundary is often fuzzy), and their state. The prioritized list of pending items (often called backlog) provides valuable input when defining the product road map, or maybe just "the next release". 
+
+ In a corporate environment, a bug-tracking system may be used to generate reports on the productivity of programmers at fixing bugs. However, this may sometimes yield inaccurate results because different bugs may have different levels of severity and complexity. The severity of a bug may not be directly related to the complexity of fixing the bug. There may be different opinions among the managers and architects. 
+
+ A local bug tracker (LBT) is usually a computer program used by a team of application support professionals (often a help desk ) to keep track of issues communicated to software developers. Using an LBT allows support professionals to track bugs in their "own language" and not the "language of the developers." In addition, an LBT allows a team of support professionals to track specific information about users who have called to complain — this information may not always be needed in the actual development queue. Thus, there are two tracking systems when an LBT is in place. 
+
+ Part of integrated project management systems 
+ Bug and issue tracking systems are often implemented as a part of integrated project management systems .
+This approach allows including bug tracking and fixing in a general product development process, fixing bugs in several product versions, automatic generation of a product knowledge base and release notes. 
+
+ Distributed bug tracking 
+
+ Some bug trackers are designed to be used with distributed revision control software. These distributed bug trackers allow bug reports to be conveniently read, added to the database or updated while a developer is offline. [ 4 ] Fossil and Veracity both include distributed bug trackers. 
+
+ Recently, commercial bug tracking systems have also begun to integrate with distributed version control . FogBugz , for example, enables this functionality via the source-control tool, Kiln. [ 5 ] 
+
+ Although wikis and bug tracking systems are conventionally viewed as distinct types of software, ikiwiki can also be used as a distributed bug tracker. It can manage documents and code as well, in an integrated distributed manner. However, its query functionality is not as advanced or as user-friendly as some other, non-distributed bug trackers such as Bugzilla . [ 6 ] Similar statements can be made about org-mode , although it is not wiki software as such. 
+
+ Bug tracking and test management 
+ While traditional test management tools such as HP Quality Center and IBM Rational Quality Manager come with their own bug tracking systems, other tools integrate with popular bug tracking systems. [ citation needed ] 
+
+ See also 
+ Application lifecycle management 
+ Comparison of issue-tracking systems – Including bug tracking systems 
+ Comparison of project management software – Including bug tracking systems 
+
+ References 
+ 
+ ↑ Bogomil Shopov (September 8, 2014). "Implement Client-side Bug Reporting" . Archived from the original on 13 November 2014 . Retrieved 17 November 2014 . 
+ ↑ Joel Spolsky (November 8, 2000). "Painless Bug Tracking" . Retrieved 29 October 2010 . 
+ ↑ Kaner, Cem (July 2000). "Bug Advocacy" (PDF) . kaner.com . pp.   81, 98 . Retrieved 2021-05-19 . 
+ ↑ Jonathan Corbet (May 14, 2008). "Distributed bug tracking" . LWN.net . Retrieved 7 January 2009 . 
+ ↑ "FogBugz Features" . Fogbugz.com . Archived from the original on 2013-07-05 . Retrieved 2010-10-29 . 
+ ↑ Joey Hess (6 April 2007). "Integrated issue tracking with Ikiwiki" . NetworkWorld.com . IDG . Retrieved 10 November 2014 . 
+ 
+
+ External links 
+ How to Report Bugs Effectively by Simon Tatham 
+ List of distributed bug tracking software 
+
+ v t e Bug tracking systems Years indicate the date of first stable release. Client-server Free software 
+ GNATS ( 1992 ) 
+ Debbugs ( 1994 / 1999 ) 
+ Bugzilla ( 1998 ) 
+ Request Tracker ( 1999 ) 
+ MantisBT ( 2000 ) 
+ Roundup ( 2001 ) 
+ Trac ( 2004 ) 
+ Redmine ( 2006 ) 
+ Apache Allura ( 2009 ) 
+ Maniphest ( 2010 ) 
+ Tuleap ( 2011 ) 
+ GitLab ( 2011 ) 
+ Apache Bloodhound ( 2012 ) 
+ Gitea ( 2016 ) 
+ Codeberg ( 2019 ) 
+ Forgejo ( 2022 ) 
+ Proprietary 
+ Helix ALM (formerly TestTrack) ( 1998 ) 
+ Axosoft ( 2002 ) 
+ Jira ( 2002 ) 
+ Azure DevOps Server ( 2005 ) 
+ YouTrack ( 2009 ) 
+ Distributed Free software 
+ Fossil ( 2006 ) 
+ Proprietary 
+ Azure DevOps Server ( 2013 ) 
+ SaaS -only 
+ SourceForge ( 1999 ) 
+ GNU Savannah ( 2000 ) 
+ OSDN ( 2002 ) 
+ Launchpad ( 2004 ) 
+ Assembla ( 2005 ) 
+ CodePlex ( 2006 ) discontinued 
+ GitHub ( 2008 ) 
+ Bitbucket ( 2008 ) 
+ YouTrack ( 2011 ) 
+ Azure DevOps Services ( 2012 ) 
+ 
+   Category 
+ Comparison

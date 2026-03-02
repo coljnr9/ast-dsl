@@ -1,0 +1,41 @@
+As a Reliability Engineer, I have performed a Failure Mode Analysis (FMA) based on the provided text detailing bank account operations.
+
+### 1. Operations & Failure Mode Analysis
+
+| Operation | Failure Mode (Preconditions/Inputs/State) | Expected System Response | Preservation Requirement |
+| :--- | :--- | :--- | :--- |
+| **Account Opening** | **Illegal Identity:** Use of a "false name." | **Rejected:** Application must be denied. | Legal integrity of the registry. |
+| | **Underaged Principal:** Applicant is under 18 (or 16 in some regions) without a guardian. | **Rejected:** Verification of DOB fails. | Regulatory compliance. |
+| | **Non-Compliance:** Terms and conditions are not accepted. | **Ignored:** Contract is not formed. | Integrity of the legal contract. |
+| | **Duplicate Identifier:** Account number already exists. | **Error State:** System must prevent duplicate IDs. | Unique account identification. |
+| **Fund Deposit** | **Invalid Destination:** Targeting an account number that does not exist. | **Rejected:** Transaction reversed or held. | Zero-loss of customer funds. |
+| | **Legal Restriction:** Anti-money laundering (AML) or "debanking" flags. | **Error State:** Funds frozen or transaction rejected. | Regulatory compliance data. |
+| **Fund Withdrawal** | **Insufficient Balance:** Attempting to withdraw $X$ from an account where balance < $X$ (and no credit facility). | **Rejected:** Transaction declined. | Balance non-negativity (for deposit accts). |
+| | **Limit Violation:** Exceeding "withdrawal limits" specified by law or contract. | **Rejected:** Error message stating limit exceeded. | Policy enforcement. |
+| | **Unauthorized Access:** Signatory cannot "identify themselves" according to terms. | **Rejected:** Access denied. | Asset security/Ownership. |
+| **Loan/Credit Operation** | **Collateral Deficiency:** Secured loan lacks sufficient collateral value. | **Rejected:** Loan cannot be disbursed. | Bank's asset-to-liability ratio. |
+| | **Guarantee Failure:** Third-party guarantor terms not met. | **Rejected/Error State:** Transaction suspended. | Legal claim validity. |
+| **Transaction Monitoring** | **Suspicious Pattern:** EMI/Bank identifies high-risk activity. | **Error State:** Transaction "blocked" or "queried." | Audit trail of the query. |
+| **Account Closing** | **Outstanding Debt:** Attempting to close a loan account with a debit balance. | **Rejected:** Account remains open/Liability persists. | Claim against the debtor. |
+
+---
+
+### 2. Irreversible States (Permanent Transitions)
+*   **Contract Formation:** Once the institution accepts the application, the terms and conditions form a binding contract.
+*   **Property Transfer:** Upon deposit, the actual cash "ceases to be the property of the depositor" and becomes the property of the bank. This is a permanent legal transition of ownership in exchange for a claim.
+*   **Account Number Assignment:** Once an ID is assigned and transactions are recorded, it cannot be reused for a different entity/history (implied by the audit nature of bank statements).
+
+### 3. State-Locked Operations (Impossible Actions)
+*   **Lending from EMIs:** Electronic Money Institutions are "not permitted to use client funds for lending." This operation is physically/legally impossible within that specific system state.
+*   **Withdrawal from Time Deposits:** Funds in a "Time Deposit (Bond)" or "Fixed Deposit" are locked for a duration; early withdrawal is usually impossible or violates terms.
+*   **Standard Deposit Insurance on EMIs:** EMI accounts cannot trigger deposit insurance schemes as they are not "deposit-taking institutions."
+
+### 4. Edge Cases (Condition Combinations)
+*   **Balance Polarity Switch:** Accounts that can "switch between credit and debit balances." A failure occurs if the system logic for interest calculation does not flip instantly (charging interest vs. paying interest).
+*   **Cross-Border Multi-Currency:** When "multi-currency" and "international transactions" occur, a failure in exchange rate synchronization can create an overdraft in one currency while the total balance is positive.
+*   **Safeguarding Failure:** EMIs must safeguard funds with "third-party credit institutions." If the third party fails, the EMI account holder faces a "High-Risk" loss scenario not present in traditional banks.
+
+### 5. Out of Scope (Unsupported Operations)
+*   **Direct Bailment:** The system does *not* support keeping the original physical currency for the customer (it is not a safe-deposit box).
+*   **Anonymous Accounts:** While "Numbered bank accounts" exist, "false names" or anonymous operation is generally listed as unlawful/unsupported.
+*   **EMI Interest Generation:** EMIs generally do not pay interest on "idle balances" as they are prohibited from lending those funds.

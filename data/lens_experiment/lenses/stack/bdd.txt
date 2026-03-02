@@ -1,0 +1,121 @@
+### **ChainMap Scenarios**
+
+**Scenario 1: Lookup value across multiple mappings (Happy Path)**
+*   **Given** a ChainMap initialized with `{'a': 1, 'b': 2}` and `{'b': 3, 'c': 4}`
+*   **When** searching for the key 'b'
+*   **Then** the result should be 2 (from the first mapping)
+
+**Scenario 2: Update reflects only on the first mapping (State Transition)**
+*   **Given** a ChainMap `c` containing two dictionaries `[{'x': 1}, {'y': 2}]`
+*   **When** the user executes `c['z'] = 10`
+*   **Then** the first dictionary should be `{'x': 1, 'z': 10}` and the second dictionary should remain `{'y': 2}`
+
+**Scenario 3: Create a subcontext with new_child (State Transition)**
+*   **Given** an existing ChainMap `base` with mappings `[{'env': 'prod'}]`
+*   **When** `base.new_child({'env': 'dev'})` is called
+*   **Then** a new ChainMap is returned where `{'env': 'dev'}` is the first mapping followed by `{'env': 'prod'}`
+
+---
+
+### **Counter Scenarios**
+
+**Scenario 4: Count occurrences from an iterable (Happy Path)**
+*   **Given** an empty Counter
+*   **When** initialized with the string "gallahad"
+*   **Then** the count for 'a' should be 3 and the count for 'l' should be 2
+
+**Scenario 5: Accessing a missing key (Edge Case)**
+*   **Given** a Counter object `c = Counter({'red': 4})`
+*   **When** checking the value for the key 'blue'
+*   **Then** the system should return 0 instead of raising a KeyError
+
+**Scenario 6: Mathematical subtraction of counters (State Transition)**
+*   **Given** `Counter(a=3, b=1)`
+*   **When** subtracting `Counter(a=1, b=2)` using the `-` operator
+*   **Then** the result should be `Counter({'a': 2})` (non-positive results are excluded)
+
+**Scenario 7: Total count of all elements (Query)**
+*   **Given** a Counter `c = Counter(a=10, b=5, c=-2)`
+*   **When** calling `c.total()`
+*   **Then** the result should be 13
+
+---
+
+### **deque Scenarios**
+
+**Scenario 8: Fast append and pop from both ends (Happy Path)**
+*   **Given** a deque `['b', 'c']`
+*   **When** `appendleft('a')` and `pop()` are executed
+*   **Then** the deque should be `['a', 'b']` and the popped value should be 'c'
+
+**Scenario 9: Bounded deque discards oldest items (Edge Case)**
+*   **Given** a deque initialized with `maxlen=3` and contents `[1, 2, 3]`
+*   **When** a new element `4` is appended to the right
+*   **Then** the deque should be `[2, 3, 4]` and the element `1` should be discarded
+
+**Scenario 10: Popping from an empty deque (Error Handling)**
+*   **Given** an empty deque object
+*   **When** the `pop()` method is called
+*   **Then** the system should raise an `IndexError`
+
+**Scenario 11: Rotating elements (State Transition)**
+*   **Given** a deque `[1, 2, 3]`
+*   **When** `rotate(1)` is called
+*   **Then** the state should transition to `[3, 1, 2]`
+
+**Scenario 12: Inserting into a full bounded deque (Precondition Violation)**
+*   **Given** a deque with `maxlen=2` containing `['x', 'y']`
+*   **When** attempting to `insert(1, 'z')`
+*   **Then** an `IndexError` should be raised because the insertion would exceed maxlen
+
+---
+
+### **defaultdict Scenarios**
+
+**Scenario 13: Automatic initialization of missing keys (Happy Path)**
+*   **Given** a defaultdict with `list` as the factory
+*   **When** accessing a non-existent key 'items' via `d['items'].append(1)`
+*   **Then** the key 'items' should be created with a value of `[1]`
+
+**Scenario 14: Default factory is None (Error Handling)**
+*   **Given** a defaultdict initialized with `default_factory=None`
+*   **When** a missing key is accessed
+*   **Then** the system should raise a `KeyError`
+
+---
+
+### **namedtuple Scenarios**
+
+**Scenario 15: Access fields by name (Query)**
+*   **Given** a namedtuple `Point = namedtuple('Point', ['x', 'y'])`
+*   **When** an instance `p = Point(11, 22)` is created
+*   **Then** `p.x` should return 11 and `p.y` should return 22
+
+**Scenario 16: Replace a field value (State Transition)**
+*   **Given** an instance `p = Point(x=1, y=2)`
+*   **When** calling `p._replace(x=10)`
+*   **Then** a new instance should be returned with `x=10` and `y=2`, and the original `p` remains unchanged
+
+**Scenario 17: Automatic renaming of invalid fields (Edge Case)**
+*   **Given** `namedtuple` called with `rename=True` and fields `['abc', 'def', 'abc']`
+*   **When** the class is created
+*   **Then** the fields should be renamed to `('abc', '_1', '_2')` (replacing keywords and duplicates)
+
+---
+
+### **OrderedDict Scenarios**
+
+**Scenario 18: Equality is order-sensitive (Query)**
+*   **Given** two OrderedDicts: `od1` with `(a:1, b:2)` and `od2` with `(b:2, a:1)`
+*   **When** checking if `od1 == od2`
+*   **Then** the result should be `False`
+
+**Scenario 19: Move existing key to the end (State Transition)**
+*   **Given** an OrderedDict `{'a': 1, 'b': 2, 'c': 3}`
+*   **When** `move_to_end('a', last=True)` is called
+*   **Then** the order of keys should become `['b', 'c', 'a']`
+
+**Scenario 20: Pop item from the beginning (Happy Path)**
+*   **Given** an OrderedDict `{'a': 1, 'b': 2}`
+*   **When** `popitem(last=False)` is called
+*   **Then** the result should be `('a', 1)` and the remaining dict should be `{'b': 2}`

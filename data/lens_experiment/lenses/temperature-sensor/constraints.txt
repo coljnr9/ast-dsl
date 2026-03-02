@@ -1,0 +1,32 @@
+As a domain expert on the DS18B20 1-Wire Digital Thermometer, I have extracted the following behavioral rules, restrictions, and constraints:
+
+1. The device must communicate over a 1-Wire bus requiring only one data line (DQ) and ground (GND).
+2. The device can derive power either from an external supply on the VDD pin or directly from the DQ data line via "parasite power."
+3. When operating in parasite power mode, the VDD pin must be connected to ground.
+4. Each device must be uniquely identified by a factory-lasered 64-bit ROM code consisting of an 8-bit family code (28h), a 48-bit serial number, and an 8-bit CRC.
+5. The device supports a user-programmable temperature-to-digital resolution of 9, 10, 11, or 12 bits.
+6. The temperature sensor measures from -55°C to +125°C.
+7. At power-up, the device defaults to a 12-bit resolution and a low-power idle state.
+8. The digital output of a temperature conversion is stored as a 16-bit sign-extended two’s complement number.
+9. An alarm flag is set if a measured temperature is lower than or equal to the TL register or higher than or equal to the TH register.
+10. The alarm flag is updated after every temperature measurement and will clear if the alarm condition no longer exists after a subsequent conversion.
+11. The TH, TL, and Configuration registers must be nonvolatile (EEPROM) to retain data during power-down.
+12. A temperature conversion is initiated only when the master issues a Convert T [44h] command.
+13. During a temperature conversion or a copy-to-EEPROM operation in parasite power mode, the master must provide a strong pullup on the bus within 10μs of the command.
+14. No other bus activity is permitted while a strong pullup is enabled during a conversion or EEPROM write.
+15. Externally powered devices must signal a "0" during conversion if a read time slot is issued and a "1" when the conversion is complete.
+16. Parasite power is not recommended for applications where temperatures exceed +100°C due to increased leakage currents.
+17. Every transaction sequence must follow a strict order: Initialization, followed by a ROM Command, followed by a Function Command.
+18. Initialization must consist of a reset pulse from the master followed by a presence pulse from the slave(s).
+19. If the bus is held low for more than 480μs, all slave devices on the bus will perform a reset.
+20. All data and commands must be transmitted least significant bit (LSB) first.
+21. The master must use the Match ROM [55h] command to address a specific device in a multidrop environment.
+22. The Skip ROM [CCh] command allows the master to address all devices simultaneously, but a Read Scratchpad command cannot follow it if multiple devices are on the bus.
+23. The Alarm Search [ECh] command limits responses to only those devices that have a set alarm flag.
+24. When using the Write Scratchpad [4Eh] command, the master must write all three bytes (TH, TL, and Config) before issuing a reset to avoid data corruption.
+25. Data is transferred from the scratchpad to the EEPROM only upon receipt of the Copy Scratchpad [48h] command.
+26. EEPROM data is automatically reloaded into the scratchpad registers upon power-up.
+27. The master can manually trigger a data reload from EEPROM to the scratchpad using the Recall E2 [B8h] command.
+28. To verify data integrity during a read, the master must calculate the CRC of the received data and compare it to the CRC byte transmitted by the device.
+29. The device determines its power mode (parasite vs. external) and informs the master when it receives a Read Power Supply [B4h] command.
+30. Write and read time slots must be a minimum of 60μs in duration with at least 1μs of recovery time between slots.

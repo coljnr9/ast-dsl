@@ -1,0 +1,30 @@
+A thermostat senses the temperature of a physical system and performs actions to maintain that temperature near a desired setpoint.
+The system operates as a "closed loop" control device by seeking to reduce the error between the desired and measured temperatures.
+A thermostat exerts control by switching heating or cooling devices on or off or by regulating the flow of a heat transfer fluid.
+Conventional "bang-bang" controllers operate the system at full capacity once the setpoint is reached or remain completely off.
+System control must include hysteresis to prevent excessively rapid cycling of the equipment around the setpoint.
+An anticipator stops the heating or cooling action slightly before reaching the setpoint to prevent temperature overshoot.
+A "normally open" (NO) contact configuration closes the circuit when the temperature rises above the setpoint.
+A "normally closed" (NC) contact configuration opens the circuit when the temperature rises above the setpoint.
+A "change over" (CO) configuration can simultaneously act as both normally open and normally closed settings.
+Bimetallic sensors convert temperature changes into mechanical displacement to actuate control of heating or cooling sources.
+Electronic thermostats use thermistors or semiconductor sensors to process temperature changes as electronic signals.
+Wax pellet thermostats progressively increase or decrease valve openings in response to temperature changes to balance fluid flow.
+Wax pellet driven valves exhibit hysteresis due to the phase transition between solid and liquid states.
+Gas-driven thermostats use expanding gas against a diaphragm to reduce the flow of gas to a burner as the temperature increases.
+Pneumatic thermostats respond to pressure changes in air-filled control tubes to activate heating or cooling.
+Standard pneumatic thermostats maintain "mains" air pressure between 15 and 18 psi.
+Millivolt thermostats are powered by a thermopile heated by a pilot light and do not require an external electrical power supply.
+Most modern low-voltage thermostats operate on 24-volt AC control circuits provided by a transformer.
+Line-voltage thermostats directly switch system power, often exceeding 40 amperes of current.
+Low-voltage thermostats must not be used on line-voltage circuits to prevent device failure or fire.
+Many digital thermostats require batteries to operate the internal electronics and LCD screen.
+"Power stealing" digital thermostats harvest energy from 24-volt AC circuits but cannot operate on millivolt circuits.
+Digital thermostats use either a relay or a semiconductor device, such as a triac, to switch HVAC units.
+Modern thermostats can use adaptive algorithms to calculate the exact activation time required to reach a specific temperature by a specific time.
+PID or MPC controllers are used for industrial applications requiring high precision and stable temperatures.
+In modern vehicles, thermostats may be bypassed to allow coolant to flow through the heater core even when the main valve is closed.
+Thermostatic mixing valves regulate the ratio of hot and cold water to prevent scalding while allowing high-temperature storage for bacteria control.
+The setpoint on a mechanical thermostat is adjusted by moving a lever or rotating a post to change the bimetallic coil position.
+Programmable thermostats allow the user to define different temperature setpoints for specific times of day or days of the week.
+Some programmable thermostats can control line-voltage systems using continuous control to mimic a dimmer effect for constant heat.

@@ -1,0 +1,72 @@
+This Failure Mode Analysis (FMA) evaluates the electronic mail system as described in the provided text, focusing on the "store-and-forward" model and the interaction between MUAs, MSAs, MTAs, and MDAs.
+
+### 1. Operations and Failure Modes
+
+#### **Operation: Message Submission (MUA to MSA)**
+*   **Failure Modes:**
+    *   **Invalid Sender Address:** The "From" field is missing or incorrectly formatted (not local-part + @ + domain).
+    *   **Network Disconnection:** Sender is offline or out of Wi-Fi range.
+    *   **Protocol Mismatch:** MUA uses a proprietary protocol (e.g., Exchange) that the gateway doesn't support.
+    *   **Size Constraint Violation:** Message/attachment is too large for the local server's policy.
+*   **Response:**
+    *   The MUA should **reject** the send attempt and notify the user immediately.
+    *   If a network error occurs, the MUA should **queue** the message for later retry.
+*   **Preservation:** The draft content must be preserved locally in the MUA until submission is confirmed.
+
+#### **Operation: Domain Name Resolution (DNS)**
+*   **Failure Modes:**
+    *   **Non-existent Domain:** The domain in `bob@b.org` does not exist.
+    *   **Missing MX Records:** The domain exists but has no mail exchange servers defined.
+    *   **Slow DNS Response:** Timeout occurs during resolution.
+*   **Response:**
+    *   For non-existent domains: **Reject/Bounce** the message as a permanent failure.
+    *   For slow responses: **Retry** the resolution according to back-off timers.
+*   **Preservation:** The original message remains in the MSA/MTA queue during retries.
+
+#### **Operation: Message Transfer (MTA to MTA via SMTP)**
+*   **Failure Modes:**
+    *   **Target Server Offline:** `mx.b.org` is down for maintenance or malfunction.
+    *   **Connection Refusal:** Target server is overloaded or identifies the sender as an "Open Relay" or spammer.
+    *   **Transmission Interruption:** Dropped packets or slow network during the "back-and-forth" SMTP handshake.
+*   **Response:**
+    *   Temporary Failures: The MTA must **queue** the message and retry for up to five days.
+    *   Permanent Failures/Timeout Expiry: The MTA must **generate a bounce message** to the sender.
+*   **Preservation:** Message integrity must be preserved; if the transfer is incomplete, the receiving server must not store a partial message.
+
+#### **Operation: Message Retrieval (MDA to MUA via POP3/IMAP)**
+*   **Failure Modes:**
+    *   **Authentication Failure:** User "Bob" provides the wrong credentials.
+    *   **Concurrent Access (POP3):** Multiple clients trying to "download-and-delete" simultaneously.
+    *   **Lack of Internet (Webmail):** User attempts to read mail on a web-based client while offline.
+*   **Response:**
+    *   **Reject** access for invalid credentials.
+    *   Webmail clients should **ignore** or show an error state for read requests when offline.
+*   **Preservation:** Messages must remain on the server (IMAP) or be fully transferred before deletion (POP3).
+
+---
+
+### 2. State and Boundary Analysis
+
+#### **Permanent Transitions (Non-Reversible)**
+*   **Deletion (POP3):** Once a message is downloaded and deleted from the server via POP3, it cannot be recovered from the server side.
+*   **Bounce Generation:** Once a "Permanent Delivery Failure" notice is sent to the sender after 5 days, the MTA typically purges the original message from its queue.
+*   **Trace Headers:** Each `Received` field added to the header is a permanent record of the path; they cannot be "un-written" once the message is delivered.
+
+#### **Impossible Operations in Specific States**
+*   **No Attachment Search:** Some clients cannot search attachment contents if they do not save separate copies of the files.
+*   **Offline Reading (Webmail):** Unlike MUAs, webmail clients cannot display messages without an active connection.
+*   **Reply without ID:** An `In-Reply-To` field cannot be generated if the original `Message-ID` header is missing.
+
+#### **Edge Cases & Combinations**
+*   **Clock Skew:** If the sender's and receiver's computer clocks are set inaccurately, the `Date` and `Received` timestamps will appear out of chronological order, breaking diagnostic tools.
+*   **Encoding Mismatch:** Sender uses a non-Latin encoding (raw non-ASCII) and the receiver uses a different one; result is "unreadable form."
+*   **HTML Missing Header:** When a client interprets a body as HTML even if the `Content-Type: html` header is missing, it may lead to rendering errors or security vulnerabilities.
+*   **Open Relays:** If a message passes through an open relay, modern MTAs may reject it mid-transit even if the sender and recipient are legitimate.
+
+---
+
+### 3. Out of Scope (Deliberately Not Supported)
+*   **Synchronous Communication:** The system does not require users to be online simultaneously (not Instant Messaging).
+*   **Guaranteed Speed:** Transmission favors reliability over speed; there is no upper-bound "real-time" delivery guarantee.
+*   **Native Non-ASCII (Standard):** Internationalized email (UTF-8) is "standardized but not widely adopted," meaning the system does not guarantee support for non-ASCII addresses across all spans.
+*   **Universal Rich Text:** Rich Text Format (RTF) is proprietary to Microsoft and is not supported by the general Internet email standard.

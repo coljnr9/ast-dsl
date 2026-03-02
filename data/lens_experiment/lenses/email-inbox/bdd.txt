@@ -1,0 +1,106 @@
+### Happy Paths (Normal Operations)
+
+**Scenario 1: Sending a basic email successfully**
+*   **Given** Alice has a configured Mail User Agent (MUA)
+*   **When** Alice composes a message to "bob@b.org" and presses send
+*   **Then** the MUA should format the message with a Header and Body and transmit it to the Mail Submission Agent (MSA) via SMTP.
+
+**Scenario 2: Successful delivery via Store-and-Forward**
+*   **Given** a message has been sent to "bob@b.org"
+*   **When** the recipient's Mail Delivery Agent (MDA) receives the message
+*   **Then** the message should be stored in Bob's mailbox until he connects to retrieve it.
+
+**Scenario 3: Reading email via Webmail**
+*   **Given** Bob has received a new email in his account
+*   **When** Bob logs into his webmail interface via a web browser
+*   **Then** he should be able to see the message in his "Inbox" without downloading it to his local device.
+
+**Scenario 4: Multipart content transmission**
+*   **Given** an email contains both text and an image attachment
+*   **When** the email is processed for transmission
+*   **Then** the system should use MIME standards to encode the multimedia content.
+
+---
+
+### Precondition Violations (Rejected Operations)
+
+**Scenario 5: Sending without mandatory header fields**
+*   **Given** a user is composing a new email
+*   **When** the user attempts to send the email without a "From" address
+*   **Then** the system should reject the operation as the "From" field is mandatory per RFC 5322.
+
+**Scenario 6: Rejecting mail from an Open Relay**
+*   **Given** a modern Mail Transfer Agent (MTA) configured for security
+*   **When** an incoming connection is identified as originating from an "open mail relay"
+*   **Then** the MTA should refuse the connection to prevent the spread of unsolicited bulk email.
+
+---
+
+### State Transitions
+
+**Scenario 7: Updating "Read" status**
+*   **Given** an email in the Inbox has the state "Unread"
+*   **When** the user opens the email to view the content
+*   **Then** the MUA should change the message state to "Read" and update the visual styling in the UI.
+
+**Scenario 8: Moving message to Trash**
+*   **Given** an email is currently located in the "Inbox"
+*   **When** the user selects the "Delete" action
+*   **Then** the message should transition from the "Inbox" folder to the "Trash" or "Deleted Items" folder.
+
+---
+
+### Edge Cases (Boundaries & Limits)
+
+**Scenario 9: Handling very large attachments**
+*   **Given** Alice attaches a 100MB file to an email
+*   **When** Alice attempts to send the message
+*   **Then** the system may experience slower delivery or a timeout due to increased network transmission time.
+
+**Scenario 10: Email header line length limit**
+*   **Given** a system is generating a long Subject line
+*   **When** the Subject line exceeds 998 characters
+*   **Then** the system must wrap or truncate the header to comply with RFC 5322 character limits.
+
+**Scenario 11: Empty Inbox query**
+*   **Given** a user has just created a new email account
+*   **When** the user views the Inbox page
+*   **Then** the system should display a "No messages" indicator rather than an error.
+
+---
+
+### Query Operations
+
+**Scenario 12: Checking for new mail via POP3**
+*   **Given** a POP3 client is configured on a local computer
+*   **When** the client polls the POP3 server for new messages
+*   **Then** the server should return a list of available messages in the "maildrop."
+
+**Scenario 13: Searching headers via IMAP**
+*   **Given** a user has many messages stored on the server
+*   **When** the user searches for a specific "Subject" via an IMAP client
+*   **Then** the client should request and display only the message headers matching the criteria from the server.
+
+---
+
+### Error Handling
+
+**Scenario 14: Permanent Delivery Failure (Bounce)**
+*   **Given** Alice sends an email to a non-existent domain
+*   **When** the MTA determines the message cannot be delivered after the maximum retry period (e.g., 5 days)
+*   **Then** the MTA must send a "bounce message" back to Alice indicating the delivery problem.
+
+**Scenario 15: Handling slow DNS responses**
+*   **Given** the MSA is attempting to resolve the MX record for "b.org"
+*   **When** the DNS server is slow or unresponsive
+*   **Then** the MSA should queue the message and retry the delivery later rather than immediately discarding it.
+
+**Scenario 16: Spam filtering disposition**
+*   **Given** an incoming message is classified as "Spam" by the system's filters
+*   **When** the MDA processes the message delivery
+*   **Then** it should either move the message to a "Spam" folder or drop it entirely based on the user's configuration.
+
+**Scenario 17: Character encoding mismatch**
+*   **Given** a sender uses a non-ASCII encoding not supported by the recipient
+*   **When** the recipient opens the email
+*   **Then** the system should display the body in a non-readable (raw) form unless a common Unicode/UTF-8 standard is used.

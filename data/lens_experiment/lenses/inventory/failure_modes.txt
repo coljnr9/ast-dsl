@@ -1,0 +1,94 @@
+This reliability engineering analysis identifies the failure modes, boundary constraints, and systemic risks inherent in the inventory management system described in the article.
+
+---
+
+### 1. Operation: Asset Identification (Scanning/Input)
+*Manual input, Barcode, RFID, QR, or NFC scanning.*
+
+*   **Failure Modes:**
+    *   **Unreadable/Damaged Tag:** Physical degradation of barcode/RFID makes the item unidentifiable.
+    *   **Duplicate Identifiers:** Two unique items sharing a serial/lot number.
+    *   **Hardware Malfunction:** Scanner/Smartphone failure or battery depletion.
+    *   **Input Latency:** Real-time update fails due to network drop (Cloud-specific).
+*   **Response to Failure:**
+    *   **Rejected:** The system must reject invalid/unknown codes with an error message.
+    *   **Manual Override:** If a scan fails, the system should allow manual entry (flagged for audit).
+*   **Preservation:** The system must preserve the last known "Good" state and not decrement/increment stock until the transaction is verified.
+
+### 2. Operation: Inventory Optimization (Reorder Point Trigger)
+*Calculations for Reorder Point, Order Quantity, and Lead Demand.*
+
+*   **Failure Modes:**
+    *   **Stale Data:** Reorder triggered based on "stock on hand" that hasn't been updated with recent sales.
+    *   **Negative Stock:** System allows stock levels to drop below zero (impossible in physical reality).
+    *   **Zero Lead Time:** Lead demand calculation fails if the supplier lead time is set to 0 or is null.
+*   **Response to Failure:**
+    *   **Error State:** Alert manager that "Optimization metrics cannot be calculated due to missing parameters."
+    *   **Default Logic:** Use historical averages if current lead demand is unavailable.
+*   **Preservation:** Must preserve the safety stock buffer despite calculation errors to prevent outages.
+
+### 3. Operation: Movement & Transport
+*Tracking items between vendors, warehouses, and retail locations.*
+
+*   **Failure Modes:**
+    *   **"Ghost" Inventory:** Items marked as "shipped" from Warehouse A but never "received" at Warehouse B (In-transit limbo).
+    *   **Location Mismatch:** Item scanned into a location that does not exist in the system hierarchy.
+    *   **Circular Transfers:** Sending items back and forth, creating infinite loops in audit logs.
+*   **Response to Failure:**
+    *   **Ignored/Blocked:** Block "Receive" actions if no corresponding "Ship" action exists.
+    *   **Reconciled:** Flag discrepancies for manual cycle counts.
+*   **Preservation:** Total global quantity (Sum of all locations + In-transit) must remain constant during the transfer process.
+
+### 4. Operation: Bill of Materials (BOM) & Work Orders
+*Creating assembly instructions and deducting parts for manufacturing.*
+
+*   **Failure Modes:**
+    *   **Infinite Recursion:** A multi-level BOM where Product A requires Product B, and Product B requires Product A.
+    *   **Partial Completion:** Work order started but stock runs out mid-process.
+    *   **Orphaned Work Orders:** Reversing a work order after parts have been consumed/scrapped.
+*   **Response to Failure:**
+    *   **Rejected:** System must prevent "Auto Work Order" if the BOM is incomplete or recursive.
+    *   **Error State:** Freeze the work order if a sub-component goes out of stock.
+*   **Preservation:** Parent-child relationship integrity (Stock deducted from components must strictly equal stock added to the finished good).
+
+### 5. Operation: User Rights & Access Control
+*Restricting access to specific employees (Security feature).*
+
+*   **Failure Modes:**
+    *   **Privilege Escalation:** User performs an "Order" action when only "Receive" was granted.
+    *   **Account Lockout:** Only one admin exists, and they are inaccessible (System Deadlock).
+*   **Response to Failure:**
+    *   **Rejected:** Unauthorized transactions must be blocked and logged.
+*   **Preservation:** Audit trail must be immutable; user identity must be attached to every stock change.
+
+---
+
+### System Constraints & States
+
+#### Permanent (Irreversible) Transitions
+*   **Final Sale/Shipment:** Once a product is shipped to a customer and leaves the system's sphere of control, the digital record can be archived but the physical state is non-reversible via software.
+*   **Product Obsolescence/Spoilage:** Marking an item as "Spoiled" removes it from "Sellable" inventory permanently.
+*   **Data Deletion:** In many ERPs, deleting a Master SKU record can permanently sever links to historical sales/work orders.
+
+#### Impossible Operations (State-Locked)
+*   **Shipping Unreceived Stock:** You cannot "Pick/Pack" an item that has not been "Received" into the warehouse.
+*   **Negative Assembly:** Creating a Bill of Materials for a finished good using 0 or negative component quantities.
+*   **Restricted Bin Movement:** Moving a "Hazardous" lot to a "Standard" bin if the system enforces storage rules.
+
+#### Edge Cases (Combination Hazards)
+*   **Simultaneous Update (Race Condition):** Two users scan the last remaining item at the exact same millisecond.
+*   **The "Zero Lead Time" Sale:** A product is sold and shipped the same second it is received, potentially bypassing "Quality Hold" states.
+*   **Peak Season Latency:** High volume of scans during "Peak Season" causes cloud-based software to lag, resulting in users double-scanning items because the screen didn't update.
+
+#### Deliberately Out of Scope
+*   **Physical Theft/Shrinkage:** The system cannot prevent physical removal of goods; it can only identify the discrepancy after a cycle count.
+*   **Vendor Production Issues:** The software tracks the *order*, not the vendor's internal manufacturing failures.
+*   **Hardware Maintenance:** Third-party provider (Cloud) hardware failures are beyond the user's operational control.
+
+---
+
+### System Preservation Goals
+Regardless of any failure mode above, the system **must** preserve:
+1.  **Transaction Immutability:** A record of what happened (and who did it) must never be lost.
+2.  **Inventory Balance Integrity:** The equation `Starting Stock + Received - Shipped = Current Stock` must always resolve, even if the numbers are wrong due to human error.
+3.  **Data Segregation:** Failures in the "Service Management" (cleaning supplies) module should not crash the "Manufacturing" (finished goods) module.

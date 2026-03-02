@@ -1,0 +1,74 @@
+This Reliability Engineering Analysis identifies the failure modes and constraints of a Bug Tracking System (BTS) based on the provided technical description.
+
+---
+
+### 1. Operations and Failure Mode Analysis
+
+#### A. Operation: Reporting a Bug (Data Entry)
+*   **Preconditions/Invalid States:** User lacks permission; required fields (Severity, Reproduction Steps, Submitter Identity) are missing or null; the database is offline; the system is in "Read-only" mode (e.g., during a migration).
+*   **Rejected Inputs:** Script injections in "Program Behavior" text fields; invalid "Severity" levels; files/attachments exceeding size limits; non-existent reporter identity in restricted systems.
+*   **System Response:**
+    *   **Invalid Input/Missing Fields:** Reject with a validation error; do not commit to the database.
+    *   **Permissions Violation:** Reject with "Access Denied."
+    *   **Database Failure:** Error state; the report must be cached locally (in distributed systems) or retry logic must be initiated.
+*   **Must Preserve:** Integrity of the existing database; the unique ID of the bug must remain sequential or unique.
+
+#### B. Operation: Changing Bug Status (State Transition)
+*   **Preconditions/Invalid States:** User lacks specific "Status Change" permissions; current status has no defined transition to the target status (e.g., trying to move from "Closed" to "In Progress" in a system that forbids it).
+*   **Rejected Inputs:** Non-existent status codes; attempt to transition to a status that requires an "Assigned Programmer" when none is set.
+*   **System Response:**
+    *   **Illegal Transition:** Reject and log the unauthorized attempt; maintain the current state.
+    *   **Missing Required Field for State:** Reject; notify the user that "Assigned Programmer" or "Resolution Code" is required for this move.
+*   **Must Preserve:** The historical audit trail of previous statuses and the identity of the person who moved the bug.
+
+#### C. Operation: Deleting a Bug
+*   **Preconditions/Invalid States:** User is not an Administrator; bug is currently "Locked" or referenced by a Project Management release milestone.
+*   **Rejected Inputs:** Operation requested by non-admin; bulk deletion requests exceeding safety thresholds.
+*   **System Response:**
+    *   **Unauthorized:** Reject; generate a security alert.
+    *   **Locked State:** Ignored with an error message explaining the dependency.
+*   **Must Preserve:** Referential integrity (ensure no "ghost" bugs remain in release notes or productivity reports).
+
+#### D. Operation: Assigning a Programmer
+*   **Preconditions/Invalid States:** Programmer identity does not exist in the system; programmer is inactive/terminated; user lacks "Assign" permissions.
+*   **Rejected Inputs:** Multiple assignees in a system that supports only one; assigning a bug to a "Reporter" who has no developer permissions.
+*   **System Response:**
+    *   **Invalid Identity:** Reject; prompt for a valid user lookup.
+*   **Must Preserve:** The previous assignee's record in the history log.
+
+#### E. Operation: Distributed Sync/Offline Update
+*   **Preconditions/Invalid States:** Merge conflicts (two users edited the same bug record while offline); incompatible schema versions between local and remote databases.
+*   **Rejected Inputs:** Corrupted log files; unauthorized sync tokens.
+*   **System Response:**
+    *   **Conflict:** Flag for manual resolution or apply a "Last-Writer-Wins" policy (system-specific).
+    *   **Incompatible Schema:** Reject sync; prompt for client update.
+*   **Must Preserve:** Local data (do not delete or overwrite local un-synced data until a successful handshake is confirmed).
+
+---
+
+### 2. State and Transition Constraints
+
+**Permanent Transitions (Non-reversible)**
+*   **Deletion:** Once a bug is deleted from the database, it cannot be recovered within the application layer (requires database backup).
+*   **History Logs/Audit Trails:** Entries in the "Time Reported" and status change logs are permanent; they cannot be edited without compromising system integrity.
+
+**Impossible Operations in Specific States**
+*   **Modification while "Closed":** If configured by administrators, a bug in a "Closed" status cannot have its severity or description edited.
+*   **Assignment without Status Change:** In some workflows, assigning a programmer is impossible unless the status is first moved to "Open" or "Acknowledged."
+*   **Offline Querying (Non-Distributed):** For standard client-server systems (e.g., Bugzilla), searching or querying is impossible when the network is down.
+
+---
+
+### 3. Edge Cases
+*   **Race Conditions:** Two administrators attempting to delete/configure the same status simultaneously.
+*   **Circular Dependencies:** Configuring a status to only move to Status B, while Status B is configured to only move back to Status A, with no "Closed" state possible.
+*   **Language Mismatch:** Data synchronization between a Local Bug Tracker (LBT) and a Developer Tracker where field mapping is not 1:1.
+*   **Severity vs. Complexity:** Reporting tools generating productivity metrics for a developer who fixed one "Highly Complex" bug vs. one who fixed five "Trivial" bugs (inaccurate productivity output).
+
+---
+
+### 4. Out of Scope (Deliberate Non-Support)
+*   **Automated Bug Fixing:** The system records and tracks bugs but does not modify the source code to fix them.
+*   **Real-time Communication:** While the system sends emails, it is not described as a chat or instant messaging platform.
+*   **Opinion Arbitration:** The system allows for differing opinions between managers and architects on severity but does not provide a mechanism to "force" a correct opinion; it only records the entered fact.
+*   **Code Review:** While integrated with version control, the BTS itself does not perform code linting or peer review logic.

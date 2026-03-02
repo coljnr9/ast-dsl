@@ -1,0 +1,28 @@
+The `CTUD` function block increments and decrements a counter value based on rising edges of the count-up and count-down inputs.
+The counter maintains a current value (`CV`) of the data type `WORD`.
+The counter accepts an upper limit/start value (`PV`) of the data type `WORD`.
+The `RESET` input takes precedence over counting operations.
+When `RESET` is `TRUE`, the current counter value `CV` is set to 0.
+When `LOAD` is `TRUE`, the current counter value `CV` is set to the value of `PV`.
+If both `RESET` and `LOAD` are `TRUE`, the `RESET` operation dominates, and `CV` is set to 0.
+The counter increments `CV` by one on a rising edge of the `CU` input.
+The counter decrements `CV` by one on a rising edge of the `CD` input.
+Incrementing via `CU` is ignored if `RESET` or `LOAD` is active.
+Decrementing via `CD` is ignored if `RESET` or `LOAD` is active.
+The `QU` output is `TRUE` if the current value `CV` is greater than or equal to the limit `PV`.
+The `QU` output is `FALSE` if the current value `CV` is less than the limit `PV`.
+The `QD` output is `TRUE` if the current value `CV` is equal to 0.
+The `QD` output is `FALSE` if the current value `CV` is greater than 0.
+The counter value `CV` remains unchanged if no rising edge is detected on `CU` or `CD` and control inputs are `FALSE`.
+The data type for `PV` in this implementation is `WORD`, deviating from the IEC standard `INT`.
+The system tracks separate boolean states for `CU` and `CD` to detect transitions from `FALSE` to `TRUE`.
+The counter value `CV` is updated and persisted between successive calls of the function block.
+Simultaneous rising edges on both `CU` and `CD` result in `CV` remaining effectively unchanged (increment then decrement).
+The counter state does not transition automatically; it only changes upon the execution (call) of the function block instance.
+The upper limit for the incrementing operation is defined by the value assigned to the `PV` input.
+The counter provides the current state of `CV`, `QU`, and `QD` as read-only outputs to the caller.
+The block does not support negative counter values as it utilizes the unsigned `WORD` data type.
+Internal logic for incrementing and decrementing is bypassed whenever the `RESET` signal is high.
+The `PV` value can be modified dynamically, and the `QU` output will update relative to the new `PV` on the next execution.
+The `CV` value is initialized to 0 upon the first instantiation or power-on cycle of the controller.
+The function block does not provide a mechanism to disable the rising edge detection logic other than through the `RESET` or `LOAD` overrides.

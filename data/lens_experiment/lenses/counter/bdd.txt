@@ -1,0 +1,117 @@
+Here are the BDD scenarios for the **CTU (Up Counter)** Function Block based on the provided technical specification.
+
+### Happy Paths (Normal Operations)
+**Scenario 1: Increment counter on rising edge**
+*   **Given** the current counter value `CV` is 0
+*   **When** the input `CU` transitions from `FALSE` to `TRUE` (rising edge)
+*   **Then** the counter value `CV` should be 1
+
+**Scenario 2: Output Q activates when limit is reached**
+*   **Given** the upper limit `PV` is set to 5 and current value `CV` is 4
+*   **When** the input `CU` receives a rising edge
+*   **Then** the counter value `CV` should be 5 and the output `Q` should be `TRUE`
+
+**Scenario 3: Output Q activates when CV exceeds PV**
+*   **Given** the upper limit `PV` is set to 3 and current value `CV` is 3
+*   **When** the input `CU` receives a rising edge
+*   **Then** the counter value `CV` should be 4 and the output `Q` should remain `TRUE`
+
+**Scenario 4: Resetting the counter**
+*   **Given** the current counter value `CV` is 10 and output `Q` is `TRUE`
+*   **When** the input `RESET` is set to `TRUE`
+*   **Then** the counter value `CV` should be 0 and the output `Q` should be `FALSE`
+
+---
+
+### Precondition Violations & Reset Priority
+**Scenario 5: Reset overrides increment signal**
+*   **Given** the current counter value `CV` is 5
+*   **When** both `CU` receives a rising edge and `RESET` is `TRUE` simultaneously
+*   **Then** the counter value `CV` should be 0 (Reset takes priority)
+
+**Scenario 6: Counter stays at zero while Reset is held high**
+*   **Given** the input `RESET` is `TRUE`
+*   **When** multiple rising edges are detected on input `CU`
+*   **Then** the counter value `CV` must remain 0
+
+---
+
+### State Transitions
+**Scenario 7: Transition from FALSE to TRUE on Q**
+*   **Given** `PV` is 2 and `CV` is 1
+*   **When** `CU` transitions from `FALSE` to `TRUE`
+*   **Then** the state of `Q` should transition from `FALSE` to `TRUE`
+
+**Scenario 8: Transition from TRUE to FALSE on Q via Reset**
+*   **Given** `PV` is 2 and `CV` is 2 (so `Q` is `TRUE`)
+*   **When** `RESET` is set to `TRUE`
+*   **Then** the state of `Q` should transition from `TRUE` to `FALSE`
+
+---
+
+### Edge Cases (Boundaries & Limits)
+**Scenario 9: Counter starts at zero**
+*   **Given** a newly instantiated `CTU` block
+*   **When** no inputs have been processed yet
+*   **Then** the initial `CV` should be 0 and `Q` should be `FALSE`
+
+**Scenario 10: PV is set to zero**
+*   **Given** the upper limit `PV` is set to 0
+*   **When** the system is initialized or reset
+*   **Then** the output `Q` should be `TRUE` (because `CV` >= `PV`)
+
+**Scenario 11: Maximum value of WORD type (Upper Boundary)**
+*   **Given** the current value `CV` is 65535 (Max WORD)
+*   **When** `CU` receives a rising edge
+*   **Then** the counter value `CV` should wrap around to 0 OR remain at 65535 (depending on implementation-specific WORD overflow handling)
+
+**Scenario 12: Changing PV while counter is running**
+*   **Given** `CV` is 3 and `PV` was 5
+*   **When** the input `PV` is changed to 2
+*   **Then** the output `Q` should immediately become `TRUE` during the next cycle
+
+---
+
+### Query Operations (State Checking)
+**Scenario 13: Read current value without incrementing**
+*   **Given** the current counter value `CV` is 7
+*   **When** the input `CU` remains `FALSE`
+*   **Then** a query to `CV` must return 7
+
+**Scenario 14: Q remains FALSE if CV is less than PV**
+*   **Given** `PV` is 10 and `CV` is 9
+*   **When** the internal state is checked
+*   **Then** the output `Q` must be `FALSE`
+
+---
+
+### Error Handling & Signal Integrity
+**Scenario 15: Static High signal on CU does not increment**
+*   **Given** the input `CU` is already `TRUE`
+*   **When** the input `CU` remains `TRUE` for multiple cycles
+*   **Then** the counter value `CV` should not increment (it requires a transition)
+
+**Scenario 16: Falling edge on CU does not increment**
+*   **Given** the input `CU` is `TRUE`
+*   **When** the input `CU` transitions from `TRUE` to `FALSE`
+*   **Then** the counter value `CV` should remain unchanged
+
+**Scenario 17: Handling of Invalid PV (Negative Simulation)**
+*   **Given** the input `PV` is provided with a value outside of the WORD range (if applicable by compiler)
+*   **When** the block is executed
+*   **Then** the system should flag a type mismatch or clamp the value to the WORD range
+
+**Scenario 18: Rapid pulsing (Signal noise)**
+*   **Given** the counter is active
+*   **When** `CU` toggles faster than the task cycle time
+*   **Then** the counter should only increment once per detected cycle-synchronized rising edge
+
+**Scenario 19: Persistence after RESET goes FALSE**
+*   **Given** the counter was reset (`CV` = 0)
+*   **When** `RESET` transitions from `TRUE` to `FALSE`
+*   **Then** the counter value `CV` should remain at 0 until the next `CU` rising edge
+
+**Scenario 20: Recovery from large CV**
+*   **Given** `CV` is 100 and `PV` is 50 (`Q` is `TRUE`)
+*   **When** `RESET` is pulsed then `CU` is pulsed once
+*   **Then** `CV` should be 1 and `Q` should be `FALSE`

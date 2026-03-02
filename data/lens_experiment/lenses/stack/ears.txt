@@ -1,0 +1,30 @@
+1. **Ubiquitous:** The **ChainMap** shall store underlying mappings as a list in the `maps` attribute.
+2. **Ubiquitous:** The **ChainMap** shall search underlying mappings successively from first to last during lookups.
+3. **Ubiquitous:** The **ChainMap** shall perform all write, update, and deletion operations only on the first mapping in the list.
+4. **When** no maps are specified during initialization, the **ChainMap** shall provide a single empty dictionary as the default mapping.
+5. **When** an underlying mapping is updated externally, the **ChainMap** shall reflect those changes by reference.
+6. **When** the `new_child()` method is called, the **ChainMap** shall return a new ChainMap consisting of a new map followed by all existing maps.
+7. **When** the `parents` property is accessed, the **ChainMap** shall return a new ChainMap containing all mappings except the first one.
+8. **Ubiquitous:** The **Counter** shall return a zero count when a missing element is accessed.
+9. **When** the `elements()` method is called, the **Counter** shall iterate over elements repeating each as many times as its integer count.
+10. **While** an element's count is less than one, the **Counter** shall ignore that element during `elements()` iteration.
+11. **When** the `subtract()` method is called, the **Counter** shall subtract counts based on the provided mapping or iterable.
+12. **When** a multiset mathematical operation (+, -, &, |) is performed, the **Counter** shall exclude results with counts of zero or less from the output.
+13. **If** the `fromkeys()` method is called on a **Counter**, then the **Counter** shall raise a NotImplementedError (as it is not implemented).
+14. **When** comparing two **Counter** objects for equality, the **Counter** shall treat missing elements as having zero counts.
+15. **While** a **deque** is initialized with a `maxlen`, the **deque** shall discard items from the opposite end when new items are added to a full container.
+16. **When** the `appendleft()` method is called, the **deque** shall add the element to the left side of the container.
+17. **If** the `pop()` or `popleft()` method is called on an empty **deque**, then the **deque** shall raise an IndexError.
+18. **If** the `index()` or `remove()` method is called with a value not present in the **deque**, then the **deque** shall raise a ValueError.
+19. **If** an `insert()` operation would cause a bounded **deque** to grow beyond `maxlen`, then the **deque** shall raise an IndexError.
+20. **While** the `default_factory` is None, when a missing key is accessed via `__getitem__`, the **defaultdict** shall raise a KeyError.
+21. **While** the `default_factory` is not None, when a missing key is accessed via `__getitem__`, the **defaultdict** shall call the factory and insert the returned value.
+22. **When** the `namedtuple()` factory is called with `rename=True`, the **namedtuple** shall replace invalid fieldnames with positional names.
+23. **When** a **namedtuple** is instantiated, the system shall permit field access by both attribute lookup and positional indexing.
+24. **When** the `_replace()` method is called on a **namedtuple**, the **namedtuple** shall return a new instance with the specified fields updated.
+25. **If** invalid keyword arguments are passed to `_replace()`, then the **namedtuple** shall raise a TypeError.
+26. **When** comparing two **OrderedDict** objects, the **OrderedDict** shall return true only if the keys, values, and order match exactly.
+27. **When** the `move_to_end()` method is called, the **OrderedDict** shall reposition the specified existing key to either the right or left endpoint.
+28. **If** `popitem()` is called on an **OrderedDict**, the **OrderedDict** shall remove and return a (key, value) pair in LIFO order by default.
+29. **When** a **UserList** operation returns a new sequence, the **UserList** shall attempt to create the result using the actual implementation class's constructor.
+30. **Ubiquitous:** The **UserString** shall store its content as a regular string object in the `data` attribute.

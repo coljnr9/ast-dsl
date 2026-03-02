@@ -1,0 +1,30 @@
+1. An inventory management system tracks inventory levels, orders, sales, and deliveries in real-time.
+2. The system can be used to create work orders, bills of materials, and production-related documents for manufacturing.
+3. Every inventory item can be tracked via a barcode, serial number, lot number, or revision number.
+4. If inventory reaches a defined reorder point threshold, the system triggers a notification to reorder the product.
+5. Service-oriented companies can track the cost of materials used during service provision to calculate total service pricing.
+6. Product data and orders are inputted into the system using barcode readers, RFID tags, QR codes, or NFC-enabled smartphones.
+7. The system uses stock on hand and stock on order data to calculate the required order quantity.
+8. The system calculates lead demand to predict the number of units sold during the replenishment lead time.
+9. Lifecycle tracking follows products from vendor transport to warehouse storage and finally to retail locations or customers.
+10. The system supports the physical movement of goods through receiving, picking, packing, and shipping states.
+11. Complex manufacturing processes are managed through multi-level work orders with sequential timelines.
+12. The system supports specialized production states through reverse work orders and auto-work orders.
+13. Inventory items can be logically grouped or located based on sales popularity or frequently co-purchased associations.
+14. System administrators can restrict user rights to grant specific access levels for receiving, ordering, or transferring products.
+15. Cloud-based systems allow users to access and update inventory data from any internet-enabled device regardless of location.
+16. A single data change in a cloud-based system must replicate company-wide instantaneously and automatically.
+17. The system tracks the length of time products are stored to provide insight into stock obsolescence and spoilage.
+18. Historical tracking includes the supplier of origin and the specific stocking locations for all products.
+19. Cloud-based inventory systems can integrate with external accounting software and online sales channels.
+20. Integrated systems sync stock levels across all 3rd party marketplaces and retail channels simultaneously.
+21. The system generates reports on inventory accuracy, turnover rates, and profit margins.
+22. Total inventory visibility must be maintained across independent departments to allow inter-departmental data retrieval.
+23. The system calculates "stock cover" as the remaining days of supply before a projected stockout.
+24. Data security prevents unauthorized users from accessing sensitive inventory and financial information.
+25. Automated systems are intended to replace manual pen-and-paper or spreadsheet-based tracking methods.
+26. Hardware such as barcode scanners or smartphones are required to interface with the digital inventory database.
+27. Software updates for cloud-based systems are performed on the provider's schedule rather than the user's schedule.
+28. The system must maintain a history of cycle counts to ensure confidence in inventory accuracy.
+29. The software facilitates the prevention of both product overstock and out-of-stock situations.
+30. The system allows for the tracking of raw materials, parts, and finished goods throughout the manufacturing lifecycle.

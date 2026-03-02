@@ -1,0 +1,38 @@
+Based on the domain description provided in the article, here are the behavioral requirements for the **Semaphore** system using EARS notation.
+
+**Normal Operations (Ubiquitous)**
+1. The Semaphore shall maintain an internal integer counter.
+2. The Semaphore shall maintain a list of waiting tasks.
+3. The Semaphore shall provide an atomic Wait (P) operation.
+4. The Semaphore shall provide an atomic Release (V) operation.
+
+**State-Driven Behavior (State-driven)**
+5. While the counter is greater than zero, the Semaphore shall allow a calling task to decrement the counter and proceed.
+6. While the counter is equal to zero, the Semaphore shall block any task calling the Wait operation.
+7. While tasks are present in the waiting list, the Semaphore shall transition one task to a running state upon a Release operation.
+
+**Triggered Responses (Event-driven)**
+8. When a Wait operation is called and the counter is greater than zero, the Semaphore shall decrement the counter by one.
+9. When a Release operation is called, the Semaphore shall increment the counter by one.
+10. When a task is released from the waiting list, the Semaphore shall decrement the counter to account for the proceeding task.
+11. When a task calls the Release operation, the Semaphore shall signal a waiting consumer task.
+
+**Error & Rejection Handling (Unwanted)**
+12. If a task attempts to decrement the counter below zero, then the Semaphore shall add the task to the blocked list.
+13. If a task fails to release a mutex-style semaphore, then the Semaphore shall prevent other tasks from accessing the protected resource.
+14. If a task calls the Wait operation on a binary semaphore already at zero, then the Semaphore shall suspend the task execution.
+
+**Complex / Preconditions (Complex)**
+15. While in a multi-threaded environment, when multiple tasks call the Wait operation simultaneously, the Semaphore shall execute the operations atomically to prevent race conditions.
+16. While initialized as a binary semaphore, when a Release is called and the counter is one, the Semaphore shall maintain the counter value at one.
+17. While the waiting list contains multiple tasks, when a Release occurs, the Semaphore shall select the next task to proceed based on a defined scheduling algorithm (e.g., FIFO or Priority).
+18. While configured for n-member access, when the $n+1$ task attempts to acquire a permit, the Semaphore shall block that task until a slot opens.
+
+**Preservation & Scope (Ubiquitous/Event-driven)**
+19. The Semaphore shall ensure that the counter value never becomes a negative number.
+20. The Semaphore shall preserve the atomicity of the counter increment/decrement regardless of the number of concurrent callers.
+21. When a task is added to the waiting list, the Semaphore shall preserve the task's state until it is signaled to resume.
+22. When used for signaling, the Semaphore shall allow a task other than the original acquirer to call the Release operation.
+23. The Semaphore shall not automatically resolve priority inversion if used as a substitute for a Mutex in an RTOS environment.
+24. The Semaphore shall not enforce resource ownership by a specific thread unless explicitly implemented as a Mutex.
+25. When a Semaphore is initialized, the system shall set the counter to a fixed non-negative integer defined by the user.

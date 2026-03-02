@@ -1,0 +1,62 @@
+Based on the provided documentation for the **CTUD (Count Up/Down)** Function Block in CODESYS, here is the domain analysis.
+
+### 1. ENTITIES
+
+**Entity: CTUD Instance (The Counter)**
+This is the primary stateful object. In the context of an IEC 61131-3 system, it is a persistent block of memory.
+
+*   **Data Carried:**
+    *   **Internal State (CV):** Current Value (Type: WORD).
+    *   **Upper Limit (PV):** Preset Value (Type: WORD).
+    *   **Input States:** `CU` (Count Up), `CD` (Count Down), `RESET`, `LOAD` (all BOOL).
+    *   **Edge Memory:** Internal flags to detect the "Rising Edge" of `CU` and `CD`.
+    *   **Output States:** `QU` (Up limit reached), `QD` (Down limit reached).
+*   **Life Cycle:**
+    *   **Created:** Instantiated during program declaration (e.g., `CTUDInst : CTUD;`). Memory is allocated.
+    *   **Modified:** State changes whenever the logic engine executes the block with new input parameters.
+    *   **Destroyed:** Typically exists for the duration of the PLC program execution (static allocation).
+*   **States:**
+    *   While the counter doesn't have "modes," its `CV` transitions across three functional zones:
+        1.  **Zero/Floor:** `CV == 0` (Flag `QD` is TRUE).
+        2.  **Intermediate:** `0 < CV < PV`.
+        3.  **Threshold/Ceiling:** `CV >= PV` (Flag `QU` is TRUE).
+
+---
+
+### 2. OPERATIONS
+
+**Operation: Execute (Call Function Block)**
+The primary action where the block logic is processed.
+
+*   **Entities Involved:** CTUD Instance, Input Variables (External), Output Variables (External).
+*   **Preconditions:** The instance must be initialized.
+*   **Logic (Order of Priority):**
+    1.  **Reset:** If `RESET` is TRUE, `CV` is forced to 0. (Highest priority).
+    2.  **Load:** If `RESET` is FALSE and `LOAD` is TRUE, `CV` is forced to `PV`.
+    3.  **Count Up:** If `RESET` and `LOAD` are FALSE, and `CU` transitions from FALSE to TRUE (Rising Edge), `CV` increments by 1.
+    4.  **Count Down:** If `RESET` and `LOAD` are FALSE, and `CD` transitions from FALSE to TRUE (Rising Edge), `CV` decrements by 1.
+*   **Changes Afterward:**
+    *   `CV` may increase, decrease, or reset.
+    *   `QU` is updated based on `CV >= PV`.
+    *   `QD` is updated based on `CV = 0`.
+    *   Current input states are stored to detect edges in the next cycle.
+*   **Stays the Same:** The `PV` (Preset Value) remains constant unless the external calling logic changes the input variable.
+
+---
+
+### 3. RELATIONSHIPS
+
+*   **Ownership:** The Function Block *owns* the `CV` (Current Value) and the edge-detection memory. These cannot be modified directly by external entities except through the block's defined inputs.
+*   **Input/Output Mapping:** The CTUD instance references external memory locations (variables like `VarBOOL1`, `VarWORD1`) to fetch inputs and write outputs during its execution cycle.
+*   **Reference:** The article notes a discrepancy in the **Library Reference** relationship: CODESYS uses the `WORD` type for `PV`, whereas the IEC standard references the `INT` type.
+
+---
+
+### 4. INVARIANTS
+
+*   **Functional Priority:** `RESET` always overrides `LOAD`, and both override `CU`/`CD` signal processing.
+*   **Output Consistency:**
+    *   `QD` must be TRUE if and only if `CV = 0`.
+    *   `QU` must be TRUE if and only if `CV >= PV`.
+*   **Data Type Boundary:** `CV` and `PV` are bounded by the limits of the `WORD` datatype (0 to 65,535).
+*   **Edge Triggering:** An increment or decrement occurs *exactly once* per transition of `CU` or `CD` from FALSE to TRUE, regardless of how many cycles the signal remains TRUE.

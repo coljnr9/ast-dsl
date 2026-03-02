@@ -1,0 +1,125 @@
+### Happy Paths (Normal Operations)
+
+**Scenario 1: Reporting a new bug**
+*   **Given** a user is logged into the bug tracking system
+*   **When** the user submits a report with severity, reproduction steps, and description
+*   **Then** the system should create a new bug record with a unique ID and the current timestamp.
+
+**Scenario 2: Assigning a developer to a bug**
+*   **Given** a bug exists in the "Open" status with no assigned developer
+*   **When** an administrator assigns the bug to a specific programmer
+*   **Then** the bug record should be updated with the identity of that programmer.
+
+**Scenario 3: Updating bug status**
+*   **Given** a bug is currently in the "New" status
+*   **When** a developer changes the status to "In Progress"
+*   **Then** the system should update the bug state and record the transition in the history.
+
+**Scenario 4: Email notification on status change**
+*   **Given** a bug has a specific submitter and an assigned programmer
+*   **When** the status of the bug is changed to "Resolved"
+*   **Then** the system should send an automated email notification to both the submitter and the programmer.
+
+---
+
+### Precondition Violations (Rejected Operations)
+
+**Scenario 5: Unauthorized deletion attempt**
+*   **Given** a bug exists in the system and the current user is a "Guest" without administrative permissions
+*   **When** the user attempts to delete the bug record
+*   **Then** the system should reject the request and display an "Access Denied" error.
+
+**Scenario 6: Invalid status transition**
+*   **Given** an administrator has configured the system to prevent moving bugs from "Closed" back to "In Progress"
+*   **When** a user attempts to move a "Closed" bug to "In Progress"
+*   **Then** the system should block the transition and notify the user that the move is not allowed.
+
+**Scenario 7: Reporting a bug with missing required fields**
+*   **Given** the "Reproduction Steps" field is marked as mandatory
+*   **When** a user attempts to save a new bug report without entering reproduction steps
+*   **Then** the system should reject the submission and highlight the missing field.
+
+---
+
+### State Transitions
+
+**Scenario 8: Moving a bug through the life cycle**
+*   **Given** a bug is in the "Verified" state
+*   **When** an administrator triggers the "Move to Production" action
+*   **Then** the bug status should transition to "Deployed" according to the configured life cycle.
+
+**Scenario 9: Reopening a resolved bug**
+*   **Given** a bug has a status of "Resolved"
+*   **When** the QA engineer finds the fix is unsuccessful and selects "Reopen"
+*   **Then** the bug status should transition back to "Open."
+
+---
+
+### Edge Cases (Boundaries & Limits)
+
+**Scenario 10: Handling an empty bug database**
+*   **Given** no bugs have been reported in a new project
+*   **When** a manager views the "Centralized Overview" or dashboard
+*   **Then** the system should display "No bugs found" rather than an error.
+
+**Scenario 11: Offline data entry in distributed trackers**
+*   **Given** a developer is using a distributed bug tracker while offline
+*   **When** the developer adds a new bug report to their local database
+*   **Then** the system should store the record locally for later synchronization with the main repository.
+
+**Scenario 12: High volume backlog prioritization**
+*   **Given** the backlog contains 1,000 pending items
+*   **When** a manager sorts the list by "Severity" and "Priority"
+*   **Then** the system should correctly order all 1,000 items without timing out.
+
+---
+
+### Query Operations (Checking State)
+
+**Scenario 13: Generating productivity reports**
+*   **Given** several bugs have been resolved by Developer A and Developer B
+*   **When** a manager generates a report on programmer productivity
+*   **Then** the system should display the count and complexity of bugs fixed by each developer.
+
+**Scenario 14: Filtering bugs by submitter**
+*   **Given** a database with bugs from multiple users
+*   **When** a user queries the system for "Internal Staff" reports only
+*   **Then** the system should return only the bugs where the reporter identity matches the internal staff criteria.
+
+**Scenario 15: Searching for specific erroneous behavior**
+*   **Given** multiple bugs are recorded in the database
+*   **When** a user performs a keyword search for "null pointer"
+*   **Then** the system should return all bug records containing that text in their facts or description.
+
+---
+
+### Error Handling
+
+**Scenario 16: Database connection failure**
+*   **Given** the bug tracking system is active
+*   **When** the connection to the underlying bug database is lost
+*   **Then** the system should display a user-friendly error message stating "Database currently unavailable" instead of crashing.
+
+**Scenario 17: Concurrent update conflict**
+*   **Given** two users are viewing the same bug record simultaneously
+*   **When** both users attempt to save different status changes at the exact same time
+*   **Then** the system should allow the first update and inform the second user that the record has been modified by another party.
+
+**Scenario 18: Integration failure with Project Management software**
+*   **Given** the bug tracker is integrated with external project management software
+*   **When** the external software API is unreachable during a status sync
+*   **Then** the bug tracker should log the error and retry the synchronization later.
+
+---
+
+### Integration & Specialized Scenarios
+
+**Scenario 19: Local Bug Tracker (LBT) to Developer Queue sync**
+*   **Given** a support professional has recorded an issue in the LBT "language"
+*   **When** the issue is escalated to the development team
+*   **Then** the system should create a corresponding entry in the developer queue with the technical details.
+
+**Scenario 20: Generating release notes from resolved bugs**
+*   **Given** a set of bugs are marked as "Fixed" for Version 2.0
+*   **When** the administrator triggers "Generate Release Notes"
+*   **Then** the system should automatically list the summaries of those bugs in a document.

@@ -1,0 +1,95 @@
+Based on the provided documentation for the `collections` module, here is the domain analysis of the core entities, operations, relationships, and invariants.
+
+---
+
+### **ENTITIES**
+
+#### **1. ChainMap**
+*   **Data Content:** A `maps` attribute (a list of mappings/dicts).
+*   **Lifecycle:** 
+    *   **Created:** via `ChainMap(*maps)`. If empty, creates one internal dict.
+    *   **Modified:** Appending/removing maps in the `maps` list; writes/deletes affecting the *first* mapping only.
+    *   **Destroyed:** Standard garbage collection.
+*   **States:** Active (contains 1 or more mappings).
+
+#### **2. Counter**
+*   **Data Content:** A dictionary-like structure where keys are hashable objects and values are integer counts (positive, zero, or negative).
+*   **Lifecycle:** 
+    *   **Created:** From an iterable, mapping, or keyword arguments.
+    *   **Modified:** Counts updated via `update()`, `subtract()`, or direct key assignment.
+    *   **Destroyed:** Standard garbage collection.
+*   **States:** Open (mutable counts).
+
+#### **3. deque (Double-Ended Queue)**
+*   **Data Content:** A sequence of elements; `maxlen` (integer or None).
+*   **Lifecycle:**
+    *   **Created:** From an iterable with an optional `maxlen`.
+    *   **Modified:** Appending/popping from either end. If bounded (`maxlen`), adding to one end may cause an item to be discarded from the other.
+*   **States:** Empty, Partial, or Full (if `maxlen` is reached).
+
+#### **4. defaultdict**
+*   **Data Content:** A dictionary plus a `default_factory` attribute (a callable).
+*   **Lifecycle:**
+    *   **Created:** Initialized with a factory (e.g., `list`, `int`) and optional data.
+    *   **Modified:** Same as `dict`, but `__getitem__` can trigger entry creation.
+*   **States:** Factory set or `None`.
+
+#### **5. namedtuple (Class and Instance)**
+*   **Data Content:** Field names (metadata) and values (tuple data).
+*   **Lifecycle:**
+    *   **Created (Class):** via `namedtuple()` factory function.
+    *   **Created (Instance):** via class instantiation or `_make()`.
+    *   **Modified:** Immutable after creation; `_replace()` creates a *new* instance.
+*   **States:** Immutable once instantiated.
+
+#### **6. OrderedDict**
+*   **Data Content:** Dictionary entries + maintainer of insertion order.
+*   **Lifecycle:**
+    *   **Modified:** Standard dict operations, plus explicit reordering via `move_to_end()`.
+*   **States:** Order-sensitive equality mode.
+
+#### **7. UserDict / UserList / UserString**
+*   **Data Content:** A `data` attribute storing the underlying built-in object.
+*   **Lifecycle:** Wrappers created to facilitate subclassing without built-in type friction.
+
+---
+
+### **OPERATIONS**
+
+| Operation | Involved Entities | Preconditions | Postconditions / Changes |
+| :--- | :--- | :--- | :--- |
+| **Lookup (ChainMap)** | ChainMap, Mappings | Maps list must not be empty. | Searches maps in order; returns first match. Internal state unchanged. |
+| **new_child()** | ChainMap | None. | Returns a new ChainMap with a new map at the front of the list. |
+| **most_common(n)**| Counter | Value types must be orderable. | Returns list of top `n` pairs. Internal counts unchanged. |
+| **Multiset Math** | Counter (A, B) | Values support addition/subtraction. | Returns new Counter. Counts $\le 0$ are discarded in the result. |
+| **Append/Pop** | deque | If pop: deque must not be empty. | Size increases/decreases. O(1) performance. |
+| **Rotate** | deque | None. | Elements shifted cyclicly. Identity preserved if $n=0$. |
+| **Missing Key** | defaultdict | `default_factory` is not None. | `default_factory()` called; result inserted into dict at key. |
+| **_replace()** | namedtuple | Keywords must match field names. | Returns a *new* instance with updated values. Original unchanged. |
+| **move_to_end()** | OrderedDict | Key must exist in mapping. | Key moved to either the first or last position in order. |
+
+---
+
+### **RELATIONSHIPS**
+
+*   **Containment & Reference:**
+    *   **ChainMap** references its underlying mappings. Changes to the underlying dicts are reflected in the ChainMap view.
+    *   **UserDict/List/String** contain their data in the `.data` attribute.
+*   **Inheritance:**
+    *   **Counter, OrderedDict, defaultdict** are subclasses of `dict`.
+    *   **namedtuple** instances are subclasses of `tuple`.
+    *   **UserDict/List/String** are *wrappers* (not necessarily inheriting from built-ins) designed for composition.
+*   **Subcontexting:**
+    *   `ChainMap.parents` creates a new ChainMap referencing a slice of the original's `maps` list (all but the first).
+
+---
+
+### **INVARIANTS**
+
+1.  **ChainMap Minimal State:** A `ChainMap` must always contain at least one mapping in its `maps` list.
+2.  **deque Boundedness:** If `maxlen` is defined, `len(d)` will never exceed `maxlen`. Appending to a full deque strictly forces an atomic pop from the opposite side.
+3.  **Counter Zero Threshold:** In multiset mathematical operations (`+`, `-`, `&`, `|`), the resulting Counter will only contain keys with counts $> 0$.
+4.  **Counter Comparison:** Two Counters are considered equal if they have the same counts for all keys, treating missing keys as having a count of zero.
+5.  **namedtuple Immutability:** Once a namedtuple instance is created, its field values cannot be changed (inherits the tuple invariant).
+6.  **OrderedDict Equality:** Two `OrderedDicts` are only equal if they contain the same items *in the same order*. (Contrast with regular `dict` equality which is order-insensitive).
+7.  **ChainMap Write Locality:** Standard writes (`__setitem__`, `__delitem__`) to a `ChainMap` always and only target `maps[0]`.

@@ -1,0 +1,25 @@
+1. **Ubiquitous:** The lock shall provide a mechanical or electronic fastening mechanism to secure an area or object.
+2. **Ubiquitous:** The lock shall allow access only to persons possessing the correct physical key, secret information, or authorized electronic token.
+3. **State-driven:** While the pins are fell part-way into the bolt (Egyptian wooden pin lock), the lock shall prevent movement of the bolt.
+4. **State-driven:** While the driver pins are pushed downwards into the plug (Pin tumbler), the lock shall prevent the plug from rotating.
+5. **Event-driven:** When the correct key is inserted into the Egyptian wooden pin lock, the lock shall lift the internal pins out of the bolt holes to allow movement.
+6. **Event-driven:** When the bittings of a key align with the shear line, the pin tumbler lock shall allow the cylinder to rotate.
+7. **Event-driven:** When a smart key button is pressed, the smart key shall transmit a unique rolling code to the lock.
+8. **Event-driven:** When an authorized device sends a cryptographic key via wireless protocol, the smart lock shall execute the lock or unlock instruction.
+9. **Event-driven:** When a keycard matches the internal signature of the reader, the keycard lock shall release the fastening device.
+10. **Unwanted:** If a lever is lifted too far in a double-acting lever lock, then the lock shall prevent the bolt from moving.
+11. **Unwanted:** If a lever is not lifted far enough in a double-acting lever lock, then the lock shall prevent the bolt from moving.
+12. **Unwanted:** If an unauthorized access attempt occurs, the Chubb detector lock shall frustrate the attempt and indicate interference to the owner.
+13. **Unwanted:** If a user attempts to pick an electronic lock with conventional tools, then the lock shall remain secured.
+14. **Unwanted:** If a user attempts to use a warded key that does not match the internal obstructions (wards), then the lock shall prevent the key from rotating.
+15. **Complex:** While in the dark, when a user slides a key along the V-shaped foliage decoration (Drunk man's lock), the lock shall guide the key into the keyhole.
+16. **Complex:** While the key is removed, when the driver pins are under spring tension, the wafer tumbler lock shall push the wafers into the outer cylinder groove to prevent rotation.
+17. **Complex:** While the ignition switch requires a transponder, when a key is inserted and turned, the system shall verify both the mechanical pin tumbler alignment and the radio transmission code.
+18. **Ubiquitous:** The keyway shall receive only keys with a profile that matches the manufacturer's specific aperture shape.
+19. **Ubiquitous:** The lock system shall include a bow on the physical key to allow the user to apply torque.
+20. **Ubiquitous:** The key duplication process shall include a deburring step to remove sharp metal particles from the new key.
+21. **High-level/Scope:** The lock system shall not prevent "lock picking" through physical force, but shall resist manipulation by unauthorized instruments.
+22. **State-driven:** While a master pin is present between key and driver pins, the lock shall allow the plug to rotate at multiple pin elevations.
+23. **Event-driven:** When the magnetic key is applied to a magnetic keyed lock, the internal tumblers shall be pushed or pulled into the release position via North and South pole orientation.
+24. **Ubiquitous:** The key duplication software shall store electronic copies of scanned key shapes for future production.
+25. **Complex:** While connected to an access control system, when an electric current is applied to the actuator, the electronic lock shall move the bolt or cylinder.

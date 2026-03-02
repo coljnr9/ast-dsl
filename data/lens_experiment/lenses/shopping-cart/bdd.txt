@@ -1,0 +1,111 @@
+### Happy Paths (Normal Operations)
+
+**Scenario 1: Add an item to the shopping cart**
+*   **Given** a visitor is viewing a product page on the Storefront
+*   **When** the visitor clicks "Add to Cart" for a specific item
+*   **Then** the item should be added to the session object
+*   **And** the shopping cart should display the item in the list.
+
+**Scenario 2: Review shortlisted purchases**
+*   **Given** a customer has accumulated several items in their cart
+*   **When** the customer views the shopping cart page
+*   **Then** the software should display a final review of all shortlisted items.
+
+**Scenario 3: Calculate order total including shipping**
+*   **Given** a customer is at the point of sale with items in their cart
+*   **When** the customer provides a delivery address
+*   **Then** the software should calculate the total amount including freight transport, postage, and packaging.
+
+**Scenario 4: Calculate applicable taxes**
+*   **Given** a customer has items in their cart and has entered their location
+*   **When** the system reaches the final checkout step
+*   **Then** the software should calculate and display associated taxes based on the customer's jurisdiction.
+
+**Scenario 5: Generate order and clear cart**
+*   **Given** a customer successfully finalizes a transaction
+*   **When** the payment is confirmed
+*   **Then** an order should be generated against the selected items in the database
+*   **And** the shopping cart should be cleared.
+
+---
+
+### Precondition Violations (Invalid States)
+
+**Scenario 6: Access administration area without credentials**
+*   **Given** a user is on the internet but not logged in as a merchant
+*   **When** the user attempts to access the Administration URL
+*   **Then** the system should deny access and redirect to a login screen.
+
+**Scenario 7: Attempt to checkout with an empty cart**
+*   **Given** the shopping cart contains no items
+*   **When** the user clicks "Checkout"
+*   **Then** the system should prevent the transition to the payment gateway
+*   **And** display a message that the cart is empty.
+
+---
+
+### State Transitions
+
+**Scenario 8: Move from shopping to payment gateway**
+*   **Given** a customer has reviewed their shortlisted purchases
+*   **When** the customer clicks "Proceed to Payment"
+*   **Then** the system should hand off the transaction data to the secure payment gateway module.
+
+**Scenario 9: Modify purchase quantity**
+*   **Given** an item is already in the shopping cart
+*   **When** the user changes the quantity from 1 to 2
+*   **Then** the session object should update the quantity
+*   **And** the cart total should recalculate in real-time.
+
+---
+
+### Edge Cases (Boundary Conditions)
+
+**Scenario 10: Apply a discount code**
+*   **Given** a merchant has configured a discount in the Administration area
+*   **When** a customer enters the valid code at checkout
+*   **Then** the software should subtract the discount value from the order total.
+
+**Scenario 11: Display "Bestsellers" dynamically**
+*   **Given** multiple orders have been placed in the database
+*   **When** a visitor views the "Bestsellers" category page
+*   **Then** the Storefront should dynamically generate a list of the most purchased items.
+
+---
+
+### Query Operations (Checking State)
+
+**Scenario 12: Search for a product**
+*   **Given** a database populated with product data
+*   **When** a visitor enters a keyword into the Storefront search bar
+*   **Then** the software should query the database and display matching results.
+
+**Scenario 13: View order history via API**
+*   **Given** a third-party accounting platform is integrated via API
+*   **When** the accounting platform requests order data
+*   **Then** the shopping cart software should export order details as invoices.
+
+---
+
+### Error Handling & Security
+
+**Scenario 14: Handle invalid credit card information**
+*   **Given** the secure payment gateway is active
+*   **When** the customer submits expired credit card details
+*   **Then** the secure gateway provider should return an error
+*   **And** the shopping cart should display a payment failure message to the customer.
+
+**Scenario 15: Manage abandoned carts**
+*   **Given** a customer has added items to their cart but did not finalize the transaction
+*   **When** the session expires or the user leaves the site
+*   **Then** the data should be stored as an "abandoned cart" for marketing purposes.
+
+**Scenario 16: Ensure PCI Compliance for data transmission**
+*   **Given** the shopping cart is processing sensitive payment information
+*   **When** data is transmitted to the server
+*   **Then** the software must use a secure gateway module to ensure the transaction meets PCI security standards.
+
+**Scenario 17: Update storefront after Admin changes**
+*   **Given** a merchant is using the desktop-based Administration app
+*   **When** the merchant edits a product price and transfers changes to the storefront
+*   **Then** the new price should be immediately reflected on the web server database.

@@ -1,0 +1,84 @@
+Based on the article provided, here is the domain analysis of the shopping cart system.
+
+### ENTITIES
+
+**1. Product**
+*   **Data:** Name, description, price, category, images (via templates), and inventory data.
+*   **Creation/Destruction:** Created and modified by the Merchant via the Administration area; stored in the database.
+*   **States:** Available, Out of Stock (implied).
+
+**2. Shopping Cart (The "Shortlist")**
+*   **Data:** List of items (Products), quantities, and temporary Session ID.
+*   **Creation/Destruction:** Created when a Visitor adds their first item. It is destroyed (cleared) when an order is generated or remains as an "Abandoned Cart" if the user leaves.
+*   **States:**
+    *   *Active:* Items being added/removed.
+    *   *Shortlisted:* Final review state before checkout.
+    *   *Abandoned:* Abandoned by the user (used for marketing data).
+    *   *Cleared:* Converted into an order.
+
+**3. Order**
+*   **Data:** Customer details, items purchased, total cost, freight/postage, packaging/labeling costs, and applicable taxes.
+*   **Creation/Destruction:** Generated from the Shopping Cart at the point of sale.
+*   **States:** Pending, Paid (via Payment Gateway), Exported (via API to accounting software).
+
+**4. Customer / Visitor**
+*   **Data:** Payment information (captured but often passed to gateways), email/contact info, and session data (cookies).
+*   **Creation/Destruction:** Created when a user visits or registers. 
+
+**5. Category**
+*   **Data:** Name, hierarchy/grouping logic.
+*   **Creation/Destruction:** Defined by the Merchant in the Administration area to organize Products.
+
+---
+
+### OPERATIONS
+
+**1. Add/Modify Item**
+*   **Entities:** Shopping Cart, Product.
+*   **Preconditions:** Product must exist and be accessible on the Storefront.
+*   **Changes:** Cart contents updated; "total" recalculated.
+*   **Stays same:** Product price and details in the database.
+
+**2. Calculate Checkout Total**
+*   **Entities:** Shopping Cart, Order.
+*   **Preconditions:** Cart must contain at least one item.
+*   **Changes:** Freight, postage, packaging, and taxes are calculated and added to the subtotal.
+
+**3. Process Payment**
+*   **Entities:** Customer, Payment Gateway, Order.
+*   **Preconditions:** Valid credit card or payment info provided; secure gateway connection established.
+*   **Changes:** Payment info is captured; transaction status updated. 
+
+**4. Finalize Transaction (Order Generation)**
+*   **Entities:** Shopping Cart, Order.
+*   **Preconditions:** Successful payment or checkout completion.
+*   **Changes:** Cart is cleared; a permanent Order record is created.
+
+**5. System Administration (Manage Store)**
+*   **Entities:** Product, Category, Discount, Settings.
+*   **Preconditions:** Merchant must have access to Admin area (Web or Desktop).
+*   **Changes:** Storefront pages are dynamically updated based on database changes.
+
+---
+
+### RELATIONSHIPS
+
+*   **Ownership:**
+    *   The **Merchant** owns the **Storefront** and **Administration** settings.
+    *   A **Category** contains multiple **Products**.
+    *   An **Order** contains a snapshot of **Shopping Cart** data.
+*   **Referencing:**
+    *   The **Shopping Cart** references **Products** via session objects or cookies.
+    *   The **Storefront** references the **Database** to dynamically generate pages.
+    *   **External Integrations (API)** reference **Orders** to create invoices in accounting platforms.
+*   **Indexing:**
+    *   Products are indexed by **Category** or **Search** terms for Visitor navigation.
+
+---
+
+### INVARIANTS
+
+*   **Security (PCI Compliance):** Sensitive payment account data must always be handled according to PCI DSS regulations (validated by providers like Visa).
+*   **Data Consistency:** The Storefront must reflect the current state of the database (Products, Prices, and Categories) in real time.
+*   **State Transition:** A Shopping Cart cannot become an Order until calculating required fees (tax, shipping) and capturing payment information.
+*   **Uniqueness:** Every session must have a unique identifier (Cookie or Query String) to prevent item mix-ups between different shoppers.

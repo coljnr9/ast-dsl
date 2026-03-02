@@ -1,0 +1,62 @@
+This Failure Mode Analysis (FMA) evaluates a **Semaphore-based Synchronization System** based on the technical details and bouncer/bathroom analogies provided in the article.
+
+---
+
+### 1. Operations & Failure Modes
+
+#### **Operation: Initialization (Constructor)**
+*   **Failure Modes:**
+    *   **Invalid Initial Count:** Providing a negative integer or a value exceeding system limits.
+    *   **Misconfigured Max Capacity:** Setting the initial count higher than the maximum intended capacity (e.g., `initialCount > maxCount`).
+    *   **Incoherent Strategy:** Initializing a semaphore for a resource that requires exclusive ownership (using a counting semaphore where a mutex is required).
+*   **Response:** The operation should be **rejected** (Exception/Error). If it continues, the system enters an **invalid starting state** where more resources are granted than exist.
+*   **Invariants:** The system must preserve the **maximum capacity boundary**; it should never allow the internal counter to exceed the defined limit.
+
+#### **Operation: Wait / Acquire (P / WaitOne)**
+*   **Failure Modes:**
+    *   **Infinite Blocking (Starvation):** A thread waits on a semaphore that is never released because of a leak or a deadlocked task.
+    *   **Wait in Interrupt Context:** Attempting to wait in a non-blocking context (like an RTOS interrupt), causing a system-wide freeze.
+    *   **Priority Inversion:** A high-priority task waits on a semaphore held by a low-priority task that is itself preempted by a medium-priority task.
+    *   **Timeout Expiry:** The `tryAcquire` call fails because the resource didn't become available within the specified duration.
+*   **Response:** The thread should remain in a **blocked state** or return a **failure/false code** (if a timeout was used). In RTOS, a priority inheritance protocol should ideally trigger, but according to the article, semaphores often **fail to correct** this, leading to unexpected latency.
+*   **Invariants:** The system must preserve **Atomicity**. The counter must decrement only if the permit is successfully granted.
+
+#### **Operation: Release / Post (V / Signal)**
+*   **Failure Modes:**
+    *   **Unintended Release (Bystander Release):** A thread that does *not* hold a permit calls `Release()`.
+    *   **Overflow (Count Exceeds Initial Max):** Calling Release more times than Wait was called, or exceeding the `maxCount` defined during initialization.
+    *   **Leakage:** A task crashes or finishes without calling Release, permanently reducing the available capacity.
+*   **Response:** If the release exceeds the max capacity, it should be **rejected/error**. If released by the wrong thread, semaphores generally **allow it** (unlike mutexes), which can lead to data races if used for mutual exclusion.
+*   **Invariants:** The system must preserve the **integrity of the counter**. It must never become a negative value.
+
+---
+
+### 2. State & Transition Analysis
+
+#### **Permanent Transitions (Irreversible States)**
+*   **Object Destruction/Shutdown:** Once a semaphore is disposed of or the `ExecutorService` is shut down, no further permits can be requested. Any threads currently waiting may be left in an **undefined error state** (InterruptedException).
+
+#### **Impossible Operations in Specific States**
+*   **Acquire in Exhausted State:** If the counter is `0`, the `Wait` operation is impossible to complete immediately; the caller is transitioned to a "Wait List" state.
+*   **Release in Max-Capacity State:** In many implementations, calling `Release` when the counter is already at its maximum limit is prohibited and will throw an exception.
+
+#### **Edge Cases (Combinations of Conditions)**
+*   **N Readers vs. 1 Writer:** Using a counting semaphore for a Read/Write lock where a writer tries to acquire all permits while a reader is still holding one. This creates a partial-acquisition trap if the writer isn't atomic in its "acquire all" logic.
+*   **Race to Zero:** Multiple threads hitting `Wait` simultaneously when only one permit remains. The system must ensure only one succeeds via atomic hardware flags.
+*   **The "Double Release":** A thread calls Release twice for a single Acquire, effectively "creating" a phantom resource that doesn't exist, leading to over-concurrency.
+
+---
+
+### 3. Out-of-Scope Operations
+The system described does **NOT** support:
+*   **Ownership Tracking:** The system does not know *who* took the permit; it only knows how many permits are left.
+*   **Recursive Re-entrancy:** Unlike some mutexes, a thread cannot necessarily "re-wait" on a semaphore it already holds without decrementing the counter again (risking self-deadlock).
+*   **Automated Priority Management:** Standard semaphores do not support priority inheritance (the system does not automatically "boost" the priority of a permit holder to unblock a high-priority waiter).
+
+---
+
+### 4. Critical Invariants to Preserve
+Regardless of failure, the system must ensure:
+1.  **Atomicity:** Counter increments and decrements must be indivisible.
+2.  **Non-Negativity:** The permit counter can never be less than zero.
+3.  **No Ghost Permits:** The number of permits in circulation + the internal counter must equal the total number of available resources (unless deliberately signaling).

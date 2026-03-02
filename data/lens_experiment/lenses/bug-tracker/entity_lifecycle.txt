@@ -1,0 +1,83 @@
+Based on the article provided, here is the domain analysis for a **Bug Tracking System**.
+
+### ENTITIES
+
+**1. Bug (or Issue/Defect)**
+*   **Data:** Unique ID, Title/Description, Erroneous behavior, Steps to reproduce, Severity, Complexity, Time reported, Status.
+*   **Creation/Destruction:** Created when a user/submitter enters a report. Can be deleted by an Administrator.
+*   **States:** Configurable by administrators (e.g., New, Assigned, Fixed, Closed).
+*   **Transitions:** Moved from one status to another based on workflow rules defined by administrators.
+
+**2. User (Person)**
+*   **Data:** Identity (Name/ID), Role (Submitter, Programmer, Administrator), Contact info (Email).
+*   **Creation/Destruction:** Not explicitly detailed, but implied as part of the infrastructure.
+*   **States:** Can be "interested parties" for specific bugs.
+
+**3. Project / Product Version**
+*   **Data:** Version number, Roadmap, Release notes.
+*   **Creation/Destruction:** Created during the development process.
+*   **States:** Current, Past (several versions), Future (Next Release).
+
+**4. Backlog**
+*   **Data:** A prioritized list of "pending items" (Bugs and Improvements).
+*   **Creation/Destruction:** Emerges as a collection of existing bugs.
+*   **States:** Active, definition for "Next Release."
+
+**5. Database**
+*   **Data:** Records all facts about bugs and their history.
+*   **Lifecycle:** Centralized or Distributed (allowing offline additions/updates).
+
+---
+
+### OPERATIONS
+
+**1. Submit Bug Report**
+*   **Entities:** Submitter (User), Bug, Database.
+*   **Preconditions:** User must have permission to enter reports (end-users or internal staff).
+*   **Changes:** A new Bug record is added to the Database; "Interested parties" are emailed.
+*   **Stays the same:** Existing bug records.
+
+**2. Update Status (Move Bug)**
+*   **Entities:** Bug, Administrator/Programmer, Database.
+*   **Preconditions:** Transition must be allowed by the configured workflow; User must have permission for that specific status change.
+*   **Changes:** Bug's status attribute; Update email sent to interested parties.
+*   **Stays the same:** Original report time and reproduction steps.
+
+**3. Assign Bug**
+*   **Entities:** Bug, Programmer.
+*   **Preconditions:** Bug exists; Programmer is available in the system.
+*   **Changes:** Programmer identity is associated with the Bug.
+
+**4. Configure Workflow**
+*   **Entities:** Administrator, Statuses.
+*   **Preconditions:** User must have Administrative privileges.
+*   **Changes:** Valid transitions between states; permissions for each state.
+
+**5. Generate Reports**
+*   **Entities:** Bug Database, Programmer (Subject).
+*   **Preconditions:** Historical data exists in the database.
+*   **Changes:** None (Read-only operation). Produces productivity metrics or release notes.
+
+---
+
+### RELATIONSHIPS
+
+*   **Many-to-One (Bug to Submitter):** A bug is reported by one person (Submitter).
+*   **Many-to-One (Bug to Assigned Programmer):** A bug is worked on by a specific programmer.
+*   **One-to-Many (Bug to Interested Parties):** Multiple people may receive email updates for one bug.
+*   **Ownership (System to Database):** The tracking system contains and manages the database of facts.
+*   **Indexing (Backlog):** The backlog acts as a prioritized index of pending bugs for the Product Roadmap.
+*   **External Integration:**
+    *   **Project Management System:** Contains the Bug Tracker.
+    *   **Local Bug Tracker (LBT) to Developer Tracker:** The LBT acts as a "front-end" index for support staff, often mapping user-specific complaints to developer-specific bug reports.
+    *   **Source Control:** Bug reports reference specific code changes (especially in distributed systems).
+
+---
+
+### INVARIANTS
+
+*   **Status Validity:** A bug must always be in a valid status as defined by the administrator's configuration.
+*   **Uniqueness:** Each bug report is recorded as a distinct set of facts (usually implying a unique identifier).
+*   **Traceability:** A bug must always carry the identity of who reported it and the time it was reported.
+*   **Workflow Constraint:** A bug cannot move to a new status unless that specific transition is permitted by the system's configuration.
+*   **Productivity Discrepancy:** (Business Invariant) Bug counts do not strictly equal complexity or productivity (severity $\neq$ complexity).

@@ -1,0 +1,84 @@
+This domain analysis outlines the core entities, operations, and logic of a Traffic Signaling System based on the provided text.
+
+### **ENTITIES**
+
+**1. Signal Head**
+*   **Data:** Orientation (Vertical/Horizontal), Mounting Type (e.g., Tower, Mast arm, Doghouse), Physical Shape (Circular, Arrow, Square, Diamond).
+*   **Creation/Destruction:** Installed by authorities at intersections/crossings; decommissioned or replaced during technology upgrades.
+*   **States:** 
+    *   *Active:* Participating in traffic control.
+    *   *Flashing/Preempted:* Overridden by emergency vehicles or rail level crossings.
+    *   *Dark/Out of Order:* Power failure or maintenance required.
+
+**2. Aspect (Lamp/Light)**
+*   **Data:** Color (Red, Amber, Green, White, Blue), Symbol (Solid, Arrow, Walking Man, Hand, Bicycle, Countdown Number), Mode (Steady, Flashing, Rapidly Flashing).
+*   **Lifecycle:** Modified by the Controller to change state (Illuminated vs. Extinguished).
+*   **States:** `OFF`, `STEADY_ON`, `FLASHING`.
+
+**3. Controller**
+*   **Data:** Logic Type (Fixed Timer, Computerized, Volume-based/Sensor-driven), Phase Timing (Seconds), Communication Link (Telephone lines, Fiber).
+*   **Lifecycle:** Created as a physical hardware unit; logic is modified via programming updates.
+*   **States:** `MANUAL_CONTROL` (Police/Traffic Officer), `AUTOMATIC_TIMER`, `COMPUTER_COORDINATED`, `VOLUME_SENSITIVE`.
+
+**4. Intersection / Crossing**
+*   **Data:** Location, Road Type (Standard, Level Crossing, Tidal Flow, Smart Motorway), Participating Flows (Vehicular, Pedestrian, Rail, Aircraft).
+*   **Relationships:** Contains multiple Signal Heads.
+
+**5. Detection Sensor (Implied)**
+*   **Data:** Vehicle presence, Pedestrian push-button activation.
+*   **Lifecycle:** Actively triggers transitions in the Controller’s state.
+
+---
+
+### **OPERATIONS**
+
+**1. Change Phase**
+*   **Entities:** Controller, Signal Head, Aspects.
+*   **Preconditions:** Current phase duration has expired OR a sensor has detected a vehicle/pedestrian demand.
+*   **Changes:** Specific Aspects transition (e.g., Green `OFF` $\rightarrow$ Amber `STEADY_ON`).
+*   **Stays Same:** Intersection geometry and physical signal head positions.
+
+**2. Preempt Signal**
+*   **Entities:** Controller, Emergency Vehicle/Train.
+*   **Preconditions:** High-priority vehicle approaches or movable barrier closes (runway/bridge).
+*   **Changes:** Normal cycle is interrupted; specific aspects (usually Red) are forced on to clear the path.
+
+**3. Display Countdown**
+*   **Entities:** Countdown Light (Aspect).
+*   **Preconditions:** Main Signal is in a timed state.
+*   **Changes:** Numerical value decrements per second until reaching zero.
+
+**4. Pedestrian Request**
+*   **Entities:** Pedestrian, Push Button (Sensor), Controller.
+*   **Preconditions:** System is in a vehicular-priority state.
+*   **Changes:** Controller queues a "Walk" phase transition.
+
+---
+
+### **RELATIONSHIPS**
+
+*   **Ownership (Composition):** An **Intersection** owns multiple **Signal Heads**. A **Signal Head** contains one or more **Aspects**.
+*   **Control (Reference):** A **Controller** references and manages the state of multiple **Signal Heads** to prevent conflicting traffic flows.
+*   **Dependency:** **Pedestrian Signals** are often linked to **Vehicular Signals** (e.g., "Parallel Walk" where the green man coincides with the green car light).
+*   **Indexing:** Signal heads are indexed by **Direction** (Northbound, Left-turn filter) and **User Type** (Bus, Bicycle, Pedestrian).
+
+---
+
+### **INVARIANTS**
+
+1.  **Conflict Avoidance:** No two conflicting traffic flows (e.g., North-South Green and East-West Green) may be active simultaneously.
+2.  **Sequence Integrity:** Vehicular signals must follow a standardized sequence (e.g., Green $\rightarrow$ Amber $\rightarrow$ Red) to prevent sudden stops and "Yellow Traps."
+3.  **The "Red Rule":** During a "Red/Amber" transition (UK/Germany), the legal requirement to remain stopped (Red rule) applies until the Green aspect is shown.
+4.  **Fail-Safe:** If a system fails or enters a "Dilemma Zone," it should default to a safe state (e.g., Flashing Amber/Red or All-Red).
+5.  **Visibility:** Signal aspects must be arranged in a specific order (Red on top/left) to ensure accessibility for color-blind users.
+
+---
+
+### **SUMMARY OF STATES (Example Lifecycle)**
+**Vehicular Phase Transition (Standard):**
+1.  `GREEN_STEADY` (Proceed)
+2.  `AMBER_STEADY` (Clear Intersection/Prepare to stop)
+3.  `ALL_RED` (Buffer for safety - *optional invariant*)
+4.  `RED_STEADY` (Stop)
+5.  `RED_AMBER_STEADY` (Prepare to proceed - *regional*)
+6.  *Loop back to 1.*

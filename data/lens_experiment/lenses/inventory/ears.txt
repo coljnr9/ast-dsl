@@ -1,0 +1,30 @@
+1. **Ubiquitous:** The Inventory Management Software shall track inventory levels, orders, sales, and deliveries.
+2. **Ubiquitous:** The Inventory Management Software shall store data on products and parts transit between vendors, warehouses, and retail locations.
+3. **Event-driven:** When a user scans a barcode, RFID tag, or QR code, the Inventory Management Software shall look up the associated product information.
+4. **Event-driven:** When a product is received in a warehouse, the Inventory Management Software shall update the stock on hand.
+5. **State-driven:** While in manufacturing mode, the Inventory Management Software shall allow the creation of bills of materials and work orders.
+6. **State-driven:** While a product is stored in a warehouse, the Inventory Management Software shall track its location using serial numbers, lot numbers, or revision numbers.
+7. **Complex:** While automated replenishment is enabled, when inventory reaches a specific threshold, the Inventory Management Software shall trigger a reorder notification to managers.
+8. **Event-driven:** When a multilevel work order is created, the Inventory Management Software shall generate a timeline of processes in the required assembly order.
+9. **Unwanted:** If a user attempts to access data without sufficient restricted user rights, then the Inventory Management Software shall deny access to that information.
+10. **Ubiquitous:** The Inventory Management Software shall calculate the cost of materials used for service-oriented tasks.
+11. **Ubiquitous:** The Inventory Management Software shall calculate lead demand based on unit sales during the replenishment lead time.
+12. **Ubiquitous:** The Inventory Management Software shall track stock cover by calculating the number of days remaining before a stockout occurs.
+13. **Ubiquitous:** The Inventory Management Software shall calculate the order quantity based on reorder points, stock on hand, and stock on order.
+14. **State-driven:** While the system is cloud-based, the Inventory Management Software shall allow data access via internet-enabled devices including smartphones and tablets.
+15. **Event-driven:** When a change is made to inventory levels in a cloud-based environment, the Inventory Management Software shall replicate the change company-wide instantaneously.
+16. **Ubiquitous:** The Inventory Management Software shall generate reports for analyzing inventory trends and supplier performance.
+17. **Event-driven:** When integrated with an eCommerce store, the Inventory Management Software shall synchronize stock levels across all sales channels.
+18. **Unwanted:** If an external system or service provider is incompatible, then the Inventory Management Software shall refrain from syncing data with that system.
+19. **Unwanted:** If the cloud service provider schedules a system upgrade, then the Inventory Management Software may restrict user flexibility during the upgrade period.
+20. **Ubiquitous:** The Inventory Management Software shall provide training manuals or help information to users within the interface.
+21. **State-driven:** While acting as a service management tool, the Inventory Management Software shall attach material costs to services to reflect the total cost of performance.
+22. **Event-driven:** When items are picked, packed, or shipped, the Inventory Management Software shall record the change in inventory status.
+23. **Complex:** While tracking assets, when a product is moved between warehouses, the Inventory Management Software shall update the location data in real-time.
+24. **Ubiquitous:** The Inventory Management Software shall allow managers to group popular products together in the digital warehouse map to optimize picking speed.
+25. **Ubiquitous:** The Inventory Management Software shall maintain a balance between stock outages and overstock through demand forecasting.
+26. **Event-driven:** When a reverse work order is requested, the Inventory Management Software shall generate the necessary documentation for disassembly or return.
+27. **Ubiquitous:** The Inventory Management Software shall support the use of smartphones as scanning hardware for QR and NFC tags.
+28. **State-driven:** While integrated with accounting software, the Inventory Management Software shall share financial data related to inventory costs and sales.
+29. **Unwanted:** If a vendor-managed inventory (VMI) process is offline, then the Inventory Management Software shall preserve the last known synchronized state.
+30. **Ubiquitous:** The Inventory Management Software shall provide real-time visibility of inventory conditions for executive decision-making.

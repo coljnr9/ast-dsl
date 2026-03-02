@@ -1,0 +1,30 @@
+1. **Ubiquitous:** The **ChainMap** shall store underlying mappings as a list in the **maps** attribute.
+2. **Ubiquitous:** The **ChainMap** shall search underlying mappings successively from first to last during lookups.
+3. **Ubiquitous:** The **ChainMap** shall perform all writes, updates, and deletions on only the first mapping in the chain.
+4. **When** no maps are specified during initialization, the **ChainMap** shall provide a single empty dictionary as the default mapping.
+5. **If** an underlying mapping is updated externally, then the **ChainMap** shall reflect those changes by reference.
+6. **When** the **new_child()** method is called, the **ChainMap** shall return a new instance containing a new map followed by all maps from the current instance.
+7. **When** the **parents** property is accessed, the **ChainMap** shall return a new instance containing all mappings except the first one.
+8. **Ubiquitous:** The **Counter** shall return a zero count for missing items instead of raising a KeyError.
+9. **When** a count is set to zero, the **Counter** shall retain the element in the mapping.
+10. **When** the **elements()** method is called, the **Counter** shall return an iterator that ignores elements with counts less than one.
+11. **When** the **subtract()** method is called, the **Counter** shall decrease counts based on the provided mapping or iterable.
+12. **While** performing multiset mathematical operations (+, -, &, |), the **Counter** shall exclude any results with counts of zero or less from the output.
+13. **Ubiquitous:** The **Counter** shall NOT implement the **fromkeys()** class method.
+14. **When** a **deque** is initialized with a **maxlen**, the **deque** shall set the maximum size to the specified value.
+15. **State-driven:** While a **deque** is full and has a defined **maxlen**, when a new item is added, the **deque** shall discard a corresponding number of items from the opposite end.
+16. **When** the **pop()** or **popleft()** method is called on an empty container, the **deque** shall raise an **IndexError**.
+17. **If** the **insert()** method would cause a bounded **deque** to grow beyond **maxlen**, then the **deque** shall raise an **IndexError**.
+18. **If** the **index()** or **remove()** method is called for a value that does not exist, then the **deque** shall raise a **ValueError**.
+19. **While** the **default_factory** is None, when a missing key is accessed via **__getitem__**, the **defaultdict** shall raise a **KeyError**.
+20. **While** the **default_factory** is not None, when a missing key is accessed via **__getitem__**, the **defaultdict** shall call the factory to create and insert a default value.
+21. **When** the **get()** method is called on a missing key, the **defaultdict** shall return **None** without calling the **default_factory**.
+22. **When** a **namedtuple** is created with **rename=True**, the **namedtuple** factory shall replace invalid or duplicate fieldnames with positional names.
+23. **Ubiquitous:** The **namedtuple** shall provide field access via attribute lookup, index, and iteration.
+24. **When** the **_replace()** method is called, the **namedtuple** shall return a new instance with the specified fields updated while leaving the original instance unchanged.
+25. **If** invalid keyword arguments are passed to **_replace()**, then the **namedtuple** shall raise a **TypeError**.
+26. **Ubiquitous:** The **OrderedDict** shall consider the order of elements when performing equality tests with other **OrderedDict** objects.
+27. **When** **popitem(last=False)** is called, the **OrderedDict** shall remove and return the (key, value) pair in FIFO order.
+28. **When** **move_to_end()** is called, the **OrderedDict** shall reposition an existing key to either the beginning or the end of the dictionary.
+29. **If** **move_to_end()** is called for a key that does not exist, then the **OrderedDict** shall raise a **KeyError**.
+30. **Ubiquitous:** The **UserDict**, **UserList**, and **UserString** shall store their underlying data in a **data** attribute.

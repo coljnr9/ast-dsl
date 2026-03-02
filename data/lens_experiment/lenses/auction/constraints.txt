@@ -1,0 +1,30 @@
+An auction must involve at least one seller and at least one buyer, but a process with exactly one seller and only one buyer is not considered an auction.
+A seller offers goods or services for money or barter exchange, while a buyer pays to acquire them.
+In a forward auction, a seller offers items for sale and expects the highest price from buyers.
+In a reverse auction, the roles of buyer and seller are reversed to drive the purchase price downward.
+A double auction allows for the simultaneous presence of multiple buyers and multiple sellers within the same event.
+Under a Walrasian auction, the auctioneer serves as an intermediary who adjusts prices until the supply from sellers exactly matches the demand from buyers.
+In an English auction, each subsequent bid submitted by a participant must be higher than the previous bid.
+An English auction concludes when no participant is willing to submit a higher bid, at which point the highest bidder pays their bid.
+In a Dutch auction, the auctioneer begins with a high asking price and lowers it until a participant accepts the price or the reserve price is met.
+In a multi-item Dutch auction, items are allocated in the order bids are received, starting with the first bidder to accept the price.
+In a Japanese auction, no participant is permitted to enter or re-enter the bidding process once the auction has commenced.
+A Japanese auction terminates immediately when only one participant remains in the process.
+In a first-price sealed-bid auction, all bidders must submit their bids simultaneously without knowledge of any other participant's bid.
+Bidders in a first-price sealed-bid auction are restricted to submitting only one bid each.
+In a Vickrey auction, the winning bidder is the highest bidder, but the price paid is the value of the second-highest bid.
+The auctioneer may establish a minimum bidding increment that all subsequent bids must satisfy to be valid.
+If a seller sets a reserve price and the final bid fails to reach that amount, the item remains unsold.
+In a no-reserve (absolute) auction, the item must be sold to the highest bidder regardless of the final price reached.
+Sellers in a reserve auction maintain the right to accept or reject the highest bid if it does not meet their satisfaction.
+The reserve price may be kept confidential by the auctioneer or announced publicly to all bidders.
+In a combinatorial auction, bidders are allowed to place "all-or-nothing" bids on packages of multiple items.
+In a combinatorial auction, the highest individual bidder for a specific item is not guaranteed to win if a combined package bid offers a higher total value to the seller.
+A "bid by candle" terminates automatically and unpredictably when the flame of a burning candle expires.
+In a Scottish auction, all bidding activity must be completed within a strictly defined time interval.
+In a multi-unit uniform price auction, all winning bidders pay the same price for identical items.
+In a multi-unit discriminatory price auction, different winning bidders may pay different prices for identical items based on their specific bids.
+Auctioneers may accept and execute absentee bids on behalf of bidders according to their prior instructions.
+Bidders in an open ascending auction may submit bids vocally, electronically, or through a proxy.
+In a barter double auction, participants offer and demand goods based on multiple attributes without the exchange of money.
+A seller may withdraw an item from an auction or extend the period indefinitely unless restricted by law or specific terms of sale.

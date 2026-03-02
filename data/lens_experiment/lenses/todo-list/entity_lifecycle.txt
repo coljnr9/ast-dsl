@@ -1,0 +1,82 @@
+This domain analysis describes the **TodoMVC** ecosystem, a platform designed to compare web frameworks by implementing a standardized "Todo" application across multiple technologies.
+
+---
+
+### ENTITIES
+
+#### 1. Framework Implementation
+The core unit of the system; a specific version of the Todo app built with a particular technology.
+*   **Data:** Name, category (JavaScript, Compile-to-JS, or Labs), metadata (from `learn.json`), source code structure (HTML, JS, CSS), dependencies (`package.json`).
+*   **Lifecycle:** 
+    *   **Created:** By contributors following the `app-spec.md`.
+    *   **Modified:** Updated to newer framework versions or to fix spec compliance.
+    *   **States:** 
+        *   *Lab/Experimental:* New or less common frameworks.
+        *   *Stable/Official:* Vetted implementations.
+        *   *Broken:* Failing automated tests.
+*   **Transitions:** *Lab* $\rightarrow$ *Stable* (upon passing review/testing); *Stable* $\rightarrow$ *Broken* (if CI tests fail).
+
+#### 2. Todo Item
+The unit of data managed within a *Framework Implementation*.
+*   **Data:** Title (string), Completion Status (boolean), Unique ID.
+*   **Lifecycle:**
+    *   **Created:** By user input in the application UI.
+    *   **Modified:** Title edited or completion status toggled.
+    *   **Destroyed:** Removed by user action or "Clear Completed."
+*   **States:** `Active`, `Completed`.
+*   **Transitions:** `Active` $\leftrightarrow$ `Completed`.
+
+#### 3. Test Suite (Selenium/Cypress)
+The automated validation logic.
+*   **Data:** 27 test cases, CSS selectors (Page Object Model), assertion logic.
+*   **Lifecycle:** Static logic executed against implementations.
+
+#### 4. Build Pipeline / CI/CD
+The process that transforms source code into a deployable site.
+*   **Data:** Gulp tasks, CI configurations (`.travis.yml`, `circle.yml`), build artifacts.
+
+---
+
+### OPERATIONS
+
+#### Todo Management (Application Level)
+*   **Create Todo:**
+    *   **Involved:** Todo Item, Framework Implementation.
+    *   **Precondition:** Framework is loaded; user enters non-empty text.
+    *   **Post-condition:** New Todo added to list and `localStorage`.
+*   **Toggle/Edit/Delete:**
+    *   **Involved:** Todo Item.
+    *   **Post-condition:** State change is persisted to `localStorage`.
+*   **Filter List:**
+    *   **Involved:** List of Todo Items.
+    *   **Precondition:** User selects "All", "Active", or "Completed".
+    *   **Change:** UI view changes; underlying data remains the same.
+
+#### System/Infrastructure Level
+*   **Lint/Build (Gulp):**
+    *   **Involved:** Framework Implementation files.
+    *   **Change:** Assets optimized/minified; artifacts copied to build folder.
+*   **Test Execution (Test Runner):**
+    *   **Involved:** Framework Implementation, Test Suite.
+    *   **Precondition:** Dev server (`server.js`) is running.
+    *   **Change:** Generation of pass/fail reports.
+
+---
+
+### RELATIONSHIPS
+
+*   **Reference:** `learn.json` references all **Framework Implementations** to populate the main website UI.
+*   **Ownership:** The **Core Project** owns the **App-Spec** and the **Testing Infrastructure**.
+*   **Containment:** A **Framework Implementation** contains many **Todo Items** (stored in `localStorage`).
+*   **Compliance:** Every **Framework Implementation** must relate back to the **App-Spec**; if the relationship is broken (non-compliant), the implementation is invalid.
+*   **Indexing:** The `index.html` serves as a lookup registry for all available frameworks.
+
+---
+
+### INVARIANTS
+
+*   **Persistence Invariant:** All implementations *must* use `localStorage` for data persistence so that state survives page reloads.
+*   **Visual Invariant:** All implementations must use the same CSS classes and HTML structure specified in the architecture to ensure a consistent UI across frameworks.
+*   **Functional Invariant:** Every implementation must pass the same 27 test cases defined in the test suite to be considered a valid TodoMVC entry.
+*   **UI Visibility Invariant:** The central "Main" section and "Footer" must be hidden if the Todo list is empty.
+*   **Routing Invariant:** The application must support URL routing (e.g., `#/active`, `#/completed`) to filter the list.

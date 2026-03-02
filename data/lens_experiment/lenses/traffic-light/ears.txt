@@ -1,0 +1,43 @@
+Here are the behavioral requirements for the Traffic Light system (referred to as the "Stoplight" or "Signal-head") based on the provided article, using EARS notation:
+
+**Normal Operations (Ubiquitous)**
+1. The Stoplight shall transmit information to road users through colors and symbols including arrows and bicycles.
+2. The Stoplight shall arrange the red, amber, and green signals either vertically with red on top or horizontally.
+3. The Stoplight shall provide non-flashing red, amber, and green lights for standard three-color signal heads.
+4. The Stoplight shall display a green walking human figure to indicate a safe-to-cross state for pedestrians.
+5. The Stoplight shall display a red or orange standing man or hand symbol to indicate a do-not-walk state for pedestrians.
+
+**State-Driven Behavior (State-driven)**
+6. While in a non-flashing Red state, the Stoplight shall prohibit traffic from proceeding beyond the stop line.
+7. While in a Green state, the Stoplight shall allow traffic to proceed through the intersection.
+8. While in an Amber state, the Stoplight shall indicate that the green movement is being terminated.
+9. While the main light is red, the Stoplight shall display a Green Arrow to permit traffic to proceed in a specific direction.
+10. While transitioning from green to red, the countdown light shall display the remaining seconds in a color matching the active signal.
+
+**Event-Driven Behavior (Event-driven)**
+11. When the red-amber sequence is initiated (UK standard), the Stoplight shall signal drivers to prepare to proceed without entering the intersection.
+12. When a Green Arrow is combined with a green signal, the Stoplight shall indicate that turning traffic has priority over oncoming traffic.
+13. When the countdown reaches zero, the Stoplight shall immediately change the main light color to the next phase.
+14. When a pedestrian pushes the cross button (HAWK beacon), the Stoplight shall initiate an amber light followed by red lights.
+15. When an aircraft is landing or taking off at a runway crossing, the Stoplight shall close the movable barrier.
+
+**Unwanted/Error/Rejection Cases (Unwanted)**
+16. If the Stoplight system fails or is out of order, then the Stoplight shall flash amber to indicate road users must proceed with caution.
+17. If a "yellow trap" condition exists, then the Stoplight shall display a sign reading "Oncoming traffic has extended green."
+18. If a driver cannot safely stop when the amber light appears (except in South Korea), then the Stoplight shall allow the vehicle to pass the stop line.
+19. If a vehicle would not clear the intersection before the next phase change, then the Stoplight shall prohibit the vehicle from proceeding on green.
+
+**Complex/Specific Conditions (Complex)**
+20. While at a level crossing or swing bridge, when a flashing red light is displayed, the Stoplight shall activate additional alarms and voice prompts.
+21. While in a flashing amber arrow state, the Stoplight shall indicate that drivers must give way to other users before turning.
+22. While the red signal is active, when a circular red light flashes (US/MUTCD), the Stoplight shall allow traffic to proceed after a full stop as per STOP sign rules.
+23. While in the "advance green" state (Ontario), when the green lamp flashes rapidly, the Stoplight shall permit straight-through movement and protected left turns.
+24. While the countdown timer exceeds 99 seconds, the Stoplight shall display a letter (e.g., A0) or a flashing "99" to indicate the extended duration.
+25. While in the "all-red" stage (Pedestrian Scramble), the Stoplight shall hold all vehicular traffic to allow pedestrians to cross diagonally.
+
+**Scope and Preservation (Ubiquitous/State-driven)**
+26. The Stoplight shall not recognize a "dilemma zone" for amber lights when operating under South Korean legal jurisdiction.
+27. The Stoplight shall maintain the Red signal rule while the Red/Amber transition signal is active.
+28. The Stoplight shall remain unlit (HAWK beacon) until a pedestrian trigger is received.
+29. The Stoplight shall not allow the display of a circular green signal in a flashing mode.
+30. The Stoplight shall preserve the square shape for red signals and diamond shape for amber signals when deployed in Quebec.

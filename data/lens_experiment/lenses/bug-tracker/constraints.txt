@@ -1,0 +1,30 @@
+1. A bug tracking system must record facts about known bugs in a centralized database.
+2. The system must allow end-users to enter bug reports directly if configured for open-source or public access.
+3. Access to bug reports can be restricted to internal employees within an organization.
+4. The system must record the specific time a bug was reported.
+5. Every bug report must include a description of the erroneous program behavior.
+6. A bug report should include details on how to reproduce the reported bug.
+7. The system must track the identity of the person who reported the bug.
+8. The system must track the identity of any programmers assigned to work on a specific bug.
+9. Every bug must be assigned a status that represents its current stage in the lifecycle.
+10. Administrators can define and configure the available statuses within the system.
+11. Administrators can configure permissions that restrict actions based on the current status of a bug.
+12. The system must allow bugs to be moved from one status to another based on defined transition rules.
+13. Administrators have the authority to delete bugs from the database.
+14. The system can trigger automated email notifications to the submitter when a bug record is added or changed.
+15. The system can trigger automated email notifications to assigned programmers when the status of a bug changes.
+16. The system must track the severity level of each bug.
+17. The system may track the perceived complexity of a bug fix as a distinct value from its severity.
+18. The system must maintain a prioritized backlog of pending items for product roadmap planning.
+19. Distributed bug trackers allow users to read, add, or update bug reports while the developer is offline.
+20. Distributed bug trackers must synchronize offline updates with the main database once connectivity is restored.
+21. The system can categorize entries as either "bugs" or "improvements."
+22. The system can generate reports on programmer productivity based on bug resolution data.
+23. Local bug trackers (LBT) may exist as independent systems to translate user issues into developer language.
+24. Local bug trackers can store specific user contact information that is not transferred to the main development queue.
+25. Integrated systems can automatically generate a knowledge base from resolved bug reports.
+26. Integrated systems can automatically generate release notes based on fixed bugs.
+27. The system may allow for bugs to be tracked against multiple versions of a software product.
+28. Integration with version control allows a bug report to be linked to specific source code changes.
+29. The system must preserve the history of a bug's state transitions throughout its lifecycle.
+30. The system does not require the complexity of a fix to be mathematically proportional to the bug's severity.

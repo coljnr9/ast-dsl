@@ -1,0 +1,132 @@
+### BDD Scenarios for Python `collections` Module
+
+#### **ChainMap Scenarios**
+
+**Scenario 1: Look up a key across multiple mappings (Happy Path)**
+*   **Given** a ChainMap initialized with `{'a': 1, 'b': 2}` and `{'b': 3, 'c': 4}`
+*   **When** searching for the key "b"
+*   **Then** the value returned should be 2 (from the first mapping)
+
+**Scenario 2: Write operations only affect the first mapping (State Transition)**
+*   **Given** a ChainMap `c` containing `[{'x': 1}, {'y': 2}]`
+*   **When** the user sets `c['z'] = 3`
+*   **Then** the first dictionary in `c.maps` should be `{'x': 1, 'z': 3}` and the second should remain `{'y': 2}`
+
+**Scenario 3: Create a nested subcontext (State Transition)**
+*   **Given** an existing ChainMap `c`
+*   **When** calling `c.new_child(m={'local': True})`
+*   **Then** a new ChainMap is returned with `{'local': True}` as the first mapping, followed by all mappings from `c`
+
+---
+
+#### **Counter Scenarios**
+
+**Scenario 4: Count items from an iterable (Happy Path)**
+*   **Given** an empty Counter
+*   **When** initialized with the string "abracadabra"
+*   **Then** the count for "a" should be 5 and the count for "b" should be 2
+
+**Scenario 5: Accessing a missing key (Edge Case)**
+*   **Given** a Counter object `c = Counter({'red': 3})`
+*   **When** accessing the key "blue"
+*   **Then** the system should return 0 instead of raising a KeyError
+
+**Scenario 6: Mathematical subtraction between Counters (Happy Path)**
+*   **Given** `Counter(a=3, b=1)` and `Counter(a=1, b=2)`
+*   **When** performing multiset subtraction (c - d)
+*   **Then** the result should be `Counter({'a': 2})` and the non-positive count for "b" should be excluded
+
+**Scenario 7: Total count of all elements (Query)**
+*   **Given** a Counter initialized with `{'a': 10, 'b': 5, 'c': -2}`
+*   **When** calling the `total()` method
+*   **Then** the result should be 13
+
+---
+
+#### **deque Scenarios**
+
+**Scenario 8: Fast append and pop from both ends (Happy Path)**
+*   **Given** a deque `d` containing `['b', 'c']`
+*   **When** performing `appendleft('a')` and `pop()`
+*   **Then** the deque should contain `['a', 'b']` and the popped value should be 'c'
+
+**Scenario 9: Bounded deque discards items when full (Edge Case)**
+*   **Given** a deque initialized with `maxlen=3` and items `[1, 2, 3]`
+*   **When** appending a new item `4` to the right
+*   **Then** the item `1` should be automatically discarded from the left
+
+**Scenario 10: Popping from an empty deque (Error Handling)**
+*   **Given** an empty deque
+*   **When** attempting to call `pop()` or `popleft()`
+*   **Then** the system should raise an `IndexError`
+
+**Scenario 11: Rotating elements (State Transition)**
+*   **Given** a deque containing `[1, 2, 3]`
+*   **When** calling `rotate(1)`
+*   **Then** the state of the deque should change to `[3, 1, 2]`
+
+---
+
+#### **defaultdict Scenarios**
+
+**Scenario 12: Automatic initialization of missing keys (Happy Path)**
+*   **Given** a defaultdict with `list` as the `default_factory`
+*   **When** accessing a non-existent key "missing"
+*   **Then** a new empty list should be created and returned for that key
+
+**Scenario 13: Missing factory results in standard error (Precondition Violation)**
+*   **Given** a defaultdict where `default_factory` is `None`
+*   **When** accessing a non-existent key
+*   **Then** the system should raise a `KeyError`
+
+---
+
+#### **namedtuple Scenarios**
+
+**Scenario 14: Access fields by name and index (Query)**
+*   **Given** a namedtuple `Point = namedtuple('Point', ['x', 'y'])`
+*   **When** an instance `p = Point(10, 20)` is created
+*   **Then** `p.x` should return 10 AND `p[0]` should return 10
+
+**Scenario 15: Create instance with default values (Edge Case)**
+*   **Given** `namedtuple('Node', ['id', 'status'], defaults=['pending'])`
+*   **When** creating a Node with only the id `Node(1)`
+*   **Then** the status should be set to "pending" by default
+
+**Scenario 16: Replace values in an immutable namedtuple (State Transition)**
+*   **Given** a namedtuple instance `p` with `x=1, y=2`
+*   **When** calling `p._replace(x=10)`
+*   **Then** a new instance should be returned with `x=10, y=2` while the original `p` remains unchanged
+
+---
+
+#### **OrderedDict Scenarios**
+
+**Scenario 17: Move an existing key to the end (State Transition)**
+*   **Given** an OrderedDict containing `{'a': 1, 'b': 2, 'c': 3}`
+*   **When** calling `move_to_end('a', last=True)`
+*   **Then** the iteration order should be `b, c, a`
+
+**Scenario 18: Reordering move on non-existent key (Error Handling)**
+*   **Given** an OrderedDict `d`
+*   **When** calling `d.move_to_end('invalid_key')`
+*   **Then** the system should raise a `KeyError`
+
+**Scenario 19: FIFO vs LIFO popping (Happy Path)**
+*   **Given** an OrderedDict `{'a': 1, 'b': 2}`
+*   **When** calling `popitem(last=False)`
+*   **Then** it should return `('a', 1)` and leave `{'b': 2}`
+
+---
+
+#### **User Classes Scenarios**
+
+**Scenario 20: Accessing underlying data in UserList (Query)**
+*   **Given** a `UserList` initialized with `[1, 2, 3]`
+*   **When** accessing the `data` attribute
+*   **Then** it should return a raw Python `list` object containing `[1, 2, 3]`
+
+**Scenario 21: UserString wrapping diverse objects (Happy Path)**
+*   **Given** a `UserString` constructor
+*   **When** passed an integer `123`
+*   **Then** the `data` attribute should be the string `"123"`

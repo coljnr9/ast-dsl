@@ -1,0 +1,32 @@
+Based on the domain description provided, the following behavioral requirements have been extracted using the EARS notation for the **Bank Account System**.
+
+1. **Ubiquitous:** The Bank Account System shall maintain a record of all financial transactions between the bank and the customer.
+2. **Ubiquitous:** The Bank Account System shall identify each account using a unique account numbering scheme.
+3. **Ubiquitous:** The Bank Account System shall report all financial transactions occurring within a specific period to the customer via a bank statement.
+4. **Ubiquitous:** The Bank Account System shall record a deposit account as a liability of the bank.
+5. **Ubiquitous:** The Bank Account System shall record a loan account as an asset of the bank.
+6. **State-driven:** While an account has a positive balance, the Bank Account System shall classify the balance as a credit balance.
+7. **State-driven:** While an account has a negative balance, the Bank Account System shall classify the balance as a debit balance.
+8. **State-driven:** While the system is an Electronic Money Institution (EMI), the Bank Account System shall safeguard client funds separately from the institution's own assets.
+9. **Event-driven:** When a customer applies for an account and is accepted, the Bank Account System shall open a new account based on the institution's terms and conditions.
+10. **Event-driven:** When a customer provides funds for deposit, the Bank Account System shall record the amount in the account designated by the customer.
+11. **Event-driven:** When a withdrawal request is made, the Bank Account System shall process the transaction in accordance with the specific account's terms and conditions.
+12. **Unwanted:** If a user attempts to open an account using a false name, then the Bank Account System shall reject the application as unlawful.
+13. **Unwanted:** If a signatory cannot be identified according to legal specifications, then the Bank Account System shall prohibit the operation of the account.
+14. **Unwanted:** If a withdrawal request exceeds the defined withdrawal limits, then the Bank Account System shall decline the transaction.
+15. **Unwanted:** If a deposit exceeds the defined deposit limits, then the Bank Account System shall decline the transaction.
+16. **Complex:** While the applicant is a minor, when a parent or guardian operates the account, the Bank Account System shall permit the transaction.
+17. **Complex:** While the system is an EMI, when a client provides funds, the Bank Account System shall issue electronic money in exchange.
+18. **Complex:** While the system is an EMI, when a transfer is within the institution's risk appetite, the Bank Account System shall allow the transaction.
+19. **Complex:** While a loan account is active, when the borrower provides collateral, the Bank Account System shall record the account as a secured loan.
+20. **Ubiquitous:** The Bank Account System shall calculate the balance of the account to represent the customer's financial position at any point in time.
+21. **State-driven:** While the system is an EMI, the Bank Account System shall NOT use client funds for lending to third parties.
+22. **State-driven:** While the account is a traditional bank account, the Bank Account System shall provide deposit insurance schemes where applicable.
+23. **Event-driven:** When an account is categorized as a savings account, the Bank Account System shall maintain the balance routinely in credit.
+24. **Ubiquitous:** The Bank Account System shall preserve the customer's claim against the bank for the total sum deposited regardless of the bank's use of the cash.
+25. **Unwanted:** If an EMI account is requested by a business, then the Bank Account System shall NOT provide deposit insurance.
+26. **Complex:** While operating in the European Union, when managing EMIs, the Bank Account System shall comply with the Electronic Money Directive (EMD2) requirements.
+27. **Event-driven:** When a transaction monitoring query is triggered in a traditional bank account, the Bank Account System shall block the transfer until the query is resolved.
+28. **State-driven:** While a loan is guaranteed by a third person, the Bank Account System shall record the guarantee status in the account records.
+29. **Unwanted:** If an applicant is under the minimum age (18, or 16 depending on jurisdiction), then the Bank Account System shall prevent the opening of an independent account.
+30. **Ubiquitous:** The Bank Account System shall permit a single customer to maintain more than one account simultaneously.

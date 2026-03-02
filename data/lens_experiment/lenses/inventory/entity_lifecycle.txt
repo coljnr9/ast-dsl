@@ -1,0 +1,68 @@
+This domain analysis outlines the core components of an Inventory Management System as described in the provided text.
+
+### ENTITIES
+
+**1. Product (Item)**
+*   **Data:** Identification (Barcode, RFID, QR code, NFC, Serial Number, Lot Number, Revision Number), Description, Category.
+*   **Lifecycle:** Created when a new product type is defined; Modified when details change; Destroyed/Archived when the product is discontinued.
+*   **States:** Active, Discontinued, Out-of-Stock.
+
+**2. Inventory Level (Stock-on-Hand)**
+*   **Data:** Quantity, Location (Warehouse/Retail/Bin), Stock on Order, Carrying Cost, Expiration Date (for spoilage tracking).
+*   **Lifecycle:** Created when stock is first received; Modified by sales, deliveries, or transfers; Destroyed when stock is written off or fully depleted.
+*   **States:** Available, Low Stock (below Reorder Point), Out of Stock, Obsolete/Spoiled.
+
+**3. Location**
+*   **Data:** Name (Warehouse, Store, Vendor), Type, Address, Layout/Grouping data.
+*   **Lifecycle:** Created when a facility is added; Modified during reorganization.
+*   **States:** Active, Capacity-Reached, Inactive.
+
+**4. Order (Purchase, Sales, or Transfer)**
+*   **Data:** Items, Quantities, Status, Destination/Source, Timeline.
+*   **Lifecycle:** Created upon demand or reorder trigger; Modified as it moves through fulfillment; Completed/Closed upon receipt or delivery.
+*   **States:** Pending, Picking, Packing, Shipped, Delivered, Cancelled.
+
+**5. Manufacturing Documents (Bill of Materials & Work Orders)**
+*   **Data:** 
+    *   **BoM:** List of parts/tools required for a finished product.
+    *   **Work Order:** Timeline of processes, linked BoM, Quantity to build.
+*   **Lifecycle:** Created during production planning; Modified during assembly; Closed when the final product is added to inventory.
+*   **States:** Draft, In-Progress, Completed, Reversed.
+
+---
+
+### OPERATIONS
+
+| Operation | Entities Involved | Preconditions | Post-conditions |
+| :--- | :--- | :--- | :--- |
+| **Receive** | Product, Inventory Level, Order | Incoming shipment arrives from vendor. | Stock-on-Hand increases; Order status marks as "Received." |
+| **Pick/Pack/Ship** | Product, Inventory Level, Order | Order exists; Stock-on-Hand > 0. | Stock-on-Hand decreases; Item is moved to "Shipped" state. |
+| **Reorder** | Product, Order, Inventory Level | Stock-on-Hand ≤ Reorder Point. | New Purchase Order created; "Stock on Order" increases. |
+| **Transfer** | Product, Location (Source/Dest) | Stock exists at source. | Stock decreases at Source and increases at Destination. |
+| **Cycle Count** | Inventory Level | System visibility enabled. | Physical count matches software record; Accuracy metrics updated. |
+| **Production** | Work Order, BoM, Inventory | Component stock available. | Component stock decreases; Finished good stock increases. |
+
+---
+
+### RELATIONSHIPS
+
+*   **Ownership/Containment:**
+    *   **Location** contains multiple **Inventory Levels**.
+    *   **Inventory Management System** contains/integrates with **Accounting** and **Online Sales** (E-commerce).
+*   **Reference:**
+    *   **Work Order** references a **Bill of Materials**.
+    *   **Inventory Level** references a specific **Product** and **Location**.
+    *   **Orders** reference **Products** and **Vendors/Customers**.
+*   **Lookup/Indexing:**
+    *   **Barcode/RFID/QR** tags serve as the primary key for looking up **Product** data and **Inventory Levels** in the database.
+
+---
+
+### INVARIANTS
+
+*   **Stock Integrity:** Total Stock = Stock-on-Hand + Stock-on-Order.
+*   **Non-Negativity:** Physical inventory levels cannot be less than zero (though "out of stock" is a valid state).
+*   **Identification Uniqueness:** Each product or specific asset (serial number) must have a unique identifier (UPC, Serial, or RFID) to prevent data duplication.
+*   **Supply Chain Continuity:** An item cannot be "Shipped" unless it has first been "Received" or "Produced."
+*   **Reorder Synchronization:** Automatic reordered quantities must be calculated based on the sum of `stock on hand` and `stock on order` to prevent overstocking.
+*   **Access Control:** Data modification is restricted based on User Rights (e.g., an employee can "Receive" but perhaps not "Delete" a product).

@@ -1,0 +1,111 @@
+### Happy Paths (Normal Operations)
+
+**Scenario 1: Standard Three-Color Sequence (International)**
+*   **Given** the traffic light is currently "Red"
+*   **When** the timer for the red phase expires
+*   **Then** the light should transition to "Green" (or "Red/Amber" depending on local law) to allow traffic to proceed
+
+**Scenario 2: Amber Caution Transition**
+*   **Given** the traffic light is "Green"
+*   **When** the green phase is terminating
+*   **Then** the light should change to "Amber" to warn traffic that a red signal will soon be displayed
+
+**Scenario 3: UK-Specific Preparedness Sequence**
+*   **Given** the system is operating under UK regulations and the light is "Red"
+*   **When** the signal is about to change to green
+*   **Then** the light should display "Red and Amber" simultaneously to signal drivers to get ready
+
+**Scenario 4: Green Arrow Filter Turn**
+*   **Given** the main vehicular signal is "Red"
+*   **When** the specific timer for a protected left turn begins
+*   **Then** the "Green Arrow" should illuminate, allowing traffic to proceed only in the indicated direction
+
+**Scenario 5: Pedestrian Standard Crossing**
+*   **Given** the pedestrian signal is showing a "Red Man"
+*   **When** a pedestrian presses the push button and the vehicular traffic is stopped
+*   **Then** the "Green Walking Man" should illuminate to indicate it is safe to cross
+
+---
+
+### Precondition Violations (Invalid State Rejection)
+
+**Scenario 6: Illegal Transition from Red to Amber**
+*   **Given** the traffic light is "Red"
+*   **When** a "Change to Amber" command is received (without a Red/Amber intermediate step in applicable regions)
+*   **Then** the system should reject the command and remain "Red" to prevent traffic accidents
+
+**Scenario 7: Simultaneous Conflicting Green Lights**
+*   **Given** North-South traffic has a "Green" signal
+*   **When** a request is made to turn East-West traffic to "Green"
+*   **Then** the system must reject the request until North-South traffic has transitioned through Amber to Red
+
+---
+
+### State Transitions
+
+**Scenario 8: Flashing North-American Pedestrian Phase**
+*   **Given** the pedestrian "Walk" signal is currently active
+*   **When** the safe crossing interval is ending
+*   **Then** the signal should transition to a "Flashing Orange Stophand" to warn pedestrians not to start crossing
+
+**Scenario 9: Level Crossing Emergency State**
+*   **Given** the traffic light is "Green" at a level crossing
+*   **When** a train approach sensor is triggered
+*   **Then** the light should transition to "Flashing Red" and activate additional alarms
+
+---
+
+### Edge Cases (Boundary/Empty/Full)
+
+**Scenario 10: Countdown Timer at Maximum Capacity**
+*   **Given** a countdown light is equipped to show 2 digits
+*   **When** the remaining red light time is 115 seconds
+*   **Then** the display should show "A5" (where A=110) or flash "15" to indicate the time exceedance
+
+**Scenario 11: Low Traffic Night Mode**
+*   **Given** the system time is after midnight in a "Yellow Caution" jurisdiction
+*   **When** the intersection enters low-power mode
+*   **Then** the vehicular signals should transition to "Flashing Amber" to indicate "proceed with caution"
+
+**Scenario 12: Minimal 2-Aspect Configuration**
+*   **Given** a temporary construction signal with only Red and Green aspects
+*   **When** the "Stop" command is triggered
+*   **Then** the light must transition directly from Green to Red as there is no Amber aspect available
+
+---
+
+### Query Operations (Checking State)
+
+**Scenario 13: Traffic Officer Status Check**
+*   **Given** the intersection is under computerized control
+*   **When** a remote query is sent to check the current aspect of Signal Head #4
+*   **Then** the system should return the current color (e.g., "Circular Green") and remaining phase time
+
+**Scenario 14: Pedestrian Button Feedback**
+*   **Given** the pedestrian light is "Red"
+*   **When** a pedestrian pushes the call button
+*   **Then** the system should register the "Wait" request and illuminate the button indicator
+
+---
+
+### Error Handling & Safety
+
+**Scenario 15: Signal Out-of-Order Fail-Safe**
+*   **Given** the internal system detects a hardware fault or lamp failure
+*   **When** the system diagnostic runs
+*   **Then** all vehicular signals should default to "Flashing Amber" (Central Europe) or "Flashing Red" to ensure a multi-way stop
+
+**Scenario 16: Preventing the "Yellow Trap"**
+*   **Given** an intersection with cross-turning traffic and no all-red phase
+*   **When** the signal for one direction turns "Amber"
+*   **Then** the system must ensure oncoming traffic does not receive a "Green" until the clearing interval is complete
+
+**Scenario 17: South Korean Speeding Violation (Dilemma Zone)**
+*   **Given** a vehicle is approaching the intersection at 62 km/h in a 40 km/h zone
+*   **When** the light turns "Amber"
+*   **Then** the system records a violation if the vehicle passes the stop line, regardless of stopping safety
+
+**Scenario 18: HAWK Beacon Activation**
+*   **Given** a HAWK beacon is currently unlit (dark)
+*   **When** a pedestrian pushes the cross button
+*   **Then** the sequence must start with "Flashing Amber", then "Steady Amber", then "Steady Red" before showing the "Walk" icon
