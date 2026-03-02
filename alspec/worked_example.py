@@ -189,8 +189,14 @@ def _unwrap_function(code: str) -> str:
                     continue
                 continue
 
-        # Skip return statement
-        if stripped.startswith("return Spec(") or stripped == "return sig":
+        # Convert 'return Spec(...)' to 'spec = Spec(...)' for top-level usage
+        if stripped.startswith("return Spec("):
+            # Preserve indentation
+            indent = line[:line.find("return ")]
+            result.append(indent + "spec = " + stripped[7:])
+            continue
+
+        if stripped == "return sig":
             continue
 
         # Dedent by one level (4 spaces)
