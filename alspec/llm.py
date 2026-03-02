@@ -174,6 +174,7 @@ class AsyncLLMClient:
         model: str = "meta-llama/llama-3.1-8b-instruct",
         tool_name: str = "submit_spec",
         name: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Result[tuple[str, str, UsageInfo | None], Exception]:
         """Call the model with the submit_spec tool and return (analysis, code, usage).
 
@@ -201,7 +202,7 @@ class AsyncLLMClient:
                 case _:
                     pass
 
-            with propagate_attributes(session_id=self._session_id):
+            with propagate_attributes(session_id=self._session_id, metadata=metadata):
                 kwargs: dict[str, Any] = {
                     "model": model,
                     "messages": messages,
@@ -251,15 +252,34 @@ class AsyncLLMClient:
             case _:
                 return Err(
                     RuntimeError(
-                        "submit_spec arguments missing 'analysis' or 'code' fields"
+                        f"{tool_name} arguments missing 'analysis' or 'code' fields"
                     )
                 )
+
+    async def generate_text(
+        self,
+        prompt: str,
+        model: str = "meta-llama/llama-3.1-8b-instruct",
+        name: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Result[str, Exception]:
+        """Simple wrapper for plain text generation from a single prompt string."""
+        messages: list[dict[str, str]] = [{"role": "user", "content": prompt}]
+        result = await self.generate_messages(
+            messages=messages, model=model, name=name, metadata=metadata
+        )
+        match result:
+            case Ok((content, _usage)):
+                return Ok(content)
+            case Err(e):
+                return Err(e)
 
     async def generate_messages(
         self,
         messages: list[dict[str, str]],
         model: str = "meta-llama/llama-3.1-8b-instruct",
         name: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Result[tuple[str, UsageInfo | None], Exception]:
         """Fallback: plain chat completion without tool forcing.
 
@@ -279,7 +299,7 @@ class AsyncLLMClient:
                 case _:
                     pass
 
-            with propagate_attributes(session_id=self._session_id):
+            with propagate_attributes(session_id=self._session_id, metadata=metadata):
                 kwargs: dict[str, Any] = {
                     "model": model,
                     "messages": messages,  # type: ignore[arg-type]
