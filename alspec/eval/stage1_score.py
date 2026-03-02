@@ -131,6 +131,14 @@ class Stage1Score:
 
     # --- Composite ---
     health: float = 0.0  # weighted composite in [0, 1]
+    
+    # --- Intrinsic Health (structural only) ---
+    intrinsic_health: float = 0.0
+    tier1_parse: float = 0.0
+    tier2_sig: float = 0.0
+    tier3_oblig: float = 0.0
+    tier4_balance: float = 0.0
+    tier5_complexity: float = 0.0
 
     # --- Metadata ---
     error_message: str | None = None  # set when parse_success=False
@@ -181,6 +189,7 @@ def _make_zero_score(
         fuzzy_constructor_overlap=0.0,
         fuzzy_health=0.0,
         health=credit,
+        intrinsic_health=0.05 if not error_message else 0.0, # minimal signal for trying
         error_message=error_message,
         partial_parse_credit=credit,
     )
@@ -349,6 +358,135 @@ def partial_parse_score(raw_output: str) -> float:
     if "selectors" in raw_output:
         score += 0.02  # attempted selector declarations
     return min(score, 0.15)  # cap below the 0.2 floor for well-formed sigs
+
+
+def smooth_cap(value: float, target: float, steepness: float = 2.0) -> float:
+    """Sigmoid-like scoring: full credit at target, diminishing returns above."""
+    import math
+    if target == 0:
+        return 0.0
+    ratio = value / target
+    return min(1.0, 1.0 - math.exp(-steepness * ratio) + 0.05)
+
+
+def compute_intrinsic_health(score_dict: dict) -> dict:
+    """Compute intrinsic health from structural fields.
+    
+    Ported from intrinsic_score_v2.py.
+    """
+    result = {
+        "intrinsic_health": 0.0,
+        "tier1_parse": 0.0,
+        "tier2_sig": 0.0,
+        "tier3_oblig": 0.0,
+        "tier4_balance": 0.0,
+        "tier5_complexity": 0.0
+    }
+
+    # ── Tier 1: Parse & Structure (0.20) ──────────────────────────
+    parse_ok = score_dict.get("parse_success", False)
+    well_formed = score_dict.get("well_formed", False)
+    has_gen = score_dict.get("has_generated_sorts", False)
+
+    if not parse_ok:
+        result["intrinsic_health"] = 0.05
+        return result
+
+    t1 = 0.0
+    t1 += 0.08                         # parsed
+    t1 += 0.06 if well_formed else 0   # well-formed
+    t1 += 0.06 if has_gen else 0       # has generated sorts
+    result["tier1_parse"] = t1
+
+    # ── Tier 2: Signature Richness (0.20) ──────────────────────────
+    sorts = score_dict.get("sort_count", 0)
+    fns = score_dict.get("function_count", 0)
+    preds = score_dict.get("predicate_count", 0)
+    ctors = score_dict.get("constructor_count", 0)
+    obs = score_dict.get("observer_count", 0)
+
+    t2 = 0.0
+    t2 += 0.04 * smooth_cap(sorts, 3)
+    t2 += 0.05 * smooth_cap(ctors, 3)
+    t2 += 0.04 * smooth_cap(obs, 2)
+    t2 += 0.03 * smooth_cap(preds, 1)
+    t2 += 0.02 * smooth_cap(fns, 6)
+    if ctors >= 2 and obs >= 2:
+        ratio = min(ctors, obs) / max(ctors, obs)
+        t2 += 0.02 * ratio
+    result["tier2_sig"] = min(t2, 0.20)
+
+    # ── Tier 3: Obligation Completeness (0.25) ─────────────────────
+    cells = score_dict.get("obligation_cell_count", 0)
+    expected = ctors * obs
+
+    t3 = 0.0
+    if expected > 0:
+        coverage = cells / expected
+        t3 += 0.12 * min(coverage, 1.0)
+        if coverage > 1.2:
+            t3 += 0.05
+        elif coverage > 1.0:
+            t3 += 0.03
+    t3 += 0.05 * smooth_cap(cells, 8)
+    if cells > 0 and fns > cells:
+        t3 += 0.03
+    result["tier3_oblig"] = min(t3, 0.25)
+
+    # ── Tier 4: Balance & Proportion (0.20) ────────────────────────
+    t4 = 0.0
+    if sorts >= 2 and ctors >= 3:
+        t4 += 0.05
+    elif ctors >= 2:
+        t4 += 0.03
+
+    if preds >= 2:
+        t4 += 0.05
+    elif preds >= 1:
+        t4 += 0.03
+
+    if ctors > 0 and obs > 0:
+        oc_ratio = obs / ctors
+        if 0.4 <= oc_ratio <= 2.5:
+            t4 += 0.05
+        elif 0.2 <= oc_ratio <= 4.0:
+            t4 += 0.03
+        else:
+            t4 += 0.01
+
+    if has_gen and sorts >= 3:
+        t4 += 0.05
+    elif has_gen and sorts >= 2:
+        t4 += 0.03
+    result["tier4_balance"] = min(t4, 0.20)
+
+    # ── Tier 5: Complexity Signal (0.15) ───────────────────────────
+    t5 = 0.0
+    helper_fns = fns - ctors - obs
+    if helper_fns >= 3:
+        t5 += 0.05
+    elif helper_fns >= 1:
+        t5 += 0.03
+
+    if ctors > 0:
+        density = cells / ctors
+        t5 += 0.05 * smooth_cap(density, 4)
+
+    total_symbols = fns + preds
+    if total_symbols >= 10:
+        t5 += 0.05
+    elif total_symbols >= 6:
+        t5 += 0.03
+    elif total_symbols >= 3:
+        t5 += 0.01
+    result["tier5_complexity"] = min(t5, 0.15)
+
+    # ── Composite ──────────────────────────────────────────────────
+    result["intrinsic_health"] = round(
+        result["tier1_parse"] + result["tier2_sig"] + result["tier3_oblig"] + 
+        result["tier4_balance"] + result["tier5_complexity"], 4
+    )
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -563,6 +701,19 @@ def score_stage1_output(
         obligation_cell_count=obligation_cell_count,
     )
 
+    # ---- Intrinsic Health ----
+    intrinsic = compute_intrinsic_health({
+        "parse_success": parse_success,
+        "well_formed": well_formed,
+        "has_generated_sorts": has_generated_sorts,
+        "sort_count": sort_count,
+        "function_count": function_count,
+        "predicate_count": predicate_count,
+        "constructor_count": constructor_count,
+        "observer_count": obs_count,
+        "obligation_cell_count": obligation_cell_count,
+    })
+
     return Stage1Score(
         domain=domain,
         trial_id=trial_id,
@@ -589,6 +740,12 @@ def score_stage1_output(
         fuzzy_constructor_overlap=fuzzy_constructor_overlap,
         fuzzy_health=fuzzy_health,
         health=health,
+        intrinsic_health=intrinsic["intrinsic_health"],
+        tier1_parse=intrinsic["tier1_parse"],
+        tier2_sig=intrinsic["tier2_sig"],
+        tier3_oblig=intrinsic["tier3_oblig"],
+        tier4_balance=intrinsic["tier4_balance"],
+        tier5_complexity=intrinsic["tier5_complexity"],
         error_message=None,
         failure_category=FailureCategory.OK,
         partial_parse_credit=0.0,

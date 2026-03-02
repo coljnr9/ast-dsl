@@ -35,6 +35,15 @@ class EvalResult:
     obligation_cell_count: int = 0
     covered_cell_count: int = 0
     coverage_ratio: float | None = None
+    # NEW: intrinsic health
+    intrinsic_health: float = 0.0
+    tier1_parse: float = 0.0
+    tier2_sig: float = 0.0
+    tier3_oblig: float = 0.0
+    tier4_balance: float = 0.0
+    tier5_complexity: float = 0.0
+    # NEW: captured failure reasons
+    stage2_skip_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -76,6 +85,37 @@ def _pipeline_to_eval(domain_id: str, model: str, pr: PipelineResult) -> EvalRes
         covered_cell_count = pr.score.covered_cell_count
         coverage_ratio = pr.score.coverage_ratio
 
+    # Compute intrinsic health from structural metrics
+    from alspec.eval.stage1_score import compute_intrinsic_health, _constructor_names, _observer_count, _check_well_formed
+
+    intrinsic = {"intrinsic_health": 0.0}
+    if pr.signature:
+        sig = pr.signature
+        ctors = _constructor_names(sig)
+        score_dict = {
+            "parse_success": True,
+            "well_formed": _check_well_formed(sig),
+            "has_generated_sorts": bool(sig.generated_sorts),
+            "sort_count": len(sig.sorts),
+            "function_count": len(sig.functions),
+            "predicate_count": len(sig.predicates),
+            "constructor_count": len(ctors),
+            "observer_count": _observer_count(sig),
+            "obligation_cell_count": pr.score.obligation_cell_count if pr.score else 0,
+        }
+        res = compute_intrinsic_health(score_dict)
+        intrinsic = {
+            "intrinsic_health": res["intrinsic_health"],
+            "tier1_parse": res["tier1_parse"],
+            "tier2_sig": res["tier2_sig"],
+            "tier3_oblig": res["tier3_oblig"],
+            "tier4_balance": res["tier4_balance"],
+            "tier5_complexity": res["tier5_complexity"],
+        }
+    else:
+        # Minimal credit for trying even if parse fails
+        intrinsic["intrinsic_health"] = 0.05 if pr.error_stage == "stage1" else 0.0
+
     return EvalResult(
         domain_id=domain_id,
         model=model,
@@ -93,6 +133,8 @@ def _pipeline_to_eval(domain_id: str, model: str, pr: PipelineResult) -> EvalRes
         obligation_cell_count=obligation_cell_count,
         covered_cell_count=covered_cell_count,
         coverage_ratio=coverage_ratio,
+        stage2_skip_reason=pr.stage2_skip_reason,
+        **intrinsic
     )
 
 
@@ -145,6 +187,7 @@ def _emit_langfuse_scores(eval_result: EvalResult) -> None:
             "completion_tokens": eval_result.completion_tokens,
             "cached_tokens": eval_result.cached_tokens,
             "cache_hit_rate": cache_hit_rate,
+            "intrinsic_health": eval_result.intrinsic_health,
         }
 
         if score.obligation_cell_count > 0:
@@ -159,6 +202,10 @@ def _emit_langfuse_scores(eval_result: EvalResult) -> None:
             name="spec_health",
             value=score.health,
             comment=f"errors={score.error_count} warnings={score.warning_count}",
+        )
+        langfuse.score_current_trace(
+            name="intrinsic_health",
+            value=eval_result.intrinsic_health,
         )
         langfuse.score_current_trace(
             name="well_formed",
@@ -204,6 +251,7 @@ def _emit_langfuse_scores(eval_result: EvalResult) -> None:
                 "completion_tokens": eval_result.completion_tokens,
                 "cached_tokens": eval_result.cached_tokens,
                 "cache_hit_rate": cache_hit_rate_failed,
+                "stage2_skip_reason": eval_result.stage2_skip_reason,
             }
         )
         # Log hard zeros so failed traces are visible in score-based filters.
@@ -220,6 +268,7 @@ async def run_domain_eval(
     model: str,
     *,
     session_id: str | None = None,
+    lens: str | None = None,
 ) -> EvalResult:
     """Run the two-stage pipeline for a single domain and model.
 
@@ -245,6 +294,7 @@ async def run_domain_eval(
             "complexity": str(domain.complexity),
             "model": model,
             "pipeline": "two-stage",
+            "lens": lens or "none",
         },
         tags=[f"tier:{domain.complexity}", *sorted(domain.expected_features)],
     ):
@@ -255,11 +305,11 @@ async def run_domain_eval(
             domain_id=domain.id,
             domain_description=domain.description,
             model=model,
+            lens=lens,
         )
 
         eval_result = _pipeline_to_eval(domain.id, model, result)
 
         _emit_langfuse_scores(eval_result)
 
-    langfuse.flush()
     return eval_result
