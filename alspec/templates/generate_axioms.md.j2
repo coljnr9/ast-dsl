@@ -10,21 +10,37 @@ A previous stage produced the following signature. Use it exactly as given — d
 {{ signature_code }}
 ```
 
+## Stage 1 Analysis
+
+The following analysis was produced during signature generation. Use it to inform your axiom design decisions — it contains reasoning about entities, states, operations, and key sorts that is directly relevant to axiom construction.
+
+{{ signature_analysis }}
+
 ## Obligation Table
 
-The following obligation table was derived deterministically from the signature.
-Every cell represents an axiom you must write. Cover every cell.
+The following obligation table was derived deterministically from the signature. Every cell represents an axiom you must write. Cover every cell.
 
 {{ obligation_table_md }}
 
 ## Instructions
 
-Write a complete Python function named `{{ fn_name }}` that returns a `Spec`.
-- Reuse the exact signature from above (copy it into your function)
+Write Python code that constructs a complete `Spec` **at the top level** (no function wrapper).
+Include all necessary imports at the top. Reuse the exact signature from above.
+
+Your code should assign:
+- `sig = Signature(...)` — copy the signature exactly as given
+- Variables using `var(...)` 
+- `axioms = (...)` — tuple of all Axiom objects
+- At the end: `spec = Spec(name="{{ spec_name }}", signature=sig, axioms=axioms)`
+
+Do NOT wrap the code in a function definition.
+
+Axiom writing rules:
 - Write axioms covering **every obligation cell** in the table above
 - Write any additional axioms noted in the table (equality basis, definedness biconditionals)
-- For miss cells: write delegation/preservation axioms
-- For hit cells: write the domain-specific equation or predicate assertion
+- For MISS cells: write delegation/preservation axioms
+- For HIT cells: write the domain-specific equation or predicate assertion
+- **Equality Predicates:** If the signature includes equality predicates (`eq_*`), use them for key dispatch guards: `Implication(PredApp("eq_id", (k, k2)), ...)` for HIT cells and `Implication(Negation(PredApp("eq_id", (k, k2))), ...)` for MISS cells. Do NOT use term equality `eq(k, k2)` as a dispatch guard — always use the declared equality predicate via `PredApp`.
 - Follow the loose semantics rules from the reference: use explicit `¬def(...)` for undefinedness
 
-Call the submit_spec tool with your analysis and code.
+**Call the `submit_spec` tool** with your analysis and code. Do NOT wrap code in markdown fences.

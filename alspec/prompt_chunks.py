@@ -290,7 +290,9 @@ _DEFAULT_CONFIGS: dict[Stage, list[ChunkId]] = {
         ChunkId.ROLE_PREAMBLE,
         ChunkId.TYPE_GRAMMAR,
         ChunkId.API_HELPERS,
-        ChunkId.EXAMPLE_STACK,
+        ChunkId.EXAMPLE_SESSION_STORE,
+        ChunkId.EXAMPLE_RATE_LIMITER,
+        ChunkId.EXAMPLE_DNS_ZONE,
         ChunkId.OBLIGATION_PATTERN,
     ],
     Stage.STAGE2: [

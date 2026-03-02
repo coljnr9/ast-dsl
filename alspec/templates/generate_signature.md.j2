@@ -8,12 +8,26 @@ Follow the methodology from the worked examples to analyze the domain:
 4. Identify equality predicates for key dispatch
 5. Determine the generated sort(s) and their constructors
 
-Output Python code that defines a `sig = Signature(...)` containing:
+Output Python code that assigns `sig = Signature(...)` **at the top level** (no function wrapper).
+Include all necessary imports at the top.
+
+Your code should look like:
+```
+from alspec import Signature, atomic, fn, pred, GeneratedSortInfo
+
+sig = Signature(
+    sorts={...},
+    functions={...},
+    predicates={...},
+    generated_sorts={...},
+)
+```
+
 - `sorts`: all sort declarations using `atomic(name)`
 - `functions`: all function symbols using `fn(name, params, result, total=True/False)`
 - `predicates`: all predicate symbols using `pred(name, params)`
 - `generated_sorts`: for each generated sort, use `GeneratedSortInfo(constructors=(...), selectors={...})`
 
-Do NOT write any axioms. A later stage will handle axiom generation.
+Do NOT wrap the code in a function definition.
+Do NOT write any axioms — a later stage will handle axiom generation.
 Call the submit_signature tool with your analysis and signature code.
-The eventual spec function will be named `{{ fn_name }}`.
