@@ -580,6 +580,180 @@ class TestIsDistinctness:
         f = Negation(PredApp("eq_color", (const("red"), const("green"))))
         assert _is_distinctness_axiom(f, fn_roles, sig, pred_roles=pred_roles)
 
+    def test_conjunction_of_equation_distinctness(self):
+        """Conjunction of ¬(c₁=c₂) assertions → DISTINCTNESS."""
+        from alspec import Signature, atomic, fn, Negation, Conjunction, const
+        from alspec.obligation import FnRole, FnKind
+        from alspec.axiom_match import _is_distinctness_axiom
+        from alspec.helpers import eq
+
+        sig = Signature(
+            sorts={"Phase": atomic("Phase")},
+            functions={
+                "red": fn("red", [], "Phase"),
+                "amber": fn("amber", [], "Phase"),
+                "green": fn("green", [], "Phase"),
+            },
+            predicates={},
+            generated_sorts={},
+        )
+        fn_roles = {
+            "red": FnRole("red", FnKind.CONSTANT, None),
+            "amber": FnRole("amber", FnKind.CONSTANT, None),
+            "green": FnRole("green", FnKind.CONSTANT, None),
+        }
+        f = Conjunction((
+            Negation(eq(const("red"), const("amber"))),
+            Negation(eq(const("amber"), const("green"))),
+            Negation(eq(const("red"), const("green"))),
+        ))
+        assert _is_distinctness_axiom(f, fn_roles, sig)
+
+    def test_conjunction_of_predapp_distinctness(self):
+        """Conjunction of ¬eq_phase(c₁, c₂) assertions → DISTINCTNESS."""
+        from alspec import Signature, atomic, fn, pred, Negation, Conjunction, PredApp, const
+        from alspec.obligation import FnRole, FnKind, PredRole, PredKind
+        from alspec.axiom_match import _is_distinctness_axiom
+
+        sig = Signature(
+            sorts={"Phase": atomic("Phase")},
+            functions={
+                "red": fn("red", [], "Phase"),
+                "yellow": fn("yellow", [], "Phase"),
+                "green": fn("green", [], "Phase"),
+            },
+            predicates={
+                "eq_phase": pred("eq_phase", [("p1", "Phase"), ("p2", "Phase")]),
+            },
+            generated_sorts={},
+        )
+        fn_roles = {
+            "red": FnRole("red", FnKind.CONSTANT, None),
+            "yellow": FnRole("yellow", FnKind.CONSTANT, None),
+            "green": FnRole("green", FnKind.CONSTANT, None),
+        }
+        pred_roles = {
+            "eq_phase": PredRole("eq_phase", PredKind.EQUALITY, "Phase"),
+        }
+        f = Conjunction((
+            Negation(PredApp("eq_phase", (const("red"), const("yellow")))),
+            Negation(PredApp("eq_phase", (const("yellow"), const("green")))),
+            Negation(PredApp("eq_phase", (const("red"), const("green")))),
+        ))
+        assert _is_distinctness_axiom(f, fn_roles, sig, pred_roles=pred_roles)
+
+    def test_conjunction_with_non_distinctness_conjunct(self):
+        """Conjunction where one conjunct is not distinctness → False."""
+        from alspec import Negation, Conjunction, PredApp, const
+        from alspec.obligation import FnRole, FnKind
+        from alspec.axiom_match import _is_distinctness_axiom
+        from alspec.helpers import eq
+
+        fn_roles = {
+            "red": FnRole("red", FnKind.CONSTANT, None),
+            "green": FnRole("green", FnKind.CONSTANT, None),
+        }
+        f = Conjunction((
+            Negation(eq(const("red"), const("green"))),
+            PredApp("some_pred", (const("red"),)),  # not distinctness
+        ))
+        assert not _is_distinctness_axiom(f, fn_roles, sig=None)
+
+    def test_empty_conjunction_not_distinctness(self):
+        """Empty Conjunction → False (vacuous, not meaningful distinctness)."""
+        from alspec import Conjunction
+        from alspec.axiom_match import _is_distinctness_axiom
+
+        f = Conjunction(())
+        assert not _is_distinctness_axiom(f, {}, sig=None)
+
+    def test_singleton_conjunction_distinctness(self):
+        """Conjunction with one distinctness element → DISTINCTNESS."""
+        from alspec import Signature, atomic, fn, Negation, Conjunction, const
+        from alspec.obligation import FnRole, FnKind
+        from alspec.axiom_match import _is_distinctness_axiom
+        from alspec.helpers import eq
+
+        sig = Signature(
+            sorts={"Bool": atomic("Bool")},
+            functions={
+                "true": fn("true", [], "Bool"),
+                "false": fn("false", [], "Bool"),
+            },
+            predicates={},
+            generated_sorts={},
+        )
+        fn_roles = {
+            "true": FnRole("true", FnKind.CONSTANT, None),
+            "false": FnRole("false", FnKind.CONSTANT, None),
+        }
+        f = Conjunction((
+            Negation(eq(const("true"), const("false"))),
+        ))
+        assert _is_distinctness_axiom(f, fn_roles, sig)
+
+    def test_conjunction_distinctness_full_match(self):
+        """Bundled distinctness through match_spec_sync → non_cell_axioms."""
+        from alspec import Signature, atomic, fn, Axiom, Spec, Negation, Conjunction, const
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync
+        from alspec.helpers import eq
+
+        sig = Signature(
+            sorts={"Phase": atomic("Phase"), "Light": atomic("Light")},
+            functions={
+                "red": fn("red", [], "Phase"),
+                "amber": fn("amber", [], "Phase"),
+                "green": fn("green", [], "Phase"),
+            },
+            predicates={},
+            generated_sorts={},
+        )
+        ax = Axiom("distinct_phases", Conjunction((
+            Negation(eq(const("red"), const("amber"))),
+            Negation(eq(const("amber"), const("green"))),
+            Negation(eq(const("red"), const("green"))),
+        )))
+        spec = Spec(name="Test", signature=sig, axioms=(ax,))
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        assert "distinct_phases" not in report.unmatched_axioms
+        assert "distinct_phases" in report.non_cell_axioms
+
+    def test_multiple_conjunction_distinctness_full_match(self):
+        """Two bundled distinctness axioms for different sorts → both in non_cell_axioms."""
+        from alspec import Signature, atomic, fn, Axiom, Spec, Negation, Conjunction, const
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync
+        from alspec.helpers import eq
+
+        sig = Signature(
+            sorts={"Phase": atomic("Phase"), "Mode": atomic("Mode")},
+            functions={
+                "red": fn("red", [], "Phase"),
+                "green": fn("green", [], "Phase"),
+                "normal": fn("normal", [], "Mode"),
+                "flashing": fn("flashing", [], "Mode"),
+            },
+            predicates={},
+            generated_sorts={},
+        )
+        axioms = (
+            Axiom("distinct_phases", Conjunction((
+                Negation(eq(const("red"), const("green"))),
+            ))),
+            Axiom("distinct_modes", Conjunction((
+                Negation(eq(const("normal"), const("flashing"))),
+            ))),
+        )
+        spec = Spec(name="Test", signature=sig, axioms=axioms)
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        assert "distinct_phases" not in report.unmatched_axioms
+        assert "distinct_modes" not in report.unmatched_axioms
+        assert "distinct_phases" in report.non_cell_axioms
+        assert "distinct_modes" in report.non_cell_axioms
+
 
 class TestFindObsCtor:
     """Tests for _find_obs_ctor."""

@@ -425,6 +425,15 @@ def _is_distinctness_axiom(
         ¬(true = false)
         ¬(admin = regular)
     """
+    if isinstance(f, Conjunction):
+        return (
+            len(f.conjuncts) > 0
+            and all(
+                _is_distinctness_axiom(c, fn_roles, sig, pred_roles)
+                for c in f.conjuncts
+            )
+        )
+
     if not isinstance(f, Negation):
         return False
     inner = f.formula
