@@ -263,6 +263,57 @@ def _emit_langfuse_scores(eval_result: EvalResult) -> None:
         langfuse.score_current_trace(name="well_formed", value=0.0)
 
 
+def _emit_session_scores(
+    session_id: str,
+    results: list[EvalResult],
+) -> None:
+    """Emit aggregate scores at the Langfuse session level.
+
+    These appear in the session list view, enabling at-a-glance
+    monitoring without drilling into individual traces.
+    """
+    from alspec.eval.report import _rep_aggregate
+
+    agg = _rep_aggregate(results)
+
+    langfuse.create_score(
+        name="parse_rate",
+        value=agg["parse_rate"],
+        session_id=session_id,
+        comment=f"{sum(1 for r in results if r.success)}/{len(results)}",
+    )
+    langfuse.create_score(
+        name="wf_rate",
+        value=agg["wf_rate"],
+        session_id=session_id,
+        comment="well-formed / parsed",
+    )
+    langfuse.create_score(
+        name="golden_health",
+        value=agg["mean_golden"],
+        session_id=session_id,
+    )
+    langfuse.create_score(
+        name="intrinsic_health",
+        value=agg["mean_intrinsic"],
+        session_id=session_id,
+    )
+    langfuse.create_score(
+        name="coverage",
+        value=agg["coverage_ratio"],
+        session_id=session_id,
+        comment=f"{sum(r.covered_cell_count for r in results if r.success)}/{sum(r.obligation_cell_count for r in results if r.success)}",
+    )
+
+    # Also useful: error count and cost
+    total_errors = int(agg["total_errors"])
+    langfuse.create_score(
+        name="total_errors",
+        value=float(total_errors),
+        session_id=session_id,
+    )
+
+
 @observe(capture_input=False, capture_output=False)
 async def run_domain_eval(
     client: AsyncLLMClient,

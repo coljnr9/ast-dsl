@@ -323,9 +323,6 @@ async def handle_eval(
             )
         )
 
-        # Flush Langfuse once after all tasks finish.
-        from alspec.eval.harness import langfuse as _langfuse
-        await asyncio.to_thread(_langfuse.flush)
 
         # Separate successes from failures; keep only EvalResult objects.
         import dataclasses
@@ -345,6 +342,14 @@ async def handle_eval(
 
         # Restore canonical (model, domain) order.
         rep_results.sort(key=lambda r: pair_order.get((r.model, r.domain_id), 9999))
+
+        # Emit session-level scores to Langfuse
+        from alspec.eval.harness import _emit_session_scores
+        _emit_session_scores(session_id, rep_results)
+
+        # Flush Langfuse once after all tasks and session scores are emitted.
+        from alspec.eval.harness import langfuse as _langfuse
+        await asyncio.to_thread(_langfuse.flush)
 
         run = EvalRun(
             timestamp=timestamp,
