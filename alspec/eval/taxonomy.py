@@ -26,6 +26,8 @@ class FailureCategory(Enum):
 
     # ── Parse failures (success=False, no spec produced) ──
     PARSE_OBLIGATION_VALIDATION = "parse:obligation_validation"
+    PARSE_OBLIGATION_CRASH = "parse:obligation_crash"
+    PARSE_STAGE4_EXEC = "parse:stage4_exec"
     PARSE_PYTHON_ERROR = "parse:python_error"
     PARSE_OTHER = "parse:other"
 
@@ -83,6 +85,14 @@ def classify_failure(result: EvalResult) -> FailureCategory:
 
         if "Obligation Table Validation" in error_str:
             return FailureCategory.PARSE_OBLIGATION_VALIDATION
+
+        # Obligation table builder crashed (unhandled exception, not clean validation)
+        if "Unexpected obligation table error:" in error_str:
+            return FailureCategory.PARSE_OBLIGATION_CRASH
+
+        # Stage 4 code executed but crashed at runtime (e.g. hallucinated DSL methods)
+        if "Stage 4 (Axioms) code execution failed:" in error_str:
+            return FailureCategory.PARSE_STAGE4_EXEC
 
         if any(kw in error_str for kw in _PYTHON_ERROR_KEYWORDS):
             return FailureCategory.PARSE_PYTHON_ERROR

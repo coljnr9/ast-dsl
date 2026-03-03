@@ -124,6 +124,43 @@ def test_parse_other() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Test D2: PARSE_OBLIGATION_CRASH
+# ---------------------------------------------------------------------------
+
+def test_parse_obligation_crash() -> None:
+    """success=False with unexpected OT error → PARSE_OBLIGATION_CRASH."""
+    result = _make_eval(
+        success=False,
+        parse_error="Unexpected obligation table error: 'get_id'",
+    )
+    assert classify_failure(result) == FailureCategory.PARSE_OBLIGATION_CRASH
+
+
+# ---------------------------------------------------------------------------
+# Test D3: PARSE_STAGE4_EXEC
+# ---------------------------------------------------------------------------
+
+def test_parse_stage4_exec() -> None:
+    """success=False with Stage 4 execution crash → PARSE_STAGE4_EXEC."""
+    result = _make_eval(
+        success=False,
+        parse_error="Stage 4 (Axioms) code execution failed: 'Disjunction' object has no attribute 'match'",
+    )
+    assert classify_failure(result) == FailureCategory.PARSE_STAGE4_EXEC
+
+
+def test_parse_stage4_exec_not_classified_as_python_error() -> None:
+    """Stage 4 exec crash must NOT be classified as PARSE_PYTHON_ERROR even
+    though the message contains 'attribute' (close to 'AttributeError')."""
+    result = _make_eval(
+        success=False,
+        parse_error="Stage 4 (Axioms) code execution failed: 'Conjunction' object has no attribute 'cases'",
+    )
+    # Must be STAGE4_EXEC, not PYTHON_ERROR
+    assert classify_failure(result) == FailureCategory.PARSE_STAGE4_EXEC
+
+
+# ---------------------------------------------------------------------------
 # Test E: WF_UNDECLARED_SYMBOL
 # ---------------------------------------------------------------------------
 
@@ -261,11 +298,13 @@ def test_wf_pred_declared() -> None:
     assert classify_failure(result) == FailureCategory.WF_UNDECLARED_SYMBOL
 
 
-def test_all_eight_enum_members_present() -> None:
-    """Exactly 8 enum members exist with the expected values."""
+def test_all_ten_enum_members_present() -> None:
+    """Exactly 10 enum members exist with the expected values."""
     expected = {
         "pass",
         "parse:obligation_validation",
+        "parse:obligation_crash",
+        "parse:stage4_exec",
         "parse:python_error",
         "parse:other",
         "wf:undeclared_symbol",
