@@ -198,4 +198,34 @@ def _build_coverage_diagnostics(report: MatchReport) -> tuple[Diagnostic, ...]:
             )
         )
 
+    # Count non-cell axioms by category for the summary
+    infra_count = sum(1 for m in report.matches if m.kind == MatchKind.INFRASTRUCTURE)
+    distinct_count = sum(1 for m in report.matches if m.kind == MatchKind.DISTINCTNESS)
+    defn_count = sum(1 for m in report.matches if m.kind == MatchKind.DEFINITION)
+    basis_count = sum(1 for m in report.matches if m.kind == MatchKind.BASIS)
+    ctor_def_count = sum(1 for m in report.matches if m.kind == MatchKind.CONSTRUCTOR_DEF)
+
+    non_cell_parts = []
+    if basis_count:
+        non_cell_parts.append(f"{basis_count} basis")
+    if ctor_def_count:
+        non_cell_parts.append(f"{ctor_def_count} constructor_def")
+    if distinct_count:
+        non_cell_parts.append(f"{distinct_count} distinctness")
+    if infra_count:
+        non_cell_parts.append(f"{infra_count} infrastructure")
+    if defn_count:
+        non_cell_parts.append(f"{defn_count} definition")
+
+    if non_cell_parts:
+        diagnostics.append(
+            Diagnostic(
+                check="coverage",
+                severity=Severity.INFO,
+                axiom=None,
+                message=f"Non-cell axioms: {', '.join(non_cell_parts)}",
+                path=None,
+            )
+        )
+
     return tuple(diagnostics)

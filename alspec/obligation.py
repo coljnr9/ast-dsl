@@ -120,24 +120,23 @@ def classify_predicates(sig: Signature) -> dict[str, PredRole]:
     """Classify every predicate symbol in the signature.
 
     Rules:
-      - p.params[0].sort is a generated sort → observer of that sort
-      - p has exactly 2 params of the same non-generated sort AND name
+      - p has exactly 2 params of the same sort AND name
         starts with 'eq_' → equality predicate
+      - p.params[0].sort is a generated sort → observer of that sort
       - otherwise → other
     """
     gen_sort_names = frozenset(sig.generated_sorts.keys())
     roles: dict[str, PredRole] = {}
 
     for name, p in sig.predicates.items():
-        if p.params and p.params[0].sort in gen_sort_names:
-            roles[name] = PredRole(name, PredKind.OBSERVER, p.params[0].sort)
-        elif (
+        if (
             len(p.params) == 2
             and p.params[0].sort == p.params[1].sort
-            and p.params[0].sort not in gen_sort_names
             and name.startswith("eq_")
         ):
             roles[name] = PredRole(name, PredKind.EQUALITY, p.params[0].sort)
+        elif p.params and p.params[0].sort in gen_sort_names:
+            roles[name] = PredRole(name, PredKind.OBSERVER, p.params[0].sort)
         else:
             roles[name] = PredRole(name, PredKind.OTHER, None)
 

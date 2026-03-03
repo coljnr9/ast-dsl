@@ -982,3 +982,362 @@ class TestEdgeCases:
         report = match_spec_sync(spec, table, spec.signature)
         with pytest.raises((AttributeError, dataclasses.FrozenInstanceError)):
             report.matches = ()  # type: ignore[misc]
+
+
+class TestInfrastructureAxioms:
+    """RC2: Infrastructure axioms on non-generated sorts."""
+
+    def test_geq_zero_base_is_infrastructure(self):
+        from alspec import (
+            Signature, GeneratedSortInfo, Spec, Axiom, atomic, fn, pred, var,
+            const, forall, PredApp,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={"Counter": atomic("Counter"), "Nat": atomic("Nat")},
+            functions={
+                "zero": fn("zero", [], "Nat"),
+                "succ": fn("succ", [("n", "Nat")], "Nat"),
+                "new": fn("new", [], "Counter"),
+                "inc": fn("inc", [("c", "Counter")], "Counter"),
+                "get_cv": fn("get_cv", [("c", "Counter")], "Nat"),
+            },
+            predicates={
+                "geq": pred("geq", [("a", "Nat"), ("b", "Nat")]),
+            },
+            generated_sorts={
+                "Counter": GeneratedSortInfo(constructors=("new", "inc"), selectors={}),
+            },
+        )
+        n = var("n", "Nat")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom("geq_zero_base", forall([n], PredApp("geq", (n, const("zero"))))),
+            ),
+        )
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        m = report.matches[0]
+        assert m.kind == MatchKind.INFRASTRUCTURE
+        assert m.axiom_label == "geq_zero_base"
+
+    def test_infrastructure_with_observer_is_not_infrastructure(self):
+        """A formula that uses an observer fn should NOT be INFRASTRUCTURE."""
+        from alspec import (
+            Signature, GeneratedSortInfo, Spec, Axiom, atomic, fn, pred, var,
+            app, const, forall, PredApp,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "Nat": atomic("Nat")},
+            functions={
+                "new": fn("new", [], "S"),
+                "get": fn("get", [("s", "S")], "Nat"),
+                "zero": fn("zero", [], "Nat"),
+            },
+            predicates={
+                "geq": pred("geq", [("a", "Nat"), ("b", "Nat")]),
+            },
+            generated_sorts={
+                "S": GeneratedSortInfo(constructors=("new",), selectors={}),
+            },
+        )
+        s = var("s", "S")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                # geq(get(s), zero) — uses observer 'get', so NOT infrastructure
+                Axiom("not_infra", forall([s], PredApp("geq", (app("get", s), const("zero"))))),
+            ),
+        )
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        m = report.matches[0]
+        assert m.kind != MatchKind.INFRASTRUCTURE
+
+
+class TestDistinctnessAxioms:
+    """RC3: No-confusion axioms between constructors."""
+
+    def test_negation_of_constructor_equality_is_distinctness(self):
+        from alspec import (
+            Signature, GeneratedSortInfo, Spec, Axiom, Negation, atomic, fn, const, eq,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={"Color": atomic("Color")},
+            functions={
+                "red": fn("red", [], "Color"),
+                "green": fn("green", [], "Color"),
+            },
+            predicates={},
+            generated_sorts={
+                "Color": GeneratedSortInfo(constructors=("red", "green"), selectors={}),
+            },
+        )
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom("red_neq_green", Negation(eq(const("red"), const("green")))),
+            ),
+        )
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        m = report.matches[0]
+        assert m.kind == MatchKind.DISTINCTNESS
+
+    def test_same_constructor_negation_is_not_distinctness(self):
+        """¬(red = red) is not a valid distinctness axiom."""
+        from alspec import (
+            Signature, GeneratedSortInfo, Spec, Axiom, Negation, atomic, fn, const, eq,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={"Color": atomic("Color")},
+            functions={
+                "red": fn("red", [], "Color"),
+                "green": fn("green", [], "Color"),
+            },
+            predicates={},
+            generated_sorts={
+                "Color": GeneratedSortInfo(constructors=("red", "green"), selectors={}),
+            },
+        )
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom("red_neq_red", Negation(eq(const("red"), const("red")))),
+            ),
+        )
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        m = report.matches[0]
+        assert m.kind != MatchKind.DISTINCTNESS
+
+
+class TestBuriedObsCtorPattern:
+    """RC4: obs(ctor(...)) nested one level deep in wrapper functions."""
+
+    def test_succ_wrapping_obs_ctor(self):
+        """succ(get_cv(decrement(c))) = get_cv(c) should match get_cv × decrement."""
+        from alspec import (
+            Signature, GeneratedSortInfo, Spec, Axiom,
+            Implication, Definedness,
+            atomic, fn, var, app, const, eq, forall,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={"Counter": atomic("Counter"), "Nat": atomic("Nat")},
+            functions={
+                "zero": fn("zero", [], "Nat"),
+                "succ": fn("succ", [("n", "Nat")], "Nat"),
+                "new": fn("new", [], "Counter"),
+                "decrement": fn("decrement", [("c", "Counter")], "Counter", total=False),
+                "get_cv": fn("get_cv", [("c", "Counter")], "Nat"),
+            },
+            predicates={},
+            generated_sorts={
+                "Counter": GeneratedSortInfo(
+                    constructors=("new", "decrement"), selectors={}
+                ),
+            },
+        )
+        c = var("c", "Counter")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_cv_decrement",
+                    forall(
+                        [c],
+                        Implication(
+                            Definedness(app("decrement", c)),
+                            eq(
+                                app("succ", app("get_cv", app("decrement", c))),
+                                app("get_cv", c),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        m = report.matches[0]
+        assert m.kind in (MatchKind.DIRECT, MatchKind.PRESERVATION), (
+            f"Expected DIRECT or PRESERVATION, got {m.kind}: {m.reason}"
+        )
+        assert any(c.observer_name == "get_cv" and c.constructor_name == "decrement"
+                    for c in m.cells)
+
+
+class TestDefinitionAxioms:
+    """RC5: Derived observer definitions (biconditionals)."""
+
+    def test_pred_observer_biconditional_is_definition(self):
+        """is_red(l) ↔ eq_color(get_color(l), red) should be DEFINITION."""
+        from alspec import (
+            Signature, GeneratedSortInfo, Spec, Axiom,
+            PredApp, Biconditional,
+            atomic, fn, pred, var, app, const, forall,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={"Light": atomic("Light"), "Color": atomic("Color")},
+            functions={
+                "init": fn("init", [], "Light"),
+                "advance": fn("advance", [("l", "Light")], "Light"),
+                "red": fn("red", [], "Color"),
+                "get_color": fn("get_color", [("l", "Light")], "Color"),
+            },
+            predicates={
+                "is_red": pred("is_red", [("l", "Light")]),
+                "eq_color": pred("eq_color", [("a", "Color"), ("b", "Color")]),
+            },
+            generated_sorts={
+                "Light": GeneratedSortInfo(
+                    constructors=("init", "advance"), selectors={}
+                ),
+            },
+        )
+        l = var("l", "Light")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "is_red_def",
+                    forall(
+                        [l],
+                        Biconditional(
+                            PredApp("is_red", (l,)),
+                            PredApp("eq_color", (app("get_color", l), const("red"))),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        m = report.matches[0]
+        assert m.kind == MatchKind.DEFINITION
+
+    def test_contains_def_lookup_is_definition(self):
+        """contains(b, n) ↔ def(lookup(b, n)) should be DEFINITION."""
+        from alspec import (
+            Signature, GeneratedSortInfo, Spec, Axiom,
+            PredApp, Biconditional, Definedness,
+            atomic, fn, pred, var, app, forall,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={"Book": atomic("Book"), "Name": atomic("Name"), "Number": atomic("Number")},
+            functions={
+                "empty": fn("empty", [], "Book"),
+                "add": fn("add", [("b", "Book"), ("n", "Name"), ("num", "Number")], "Book"),
+                "lookup": fn("lookup", [("b", "Book"), ("n", "Name")], "Number", total=False),
+            },
+            predicates={
+                "contains": pred("contains", [("b", "Book"), ("n", "Name")]),
+                "eq_name": pred("eq_name", [("a", "Name"), ("b", "Name")]),
+            },
+            generated_sorts={
+                "Book": GeneratedSortInfo(constructors=("empty", "add"), selectors={}),
+            },
+        )
+        b = var("b", "Book")
+        n = var("n", "Name")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "contains_def_lookup",
+                    forall(
+                        [b, n],
+                        Biconditional(
+                            PredApp("contains", (b, n)),
+                            Definedness(app("lookup", b, n)),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        m = report.matches[0]
+        assert m.kind == MatchKind.DEFINITION
+
+    def test_obs_ctor_biconditional_is_not_definition(self):
+        """A biconditional with obs(ctor(...)) should match cells, not DEFINITION."""
+        from alspec import (
+            Signature, GeneratedSortInfo, Spec, Axiom,
+            PredApp, Biconditional,
+            atomic, fn, pred, var, app, const, forall,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={"Light": atomic("Light"), "Color": atomic("Color")},
+            functions={
+                "init": fn("init", [], "Light"),
+                "advance": fn("advance", [("l", "Light")], "Light"),
+                "red": fn("red", [], "Color"),
+                "get_color": fn("get_color", [("l", "Light")], "Color"),
+            },
+            predicates={
+                "is_red": pred("is_red", [("l", "Light")]),
+                "eq_color": pred("eq_color", [("a", "Color"), ("b", "Color")]),
+            },
+            generated_sorts={
+                "Light": GeneratedSortInfo(
+                    constructors=("init", "advance"), selectors={}
+                ),
+            },
+        )
+        l = var("l", "Light")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                # is_red(advance(l)) ↔ ... — has obs(ctor(...)) pattern, should be cell match
+                Axiom(
+                    "is_red_advance",
+                    forall(
+                        [l],
+                        Biconditional(
+                            PredApp("is_red", (app("advance", l),)),
+                            PredApp("eq_color", (app("get_color", app("advance", l)), const("red"))),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        m = report.matches[0]
+        # Should match cells, not be classified as DEFINITION
+        assert m.kind != MatchKind.DEFINITION
+        assert m.kind in (MatchKind.DIRECT, MatchKind.PRESERVATION)
+

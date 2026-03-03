@@ -61,6 +61,9 @@ class MatchKind(Enum):
     PRESERVATION = "preservation"   # one axiom → HIT+MISS cells (no dispatch guard)
     CONSTRUCTOR_DEF = "constructor_def"  # iff(Definedness(ctor(...)), guard) — not a cell
     BASIS = "basis"                 # eq_pred reflexivity/symmetry/transitivity — not a cell
+    INFRASTRUCTURE = "infrastructure"  # NEW: axioms on non-generated sorts (e.g., geq over Nat)
+    DISTINCTNESS = "distinctness"      # NEW: no-confusion axioms (e.g., red ≠ yellow)
+    DEFINITION = "definition"          # NEW: derived observer definitions (e.g., is_red ↔ eq_color(get_color(l), red))
     UNMATCHED = "unmatched"         # could not determine cell
 
 
@@ -146,7 +149,13 @@ async def match_spec(
     unmatched = tuple(m.axiom_label for m in matches if m.kind == MatchKind.UNMATCHED)
     non_cell = tuple(
         m.axiom_label for m in matches
-        if m.kind in (MatchKind.CONSTRUCTOR_DEF, MatchKind.BASIS)
+        if m.kind in (
+            MatchKind.CONSTRUCTOR_DEF,
+            MatchKind.BASIS,
+            MatchKind.INFRASTRUCTURE,
+            MatchKind.DISTINCTNESS,
+            MatchKind.DEFINITION,
+        )
     )
 
     if uncovered:
@@ -209,10 +218,25 @@ async def _match_axiom(
         logger.debug("Axiom %r classified as BASIS", axiom.label)
         return AxiomCellMatch(axiom.label, (), MatchKind.BASIS)
 
-    # 3. Peel implications, collecting guards
+    # 3. Special case: infrastructure axiom on non-generated sorts
+    if _is_infrastructure_axiom(body, table.pred_roles, table.fn_roles):
+        logger.debug("Axiom %r classified as INFRASTRUCTURE", axiom.label)
+        return AxiomCellMatch(axiom.label, (), MatchKind.INFRASTRUCTURE)
+
+    # 4. Special case: distinctness axiom (no-confusion)
+    if _is_distinctness_axiom(body, table.fn_roles):
+        logger.debug("Axiom %r classified as DISTINCTNESS", axiom.label)
+        return AxiomCellMatch(axiom.label, (), MatchKind.DISTINCTNESS)
+
+    # 5. Special case: derived observer definition
+    if _is_definition_axiom(body, table.fn_roles, table.pred_roles):
+        logger.debug("Axiom %r classified as DEFINITION", axiom.label)
+        return AxiomCellMatch(axiom.label, (), MatchKind.DEFINITION)
+
+    # 6. Peel implications, collecting guards
     guards, conclusion = _peel_implications(body)
 
-    # 4. Find observer(constructor(...)) in the conclusion
+    # 7. Find observer(constructor(...)) in the conclusion
     obs_ctor = _find_obs_ctor(conclusion, table.fn_roles, table.pred_roles)
     if obs_ctor is None:
         return AxiomCellMatch(
@@ -230,7 +254,7 @@ async def _match_axiom(
         "Axiom %r: extracted (%s, %s, pred=%s)", axiom.label, obs_name, ctor_name, is_pred
     )
 
-    # 5. Look up candidate cells in the table
+    # 8. Look up candidate cells in the table
     candidates = [
         c
         for c in table.cells
@@ -244,7 +268,7 @@ async def _match_axiom(
             reason=f"No obligation cell for ({obs_name}, {ctor_name})",
         )
 
-    # 6. Determine dispatch based on table structure + guards
+    # 9. Determine dispatch based on table structure + guards
     return _resolve_dispatch(axiom.label, candidates, guards)
 
 
@@ -338,6 +362,133 @@ def _is_basis_axiom(
     return True
 
 
+def _is_infrastructure_axiom(
+    f: Formula,
+    pred_roles: dict[str, PredRole],
+    fn_roles: dict[str, FnRole],
+) -> bool:
+    """Detect infrastructure axioms on non-generated sorts.
+
+    Pattern: Formula references only predicates classified as OTHER (not
+    OBSERVER, not EQUALITY), and no observer/constructor/selector function
+    applications appear. These are axioms defining predicates or functions
+    on auxiliary sorts (e.g., geq over Nat, lt, ordering predicates).
+
+    Examples:
+        geq(n, zero)                    — geq is PredKind.OTHER
+        ¬geq(zero, succ(n))            — uses only PredKind.OTHER + constants/uninterpreted
+        geq(succ(n), succ(m)) ↔ geq(n, m)
+    """
+    preds_used = _collect_pred_names(f)
+    if not preds_used:
+        return False
+
+    other_pred_names = frozenset(
+        n for n, r in pred_roles.items() if r.kind == PredKind.OTHER
+    )
+
+    # All predicates used must be OTHER
+    if not preds_used.issubset(other_pred_names):
+        return False
+
+    # No observer/constructor/selector function applications
+    fn_names_used = _collect_fn_names(f)
+    distinguished_kinds = (FnKind.OBSERVER, FnKind.CONSTRUCTOR, FnKind.SELECTOR)
+    for fn_name in fn_names_used:
+        role = fn_roles.get(fn_name)
+        if role is not None and role.kind in distinguished_kinds:
+            return False
+
+    return True
+
+
+def _is_distinctness_axiom(
+    f: Formula,
+    fn_roles: dict[str, FnRole],
+) -> bool:
+    """Detect no-confusion / distinctness axioms between constructors.
+
+    Pattern: Negation(Equation(ctor_a, ctor_b)) where both sides are
+    constructor-rooted terms of the same generated sort, and ctor_a ≠ ctor_b.
+
+    Under loose semantics, these must be stated explicitly (CASL's free type
+    generates them automatically, but generated type does not).
+
+    Examples:
+        ¬(red = yellow)
+        ¬(true = false)
+        ¬(admin = regular)
+    """
+    if not isinstance(f, Negation):
+        return False
+    inner = f.formula
+    if not isinstance(inner, Equation):
+        return False
+
+    lhs_ctor = _ctor_root(inner.lhs, fn_roles)
+    rhs_ctor = _ctor_root(inner.rhs, fn_roles)
+
+    if lhs_ctor is None or rhs_ctor is None:
+        return False
+    if lhs_ctor == rhs_ctor:
+        return False  # ¬(red = red) would be contradictory, not distinctness
+
+    # Verify they're constructors of the same sort
+    lhs_role = fn_roles[lhs_ctor]
+    rhs_role = fn_roles[rhs_ctor]
+    if lhs_role.sort != rhs_role.sort:
+        return False
+
+    return True
+
+
+def _is_definition_axiom(
+    f: Formula,
+    fn_roles: dict[str, FnRole],
+    pred_roles: dict[str, PredRole],
+) -> bool:
+    """Detect derived observer definitions (definitional extensions).
+
+    Pattern: Biconditional where one side is an observer/predicate-observer
+    applied to a universally quantified variable (not a constructor-rooted term),
+    and the other side is a defining formula.
+    
+    If the formula contains an obs(ctor(...)) pattern, it is a cell match
+    (e.g., a biconditional preservation axiom), not a definition.
+    """
+    if not isinstance(f, Biconditional):
+        return False
+        
+    if _find_obs_ctor(f, fn_roles, pred_roles) is not None:
+        return False
+
+    for side in (f.lhs, f.rhs):
+        # Check: pred observer applied to a variable first arg
+        if isinstance(side, PredApp) and side.args:
+            role = pred_roles.get(side.pred_name)
+            if role is not None and role.kind == PredKind.OBSERVER:
+                first_arg = side.args[0]
+                if isinstance(first_arg, Var):
+                    return True
+
+        # Check: function observer applied to a variable first arg
+        if isinstance(side, FnApp) and side.args:
+            role = fn_roles.get(side.fn_name)
+            if role is not None and role.kind in (FnKind.OBSERVER, FnKind.SELECTOR):
+                first_arg = side.args[0]
+                if isinstance(first_arg, Var):
+                    return True
+
+        # Check: Definedness of function observer applied to variable
+        if isinstance(side, Definedness) and isinstance(side.term, FnApp):
+            role = fn_roles.get(side.term.fn_name)
+            if role is not None and role.kind in (FnKind.OBSERVER, FnKind.SELECTOR):
+                if side.term.args and isinstance(side.term.args[0], Var):
+                    return True
+
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Core pattern extraction
 # ---------------------------------------------------------------------------
@@ -424,10 +575,15 @@ def _extract_from_term(
     term: Term,
     fn_roles: dict[str, FnRole],
 ) -> tuple[str, bool, str] | None:
-    """Check if term is observer(constructor(...), ...).
+    """Check if term contains observer(constructor(...), ...).
 
     The observer must be classified as OBSERVER or SELECTOR.
     The first argument must be a constructor-rooted term.
+
+    Primary check: outermost function is observer with ctor-rooted first arg.
+    Fallback: if outermost is NOT observer/selector, check each argument
+    (one level deep) for the pattern. This handles cases like
+    succ(get_cv(decrement(c))) where the obs(ctor) is wrapped.
     """
     match term:
         case FnApp(fn_name, args) if args:
@@ -436,6 +592,26 @@ def _extract_from_term(
                 ctor = _ctor_root(args[0], fn_roles)
                 if ctor is not None:
                     return (fn_name, False, ctor)
+            else:
+                # Outermost is not observer — check args one level deep
+                for arg in args:
+                    match arg:
+                        case FnApp(inner_name, inner_args) if inner_args:
+                            inner_role = fn_roles.get(inner_name)
+                            if inner_role is not None and inner_role.kind in (
+                                FnKind.OBSERVER,
+                                FnKind.SELECTOR,
+                            ):
+                                ctor = _ctor_root(inner_args[0], fn_roles)
+                                if ctor is not None:
+                                    logger.debug(
+                                        "Found obs(ctor(...)) one level deep: %s(%s(...))",
+                                        inner_name,
+                                        ctor,
+                                    )
+                                    return (inner_name, False, ctor)
+                        case _:
+                            pass
         case _:
             pass
     return None
