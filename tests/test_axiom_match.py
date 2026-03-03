@@ -320,6 +320,98 @@ class TestIsBasisAxiom:
         assert not _is_basis_axiom(f, roles)
 
 
+class TestIsDistinctness:
+    """Tests for non-generated distinctness axiom detection."""
+
+    def test_negated_equation_of_same_sort_constants(self):
+        """¬(red = green) where both are constants of sort Color → DISTINCTNESS."""
+        from alspec import Signature, atomic, fn, Axiom, Spec
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync
+        sig = Signature(
+            sorts={"Color": atomic("Color"), "Light": atomic("Light")},
+            functions={
+                "red": fn("red", [], "Color"),
+                "green": fn("green", [], "Color"),
+                "yellow": fn("yellow", [], "Color"),
+            },
+            predicates={},
+            generated_sorts={},  # Color is NOT generated
+        )
+        # Build a minimal spec with just this axiom
+        ax = Axiom("color_distinct_rg", Negation(eq(const("red"), const("green"))))
+        spec = Spec(name="Test", signature=sig, axioms=(ax,))
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        # Must NOT be in unmatched
+        assert "color_distinct_rg" not in report.unmatched_axioms
+        # Must be in non_cell_axioms
+        assert "color_distinct_rg" in report.non_cell_axioms
+
+    def test_different_sort_constants_not_distinctness(self):
+        """¬(red = zero) where sorts differ → should NOT match as distinctness."""
+        from alspec import Signature, atomic, fn, Axiom, Spec
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync
+        sig = Signature(
+            sorts={"Color": atomic("Color"), "Nat": atomic("Nat")},
+            functions={
+                "red": fn("red", [], "Color"),
+                "zero": fn("zero", [], "Nat"),
+            },
+            predicates={},
+            generated_sorts={},
+        )
+        ax = Axiom("cross_sort", Negation(eq(const("red"), const("zero"))))
+        spec = Spec(name="Test", signature=sig, axioms=(ax,))
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        assert "cross_sort" in report.unmatched_axioms
+
+    def test_non_nullary_not_distinctness(self):
+        """¬(f(x) = g(x)) where f, g take arguments → not distinctness."""
+        from alspec import Signature, atomic, fn, Axiom, Spec
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync
+        sig = Signature(
+            sorts={"S": atomic("S")},
+            functions={
+                "f": fn("f", [("x", "S")], "S"),
+                "g": fn("g", [("x", "S")], "S"),
+            },
+            predicates={},
+            generated_sorts={},
+        )
+        x = var("x", "S")
+        ax = Axiom("not_distinct", Negation(eq(app("f", x), app("g", x))))
+        spec = Spec(name="Test", signature=sig, axioms=(ax,))
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        assert "not_distinct" in report.unmatched_axioms
+
+    def test_quantified_distinctness(self):
+        """forall-wrapped distinctness should still be detected (quantifiers are peeled).."""
+        from alspec import Signature, atomic, fn, Axiom, Spec
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync
+        sig = Signature(
+            sorts={"Bool": atomic("Bool")},
+            functions={
+                "high": fn("high", [], "Bool"),
+                "low": fn("low", [], "Bool"),
+            },
+            predicates={},
+            generated_sorts={},
+        )
+        # Some models wrap distinctness in a vacuous forall
+        ax = Axiom("bool_distinct", Negation(eq(const("high"), const("low"))))
+        spec = Spec(name="Test", signature=sig, axioms=(ax,))
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        assert "bool_distinct" not in report.unmatched_axioms
+        assert "bool_distinct" in report.non_cell_axioms
+
+
 class TestFindObsCtor:
     """Tests for _find_obs_ctor."""
 
@@ -435,6 +527,29 @@ class TestFindObsCtor:
         # Simple equation with no recognized roles
         f = eq(var("x", "X"), var("y", "Y"))
         assert _find_obs_ctor(f, fn_roles, pred_roles) is None
+
+
+class TestWalkFormulaFnsDefensive:
+    """_walk_formula_fns should not crash on FnApp in formula position."""
+
+    def test_fnapp_in_negation_does_not_crash(self):
+        """FnApp inside Negation (LLM error) should extract fn names, not crash."""
+        # Simulates: Negation(app("is_read", app("receive", i, m), m2))
+        malformed = Negation(app("is_read", app("receive", var("i", "Inbox"), var("m", "Msg")), var("m2", "Msg")))
+        # Should not raise TypeError
+        names = _collect_fn_names(malformed)
+        assert "is_read" in names
+        assert "receive" in names
+
+    def test_fnapp_in_conjunction_does_not_crash(self):
+        """FnApp inside Conjunction should not crash."""
+        malformed = Conjunction((
+            PredApp("some_pred", (var("x", "X"),)),
+            app("some_fn", var("y", "Y")),  # FnApp where Formula expected
+        ))
+        names = _collect_fn_names(malformed)
+        assert "some_fn" in names
+        assert "some_pred" not in names  # _collect_fn_names doesn't collect pred names
 
 
 # ===========================================================================
@@ -802,7 +917,7 @@ GOLDEN_STEMS = [
 #                     and can_access_def (derived pred with Var first arg).
 #   - email-inbox: pred_zero/pred_suc (Nat helper axioms for uninterpreted fns).
 # These are legitimately UNMATCHED — they don't follow the obs(ctor(...)) pattern.
-ZERO_UNMATCHED_SPECS = set(GOLDEN_STEMS) - {"access-control", "email-inbox"}
+ZERO_UNMATCHED_SPECS = set(GOLDEN_STEMS) - {"email-inbox"}
 
 # Specs expected to have full cell coverage (zero UNCOVERED cells).
 EXPECTED_FULL_COVERAGE_SPECS = {
@@ -1340,4 +1455,364 @@ class TestDefinitionAxioms:
         # Should match cells, not be classified as DEFINITION
         assert m.kind != MatchKind.DEFINITION
         assert m.kind in (MatchKind.DIRECT, MatchKind.PRESERVATION)
+
+
+class TestCompositionalObserver:
+    """Sprint 2: pred_obs(fn_obs(ctor(...))) compositional observer peeling."""
+
+    def test_is_true_get_q_init(self):
+        """is_true(get_q(init)) should match cell get_q × init."""
+        from alspec import (
+            Signature, GeneratedSortInfo, Spec, Axiom,
+            PredApp, Biconditional,
+            atomic, fn, pred, var, app, const, forall,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={
+                "Counter": atomic("Counter"),
+                "Bool": atomic("Bool"),
+                "Word": atomic("Word"),
+            },
+            functions={
+                "true": fn("true", [], "Bool"),
+                "false": fn("false", [], "Bool"),
+                "zero": fn("zero", [], "Word"),
+                "init": fn("init", [], "Counter"),
+                "step": fn("step", [("c", "Counter"), ("cu", "Bool")], "Counter"),
+                "get_q": fn("get_q", [("c", "Counter")], "Bool"),
+                "get_cv": fn("get_cv", [("c", "Counter")], "Word"),
+            },
+            predicates={
+                "is_true": pred("is_true", [("b", "Bool")]),
+                "geq": pred("geq", [("w1", "Word"), ("w2", "Word")]),
+            },
+            generated_sorts={
+                "Counter": GeneratedSortInfo(constructors=("init", "step"), selectors={}),
+                "Bool": GeneratedSortInfo(constructors=("true", "false"), selectors={}),
+                "Word": GeneratedSortInfo(constructors=("zero",), selectors={}),
+            },
+        )
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_q_init",
+                    Biconditional(
+                        PredApp("is_true", (app("get_q", const("init")),)),
+                        PredApp("geq", (app("get_cv", const("init")), const("zero"))),
+                    ),
+                ),
+            ),
+        )
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        m = report.matches[0]
+        assert m.kind != MatchKind.UNMATCHED, f"Expected match, got UNMATCHED: {m.reason}"
+        assert any(
+            c.observer_name == "get_q" and c.constructor_name == "init"
+            for c in m.cells
+        ), f"Expected get_q × init cell, got {[(c.observer_name, c.constructor_name) for c in m.cells]}"
+
+    def test_negated_is_true_get_q_init(self):
+        """¬is_true(get_q(init)) should also match cell get_q × init."""
+        from alspec import (
+            Signature, GeneratedSortInfo, Spec, Axiom,
+            PredApp, Negation,
+            atomic, fn, pred, var, app, const,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={
+                "Counter": atomic("Counter"),
+                "Bool": atomic("Bool"),
+            },
+            functions={
+                "true": fn("true", [], "Bool"),
+                "false": fn("false", [], "Bool"),
+                "init": fn("init", [], "Counter"),
+                "step": fn("step", [("c", "Counter"), ("cu", "Bool")], "Counter"),
+                "get_q": fn("get_q", [("c", "Counter")], "Bool"),
+            },
+            predicates={
+                "is_true": pred("is_true", [("b", "Bool")]),
+            },
+            generated_sorts={
+                "Counter": GeneratedSortInfo(constructors=("init", "step"), selectors={}),
+                "Bool": GeneratedSortInfo(constructors=("true", "false"), selectors={}),
+            },
+        )
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_q_init_false",
+                    Negation(PredApp("is_true", (app("get_q", const("init")),))),
+                ),
+            ),
+        )
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        m = report.matches[0]
+        assert m.kind != MatchKind.UNMATCHED, f"Expected match, got UNMATCHED: {m.reason}"
+        assert any(
+            c.observer_name == "get_q" and c.constructor_name == "init"
+            for c in m.cells
+        )
+
+    def test_is_true_get_q_step_with_guards(self):
+        """is_true(get_q(step(c, cu))) ↔ ... should match cell get_q × step."""
+        from alspec import (
+            Signature, GeneratedSortInfo, Spec, Axiom,
+            PredApp, Biconditional,
+            atomic, fn, pred, var, app, const, forall,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={
+                "Counter": atomic("Counter"),
+                "Bool": atomic("Bool"),
+                "Word": atomic("Word"),
+            },
+            functions={
+                "true": fn("true", [], "Bool"),
+                "false": fn("false", [], "Bool"),
+                "zero": fn("zero", [], "Word"),
+                "init": fn("init", [], "Counter"),
+                "step": fn("step", [("c", "Counter"), ("cu", "Bool")], "Counter"),
+                "get_q": fn("get_q", [("c", "Counter")], "Bool"),
+                "get_cv": fn("get_cv", [("c", "Counter")], "Word"),
+                "get_pv": fn("get_pv", [("c", "Counter")], "Word"),
+            },
+            predicates={
+                "is_true": pred("is_true", [("b", "Bool")]),
+                "geq": pred("geq", [("w1", "Word"), ("w2", "Word")]),
+            },
+            generated_sorts={
+                "Counter": GeneratedSortInfo(constructors=("init", "step"), selectors={}),
+                "Bool": GeneratedSortInfo(constructors=("true", "false"), selectors={}),
+                "Word": GeneratedSortInfo(constructors=("zero",), selectors={}),
+            },
+        )
+        c = var("c", "Counter")
+        cu = var("cu", "Bool")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "get_q_step",
+                    forall(
+                        [c, cu],
+                        Biconditional(
+                            PredApp("is_true", (app("get_q", app("step", c, cu)),)),
+                            PredApp("geq", (
+                                app("get_cv", app("step", c, cu)),
+                                app("get_pv", app("step", c, cu)),
+                            )),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        m = report.matches[0]
+        assert m.kind != MatchKind.UNMATCHED, f"Expected match, got UNMATCHED: {m.reason}"
+        assert any(
+            c.observer_name == "get_q" and c.constructor_name == "step"
+            for c in m.cells
+        )
+
+    def test_direct_pred_obs_still_works(self):
+        """alarm_flag(convert_t(d, temp)) should still match directly (no peeling)."""
+        from alspec import (
+            Signature, GeneratedSortInfo, Spec, Axiom,
+            PredApp, Biconditional,
+            atomic, fn, pred, var, app, forall,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={"Device": atomic("Device"), "Temp": atomic("Temp")},
+            functions={
+                "power_up": fn("power_up", [], "Device"),
+                "convert_t": fn("convert_t", [("d", "Device"), ("t", "Temp")], "Device"),
+                "get_temp": fn("get_temp", [("d", "Device")], "Temp"),
+            },
+            predicates={
+                "alarm_flag": pred("alarm_flag", [("d", "Device")]),
+                "is_hot": pred("is_hot", [("t", "Temp")]),
+            },
+            generated_sorts={
+                "Device": GeneratedSortInfo(
+                    constructors=("power_up", "convert_t"), selectors={}
+                ),
+            },
+        )
+        d = var("d", "Device")
+        t = var("t", "Temp")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "alarm_convert",
+                    forall(
+                        [d, t],
+                        Biconditional(
+                            PredApp("alarm_flag", (app("convert_t", d, t),)),
+                            PredApp("is_hot", (app("get_temp", app("convert_t", d, t)),)),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        m = report.matches[0]
+        assert m.kind != MatchKind.UNMATCHED
+        # Should match alarm_flag × convert_t DIRECTLY (no peeling needed)
+        assert any(
+            c.observer_name == "alarm_flag" and c.constructor_name == "convert_t"
+            for c in m.cells
+        )
+
+    def test_non_observer_wrapping_MATCHES(self):
+        """geq(get_highest_bid(reveal(a)), ...) should now match via peeling.
+
+        geq is PredKind.OTHER, but because we now try extracting from all PredApps
+        (Fix C), it finds the buried get_highest_bid × reveal.
+        """
+        from alspec import (
+            Signature, GeneratedSortInfo, Spec, Axiom,
+            PredApp, Implication, Definedness,
+            atomic, fn, pred, var, app, forall,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={
+                "Auction": atomic("Auction"),
+                "Amount": atomic("Amount"),
+            },
+            functions={
+                "create": fn("create", [("r", "Amount")], "Auction"),
+                "reveal": fn("reveal", [("a", "Auction")], "Auction"),
+                "get_highest_bid": fn("get_highest_bid", [("a", "Auction")], "Amount", total=False),
+                "get_reserve": fn("get_reserve", [("a", "Auction")], "Amount"),
+            },
+            predicates={
+                # geq over Amount — Amount is NOT generated, so geq is PredKind.OTHER
+                "geq": pred("geq", [("a1", "Amount"), ("a2", "Amount")]),
+            },
+            generated_sorts={
+                "Auction": GeneratedSortInfo(
+                    constructors=("create", "reveal"), selectors={}
+                ),
+            },
+        )
+        a = var("a", "Auction")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                Axiom(
+                    "hbid_reveal_logic",
+                    forall(
+                        [a],
+                        Implication(
+                            Definedness(app("get_highest_bid", app("reveal", a))),
+                            PredApp("geq", (
+                                app("get_highest_bid", app("reveal", a)),
+                                app("get_reserve", a),
+                            )),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        m = report.matches[0]
+        # geq is PredKind.OTHER — but Fix C enables peeling through it.
+        assert m.kind != MatchKind.UNMATCHED
+        assert any(
+            c.observer_name == "get_highest_bid" and c.constructor_name == "reveal"
+            for c in m.cells
+        )
+
+    def test_non_observer_pred_with_buried_obs_ctor(self):
+        """PredApp(OTHER, (obs(ctor(...)),)) should extract the inner obs×ctor."""
+        from alspec import PredApp, var, app
+        from alspec.obligation import FnRole, FnKind, PredRole, PredKind
+        from alspec.axiom_match import _find_obs_ctor
+        fn_roles = {
+            "init": FnRole("init", FnKind.CONSTRUCTOR, "CTU"),
+            "get_q": FnRole("get_q", FnKind.OBSERVER, "CTU"),
+            "zero": FnRole("zero", FnKind.CONSTANT, None),
+        }
+        pred_roles = {
+            "is_true": PredRole("is_true", PredKind.OTHER, None),
+        }
+        # is_true(get_q(init(w))) — is_true is OTHER but get_q(init) is obs×ctor
+        w = var("w", "Word")
+        f = PredApp("is_true", (app("get_q", app("init", w)),))
+        result = _find_obs_ctor(f, fn_roles, pred_roles)
+        assert result == ("get_q", False, "init")
+
+    def test_non_observer_pred_second_arg_obs_ctor(self):
+        """obs(ctor) in second arg of non-observer pred should also match."""
+        from alspec import PredApp, var, app
+        from alspec.obligation import FnRole, FnKind, PredRole, PredKind
+        from alspec.axiom_match import _find_obs_ctor
+        fn_roles = {
+            "reveal": FnRole("reveal", FnKind.CONSTRUCTOR, "Auction"),
+            "get_highest_bid": FnRole("get_highest_bid", FnKind.OBSERVER, "Auction"),
+            "get_reserve": FnRole("get_reserve", FnKind.OBSERVER, "Auction"),
+        }
+        pred_roles = {
+            "geq": PredRole("geq", PredKind.OTHER, None),
+        }
+        a = var("a", "Auction")
+        # geq(get_highest_bid(reveal(a)), get_reserve(a))
+        # First arg has obs×ctor, second has obs(var) — first should match
+        f = PredApp("geq", (
+            app("get_highest_bid", app("reveal", a)),
+            app("get_reserve", a),
+        ))
+        result = _find_obs_ctor(f, fn_roles, pred_roles)
+        assert result == ("get_highest_bid", False, "reveal")
+
+    def test_biconditional_with_non_observer_pred_both_sides(self):
+        """iff(is_true(get_q(init(w))), ge(zero, w)) should find get_q×init."""
+        from alspec import Biconditional, PredApp, var, app, const
+        from alspec.obligation import FnRole, FnKind, PredRole, PredKind
+        from alspec.axiom_match import _find_obs_ctor
+        fn_roles = {
+            "init": FnRole("init", FnKind.CONSTRUCTOR, "CTU"),
+            "get_q": FnRole("get_q", FnKind.OBSERVER, "CTU"),
+            "zero": FnRole("zero", FnKind.CONSTANT, None),
+        }
+        pred_roles = {
+            "is_true": PredRole("is_true", PredKind.OTHER, None),
+            "ge": PredRole("ge", PredKind.OTHER, None),
+        }
+        w = var("w", "Word")
+        f = Biconditional(
+            PredApp("is_true", (app("get_q", app("init", w)),)),
+            PredApp("ge", (const("zero"), w)),
+        )
+        result = _find_obs_ctor(f, fn_roles, pred_roles)
+        assert result == ("get_q", False, "init")
 

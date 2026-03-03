@@ -224,7 +224,7 @@ async def _match_axiom(
         return AxiomCellMatch(axiom.label, (), MatchKind.INFRASTRUCTURE)
 
     # 4. Special case: distinctness axiom (no-confusion)
-    if _is_distinctness_axiom(body, table.fn_roles):
+    if _is_distinctness_axiom(body, table.fn_roles, sig):
         logger.debug("Axiom %r classified as DISTINCTNESS", axiom.label)
         return AxiomCellMatch(axiom.label, (), MatchKind.DISTINCTNESS)
 
@@ -405,6 +405,7 @@ def _is_infrastructure_axiom(
 def _is_distinctness_axiom(
     f: Formula,
     fn_roles: dict[str, FnRole],
+    sig: Signature | None = None,
 ) -> bool:
     """Detect no-confusion / distinctness axioms between constructors.
 
@@ -413,6 +414,9 @@ def _is_distinctness_axiom(
 
     Under loose semantics, these must be stated explicitly (CASL's free type
     generates them automatically, but generated type does not).
+
+    Also detects distinctness for non-generated sorts where functions are
+    classified as CONSTANT instead of CONSTRUCTOR.
 
     Examples:
         ¬(red = yellow)
@@ -425,21 +429,30 @@ def _is_distinctness_axiom(
     if not isinstance(inner, Equation):
         return False
 
+    # 1. Check generated sorts (original logic using _ctor_root)
     lhs_ctor = _ctor_root(inner.lhs, fn_roles)
     rhs_ctor = _ctor_root(inner.rhs, fn_roles)
 
-    if lhs_ctor is None or rhs_ctor is None:
-        return False
-    if lhs_ctor == rhs_ctor:
-        return False  # ¬(red = red) would be contradictory, not distinctness
+    if lhs_ctor is not None and rhs_ctor is not None:
+        if lhs_ctor == rhs_ctor:
+            return False  # ¬(red = red) would be contradictory, not distinctness
+        # Verify they're constructors of the same sort
+        lhs_role = fn_roles[lhs_ctor]
+        rhs_role = fn_roles[rhs_ctor]
+        if lhs_role.sort == rhs_role.sort:
+            return True
 
-    # Verify they're constructors of the same sort
-    lhs_role = fn_roles[lhs_ctor]
-    rhs_role = fn_roles[rhs_ctor]
-    if lhs_role.sort != rhs_role.sort:
-        return False
+    # 2. Check non-generated sorts (Fix A)
+    if sig is not None and isinstance(inner.lhs, FnApp) and isinstance(inner.rhs, FnApp):
+        if not inner.lhs.args and not inner.rhs.args:
+            if inner.lhs.fn_name != inner.rhs.fn_name:
+                l_fn = sig.get_fn(inner.lhs.fn_name)
+                r_fn = sig.get_fn(inner.rhs.fn_name)
+                if l_fn is not None and r_fn is not None:
+                    if l_fn.result == r_fn.result:
+                        return True
 
-    return True
+    return False
 
 
 def _is_definition_axiom(
@@ -517,10 +530,18 @@ def _find_obs_ctor(
 
         case PredApp(pred_name, args) if args:
             role = pred_roles.get(pred_name)
+            # Case 1: pred IS an observer of a generated sort — direct match
             if role is not None and role.kind == PredKind.OBSERVER:
                 ctor = _ctor_root(args[0], fn_roles)
                 if ctor is not None:
                     return (pred_name, True, ctor)
+
+            # Case 2: try extracting obs(ctor) from arguments
+            # (compositional peeling through any predicate)
+            for arg in args:
+                result = _extract_from_term(arg, fn_roles)
+                if result is not None:
+                    return result
             return None
 
         case Negation(inner):
@@ -913,9 +934,14 @@ def _walk_formula_fns(f: Formula, acc: set[str]) -> None:
         case Definedness(term):
             _walk_term_fns(term, acc)
         case _:
-            raise TypeError(
-                f"_walk_formula_fns: unexpected node type {type(f).__name__}"
-            )
+            # Unknown formula node — extract fn names if it's a term node
+            # that the LLM placed in formula position (e.g., FnApp inside Negation).
+            if isinstance(f, FnApp):
+                _walk_term_fns(f, acc)
+            elif isinstance(f, (Var, FieldAccess, Literal)):
+                _walk_term_fns(f, acc)
+            # else: truly unknown node, skip gracefully
+            return
 
 
 def _walk_term_fns(t: Term, acc: set[str]) -> None:
@@ -931,6 +957,6 @@ def _walk_term_fns(t: Term, acc: set[str]) -> None:
         case Literal(_, _):
             pass
         case _:
-            raise TypeError(
-                f"_walk_term_fns: unexpected node type {type(t).__name__}"
-            )
+            # Unknown term node — skip rather than crash the matcher.
+            # This can happen when the LLM puts a Formula in term position.
+            return
