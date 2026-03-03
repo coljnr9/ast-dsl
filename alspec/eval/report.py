@@ -267,6 +267,7 @@ def export_csv(run: EvalRun, path: str) -> None:
                 "function_count",
                 "predicate_count",
                 "latency_ms",
+                "failure_category",
             ]
         )
 
@@ -298,6 +299,7 @@ def export_csv(run: EvalRun, path: str) -> None:
                         0,
                         0,
                         result.latency_ms,
+                        result.failure_category,
                     ]
                 )
             else:
@@ -320,6 +322,7 @@ def export_csv(run: EvalRun, path: str) -> None:
                         score.function_count,
                         score.predicate_count,
                         result.latency_ms,
+                        result.failure_category,
                     ]
                 )
 
@@ -433,6 +436,19 @@ def print_replicate_summary(
         out.write("  All domains parsed consistently across all replicates.\n")
     out.write("\n")
 
+    # Failure category breakdown across all replicates.
+    from collections import Counter
+    category_counts = Counter(r.failure_category for r in all_results)
+    total_runs = len(all_results)
+
+    out.write("  Failure taxonomy:\n")
+    # Sort: 'pass' first, then alphabetical
+    for cat in sorted(category_counts.keys(), key=lambda c: ("" if c == "pass" else c)):
+        count = category_counts[cat]
+        pct = count / total_runs * 100 if total_runs > 0 else 0.0
+        out.write(f"    {cat:<35} {count:>3} ({pct:5.1f}%)\n")
+    out.write("\n")
+
 
 def export_combined_csv(
     all_results: list[EvalResult],
@@ -462,6 +478,7 @@ def export_combined_csv(
                 "function_count",
                 "predicate_count",
                 "latency_ms",
+                "failure_category",
             ]
         )
 
@@ -494,6 +511,7 @@ def export_combined_csv(
                         0,
                         0,
                         result.latency_ms,
+                        result.failure_category,
                     ]
                 )
             else:
@@ -517,5 +535,6 @@ def export_combined_csv(
                         score.function_count,
                         score.predicate_count,
                         result.latency_ms,
+                        result.failure_category,
                     ]
                 )

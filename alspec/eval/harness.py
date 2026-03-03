@@ -46,6 +46,8 @@ class EvalResult:
     stage2_skip_reason: str | None = None
     # Replicate index (1-based); 1 means no replication
     replicate: int = 1
+    # Failure taxonomy classification
+    failure_category: str = "pass"  # FailureCategory.value — stored as string for serialization
 
 
 @dataclass(frozen=True)
@@ -118,7 +120,7 @@ def _pipeline_to_eval(domain_id: str, model: str, pr: PipelineResult) -> EvalRes
         # Minimal credit for trying even if parse fails
         intrinsic["intrinsic_health"] = 0.05 if pr.error_stage == "signature" else 0.0
 
-    return EvalResult(
+    eval_result = EvalResult(
         domain_id=domain_id,
         model=model,
         success=pr.success,
@@ -138,6 +140,14 @@ def _pipeline_to_eval(domain_id: str, model: str, pr: PipelineResult) -> EvalRes
         stage2_skip_reason=pr.axioms_skip_reason,
         **intrinsic
     )
+
+    # Classify after construction since classifier reads EvalResult fields.
+    import dataclasses
+    from alspec.eval.taxonomy import classify_failure
+    category = classify_failure(eval_result)
+    eval_result = dataclasses.replace(eval_result, failure_category=category.value)
+
+    return eval_result
 
 
 def _emit_langfuse_scores(eval_result: EvalResult) -> None:
@@ -213,12 +223,6 @@ def _emit_langfuse_scores(eval_result: EvalResult) -> None:
             name="well_formed",
             value=1.0 if score.well_formed else 0.0,
         )
-        langfuse.score_current_trace(
-            name="unconstrained_symbols",
-            value=unconstrained_count,
-            comment="dead symbols detected by audit_spec",
-        )
-
         if score.obligation_cell_count > 0 and score.coverage_ratio is not None:
             langfuse.score_current_trace(
                 name="cell_coverage",
@@ -226,13 +230,12 @@ def _emit_langfuse_scores(eval_result: EvalResult) -> None:
                 comment=f"{score.covered_cell_count}/{score.obligation_cell_count}",
             )
 
-        if eval_result.prompt_tokens and eval_result.prompt_tokens > 0:
-            cached = eval_result.cached_tokens or 0
-            langfuse.score_current_trace(
-                name="cache_hit_rate",
-                value=cached / eval_result.prompt_tokens,
-                comment=f"cached={cached}/{eval_result.prompt_tokens}",
-            )
+        langfuse.score_current_trace(
+            name="failure_category",
+            value=eval_result.failure_category,
+            comment=None,
+            data_type="CATEGORICAL",
+        )
     else:
         error_msg = eval_result.parse_error or eval_result.checker_error or "unknown failure"
 
@@ -261,6 +264,12 @@ def _emit_langfuse_scores(eval_result: EvalResult) -> None:
             name="spec_health", value=0.0, comment=error_msg
         )
         langfuse.score_current_trace(name="well_formed", value=0.0)
+        langfuse.score_current_trace(
+            name="failure_category",
+            value=eval_result.failure_category,
+            comment=error_msg,
+            data_type="CATEGORICAL",
+        )
 
 
 def _emit_session_scores(
