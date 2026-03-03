@@ -304,6 +304,8 @@ _DEFAULT_CONFIGS: dict[Stage, list[ChunkId]] = {
         ChunkId.EXAMPLE_RATE_LIMITER,
         ChunkId.EXAMPLE_DNS_ZONE,
         ChunkId.OBLIGATION_PATTERN,
+        ChunkId.GENERATED_SORTS_ROLES,
+        ChunkId.DISPATCH_RULES,
     ],
     Stage.AXIOMS: [
         ChunkId.ROLE_PREAMBLE,
