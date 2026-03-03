@@ -224,7 +224,7 @@ async def _match_axiom(
         return AxiomCellMatch(axiom.label, (), MatchKind.INFRASTRUCTURE)
 
     # 4. Special case: distinctness axiom (no-confusion)
-    if _is_distinctness_axiom(body, table.fn_roles, sig):
+    if _is_distinctness_axiom(body, table.fn_roles, sig, pred_roles=table.pred_roles):
         logger.debug("Axiom %r classified as DISTINCTNESS", axiom.label)
         return AxiomCellMatch(axiom.label, (), MatchKind.DISTINCTNESS)
 
@@ -406,11 +406,12 @@ def _is_distinctness_axiom(
     f: Formula,
     fn_roles: dict[str, FnRole],
     sig: Signature | None = None,
+    pred_roles: dict[str, PredRole] | None = None,
 ) -> bool:
     """Detect no-confusion / distinctness axioms between constructors.
 
-    Pattern: Negation(Equation(ctor_a, ctor_b)) where both sides are
-    constructor-rooted terms of the same generated sort, and ctor_a ≠ ctor_b.
+    Pattern: Negation(Equation(ctor_a, ctor_b)) OR Negation(PredApp(eq_pred, (ctor_a, ctor_b)))
+    where both sides are constructor-rooted terms or same-sort constants, and ctor_a ≠ ctor_b.
 
     Under loose semantics, these must be stated explicitly (CASL's free type
     generates them automatically, but generated type does not).
@@ -420,18 +421,42 @@ def _is_distinctness_axiom(
 
     Examples:
         ¬(red = yellow)
+        ¬eq_color(red, yellow)
         ¬(true = false)
         ¬(admin = regular)
     """
     if not isinstance(f, Negation):
         return False
     inner = f.formula
-    if not isinstance(inner, Equation):
+
+    # Extract the two sides being compared.
+    lhs: Term | None = None
+    rhs: Term | None = None
+
+    if isinstance(inner, Equation):
+        lhs, rhs = inner.lhs, inner.rhs
+    elif isinstance(inner, PredApp) and pred_roles is not None:
+        # Recognize PredApp equality form: ¬eq_s(c₁, c₂) ≡ ¬(c₁ = c₂)
+        # when eq_s is axiomatized as identity (reflexive, symmetric, transitive).
+        # This equivalence follows from the normal model theorem for FOL with
+        # equality — any model satisfying the equality axioms can be quotiented
+        # to a normal model where eq_s IS identity. Same normalization CASL's
+        # Hets toolchain applies via institution comorphisms (Lüttich &
+        # Mossakowski, 2007).
+        role = pred_roles.get(inner.pred_name)
+        if (
+            role is not None
+            and role.kind == PredKind.EQUALITY
+            and len(inner.args) == 2
+        ):
+            lhs, rhs = inner.args[0], inner.args[1]
+
+    if lhs is None or rhs is None:
         return False
 
     # 1. Check generated sorts (original logic using _ctor_root)
-    lhs_ctor = _ctor_root(inner.lhs, fn_roles)
-    rhs_ctor = _ctor_root(inner.rhs, fn_roles)
+    lhs_ctor = _ctor_root(lhs, fn_roles)
+    rhs_ctor = _ctor_root(rhs, fn_roles)
 
     if lhs_ctor is not None and rhs_ctor is not None:
         if lhs_ctor == rhs_ctor:
@@ -443,11 +468,11 @@ def _is_distinctness_axiom(
             return True
 
     # 2. Check non-generated sorts (Fix A)
-    if sig is not None and isinstance(inner.lhs, FnApp) and isinstance(inner.rhs, FnApp):
-        if not inner.lhs.args and not inner.rhs.args:
-            if inner.lhs.fn_name != inner.rhs.fn_name:
-                l_fn = sig.get_fn(inner.lhs.fn_name)
-                r_fn = sig.get_fn(inner.rhs.fn_name)
+    if sig is not None and isinstance(lhs, FnApp) and isinstance(rhs, FnApp):
+        if not lhs.args and not rhs.args:
+            if lhs.fn_name != rhs.fn_name:
+                l_fn = sig.get_fn(lhs.fn_name)
+                r_fn = sig.get_fn(rhs.fn_name)
                 if l_fn is not None and r_fn is not None:
                     if l_fn.result == r_fn.result:
                         return True

@@ -45,6 +45,7 @@ from alspec.axiom_match import (
     _peel_implications,
     _peel_quantifiers,
     _ctor_root,
+    _is_distinctness_axiom,
     match_spec_sync,
 )
 from alspec.obligation import (
@@ -410,6 +411,174 @@ class TestIsDistinctness:
         report = match_spec_sync(spec, table, sig)
         assert "bool_distinct" not in report.unmatched_axioms
         assert "bool_distinct" in report.non_cell_axioms
+
+    def test_negated_eq_predapp_same_sort_constants(self):
+        """¬eq_color(red, green) where eq_color is EQUALITY → DISTINCTNESS."""
+        from alspec import Signature, atomic, fn, pred, Negation, PredApp, const
+        from alspec.obligation import FnRole, FnKind, PredRole, PredKind
+        from alspec.axiom_match import _is_distinctness_axiom
+
+        sig = Signature(
+            sorts={"Color": atomic("Color"), "Light": atomic("Light")},
+            functions={
+                "red": fn("red", [], "Color"),
+                "green": fn("green", [], "Color"),
+            },
+            predicates={
+                "eq_color": pred("eq_color", [("c1", "Color"), ("c2", "Color")]),
+            },
+            generated_sorts={},
+        )
+        fn_roles = {
+            "red": FnRole("red", FnKind.CONSTANT, None),
+            "green": FnRole("green", FnKind.CONSTANT, None),
+        }
+        pred_roles = {
+            "eq_color": PredRole("eq_color", PredKind.EQUALITY, "Color"),
+        }
+        f = Negation(PredApp("eq_color", (const("red"), const("green"))))
+        assert _is_distinctness_axiom(f, fn_roles, sig, pred_roles=pred_roles)
+
+    def test_negated_eq_predapp_cross_sort_not_distinctness(self):
+        """¬eq_color(red, zero) where sorts differ → not distinctness."""
+        from alspec import Signature, atomic, fn, pred, Negation, PredApp, const
+        from alspec.obligation import FnRole, FnKind, PredRole, PredKind
+        from alspec.axiom_match import _is_distinctness_axiom
+
+        sig = Signature(
+            sorts={"Color": atomic("Color"), "Nat": atomic("Nat")},
+            functions={
+                "red": fn("red", [], "Color"),
+                "zero": fn("zero", [], "Nat"),
+            },
+            predicates={
+                "eq_color": pred("eq_color", [("c1", "Color"), ("c2", "Color")]),
+            },
+            generated_sorts={},
+        )
+        fn_roles = {
+            "red": FnRole("red", FnKind.CONSTANT, None),
+            "zero": FnRole("zero", FnKind.CONSTANT, None),
+        }
+        pred_roles = {
+            "eq_color": PredRole("eq_color", PredKind.EQUALITY, "Color"),
+        }
+        f = Negation(PredApp("eq_color", (const("red"), const("zero"))))
+        assert not _is_distinctness_axiom(f, fn_roles, sig, pred_roles=pred_roles)
+
+    def test_negated_non_eq_predapp_not_distinctness(self):
+        """¬has_ticket(a, b) where has_ticket is OBSERVER → not distinctness."""
+        from alspec import Negation, PredApp, const
+        from alspec.obligation import FnRole, FnKind, PredRole, PredKind
+        from alspec.axiom_match import _is_distinctness_axiom
+
+        fn_roles = {
+            "a": FnRole("a", FnKind.CONSTANT, None),
+            "b": FnRole("b", FnKind.CONSTANT, None),
+        }
+        pred_roles = {
+            "has_ticket": PredRole("has_ticket", PredKind.OBSERVER, "Store"),
+        }
+        f = Negation(PredApp("has_ticket", (const("a"), const("b"))))
+        assert not _is_distinctness_axiom(f, fn_roles, sig=None, pred_roles=pred_roles)
+
+    def test_negated_eq_predapp_three_args_not_distinctness(self):
+        """¬eq_color(a, b, c) with 3 args → not distinctness."""
+        from alspec import Negation, PredApp, const
+        from alspec.obligation import PredRole, PredKind
+        from alspec.axiom_match import _is_distinctness_axiom
+
+        fn_roles = {}
+        pred_roles = {
+            "eq_color": PredRole("eq_color", PredKind.EQUALITY, "Color"),
+        }
+        f = Negation(PredApp("eq_color", (const("a"), const("b"), const("c"))))
+        assert not _is_distinctness_axiom(f, fn_roles, sig=None, pred_roles=pred_roles)
+
+    def test_negated_eq_predapp_no_pred_roles_backward_compat(self):
+        """pred_roles=None (default) → PredApp branch skipped, returns False."""
+        from alspec import Negation, PredApp, const
+        from alspec.obligation import FnRole, FnKind
+        from alspec.axiom_match import _is_distinctness_axiom
+
+        fn_roles = {
+            "red": FnRole("red", FnKind.CONSTANT, None),
+            "green": FnRole("green", FnKind.CONSTANT, None),
+        }
+        # PredApp form, but pred_roles not passed → should NOT match
+        f = Negation(PredApp("eq_color", (const("red"), const("green"))))
+        assert not _is_distinctness_axiom(f, fn_roles, sig=None)
+
+    def test_negated_eq_predapp_same_constant_not_distinctness(self):
+        """¬eq_color(red, red) is contradictory, not distinctness."""
+        from alspec import Signature, atomic, fn, pred, Negation, PredApp, const
+        from alspec.obligation import FnRole, FnKind, PredRole, PredKind
+        from alspec.axiom_match import _is_distinctness_axiom
+
+        sig = Signature(
+            sorts={"Color": atomic("Color")},
+            functions={"red": fn("red", [], "Color")},
+            predicates={"eq_color": pred("eq_color", [("c1", "Color"), ("c2", "Color")])},
+            generated_sorts={},
+        )
+        fn_roles = {"red": FnRole("red", FnKind.CONSTANT, None)}
+        pred_roles = {"eq_color": PredRole("eq_color", PredKind.EQUALITY, "Color")}
+        f = Negation(PredApp("eq_color", (const("red"), const("red"))))
+        assert not _is_distinctness_axiom(f, fn_roles, sig, pred_roles=pred_roles)
+
+    def test_predapp_distinctness_full_match(self):
+        """Full spec with PredApp-form distinctness → lands in non_cell_axioms."""
+        from alspec import Signature, atomic, fn, pred, Axiom, Spec, Negation, PredApp, const
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync
+
+        sig = Signature(
+            sorts={"Color": atomic("Color"), "Light": atomic("Light")},
+            functions={
+                "red": fn("red", [], "Color"),
+                "green": fn("green", [], "Color"),
+                "yellow": fn("yellow", [], "Color"),
+            },
+            predicates={
+                "eq_color": pred("eq_color", [("c1", "Color"), ("c2", "Color")]),
+            },
+            generated_sorts={},
+        )
+        ax = Axiom("color_distinct_rg", Negation(PredApp("eq_color", (const("red"), const("green")))))
+        spec = Spec(name="Test", signature=sig, axioms=(ax,))
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+        assert "color_distinct_rg" not in report.unmatched_axioms
+        assert "color_distinct_rg" in report.non_cell_axioms
+
+    def test_negated_eq_predapp_generated_sort_constructors(self):
+        """¬eq_color(red, green) where Color is generated + red/green are CONSTRUCTOR → DISTINCTNESS."""
+        from alspec import Signature, GeneratedSortInfo, atomic, fn, pred, Negation, PredApp, const
+        from alspec.obligation import FnRole, FnKind, PredRole, PredKind
+        from alspec.axiom_match import _is_distinctness_axiom
+
+        sig = Signature(
+            sorts={"Color": atomic("Color")},
+            functions={
+                "red": fn("red", [], "Color"),
+                "green": fn("green", [], "Color"),
+            },
+            predicates={
+                "eq_color": pred("eq_color", [("c1", "Color"), ("c2", "Color")]),
+            },
+            generated_sorts={
+                "Color": GeneratedSortInfo(constructors=("red", "green"), selectors={}),
+            },
+        )
+        fn_roles = {
+            "red": FnRole("red", FnKind.CONSTRUCTOR, "Color"),
+            "green": FnRole("green", FnKind.CONSTRUCTOR, "Color"),
+        }
+        pred_roles = {
+            "eq_color": PredRole("eq_color", PredKind.EQUALITY, "Color"),
+        }
+        f = Negation(PredApp("eq_color", (const("red"), const("green"))))
+        assert _is_distinctness_axiom(f, fn_roles, sig, pred_roles=pred_roles)
 
 
 class TestFindObsCtor:
