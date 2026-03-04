@@ -1,0 +1,43 @@
+[experiment]
+name = "stage4-chunk-screen-v1"
+description = "Resolution IV screening of Stage 4 prompt chunks — identify which methodology and example chunks improve intrinsic health"
+output_dir = "results/stage4-screen-v1"
+
+[design]
+resolution = "resolution_iv"
+replicates = 3
+
+[pipeline]
+stage = "stage4"
+model = "google/gemini-3-flash-preview"
+temperature = 0.7
+max_concurrent = 10
+upstream_model = "google/gemini-3-flash-preview"
+upstream_lens = "entity_lifecycle"
+
+[domains]
+include = [
+    "counter", "boolean-flag", "stack", "door-lock",
+    "bounded-counter", "traffic-light", "thermostat",
+    "session-store", "dns-zone", "auction", "shopping-cart",
+]
+
+[chunks]
+mandatory = [
+    "ROLE_PREAMBLE",
+    "TYPE_GRAMMAR",
+    "API_HELPERS",
+    "OBLIGATION_PATTERN",
+    "AXIOMS_METHODOLOGY",
+    "WF_CHECKLIST",
+]
+
+[chunks.factors]
+A_formal_frame = ["FORMAL_FRAME"]
+B_basis_catalog = ["BASIS_CATALOG"]
+C_loose_semantics = ["LOOSE_SEMANTICS_RULE"]
+D_guard_patterns = ["PARTIAL_FN_PATTERNS", "GUARD_POLARITY", "DOMAIN_SUBCASES"]
+E_cell_tiers = ["CELL_TIERS", "PRESERVATION_COLLAPSE"]
+F_formal_grounding = ["GENERATED_SORTS_ROLES", "DISPATCH_RULES", "EQ_PRED_BASIS"]
+G_primary_examples = ["EXAMPLE_SESSION_STORE_SPEC", "EXAMPLE_RATE_LIMITER_SPEC", "EXAMPLE_DNS_ZONE_SPEC"]
+H_secondary_examples = ["EXAMPLE_COUNTER", "EXAMPLE_STACK", "EXAMPLE_BOUNDED_COUNTER"]

@@ -39,11 +39,10 @@ class DoeConfig:
     replicates: int
 
     # [pipeline]
-    stage: str  # "stage1"
+    stage: str  # "stage1" | "stage4"
     model: str
     temperature: float
     max_concurrent: int
-
     # [domains]
     domains: tuple[str, ...]  # resolved domain IDs
 
@@ -52,12 +51,16 @@ class DoeConfig:
     # Ordered list of factors; each factor is a tuple of ChunkIds
     factors: tuple[tuple[str, tuple[ChunkId, ...]], ...]  # (label, chunk_ids)
 
+    # Stage 4 upstream config (only used when stage == "stage4")
+    upstream_model: str = ""          # model for stages 1-2 (defaults to config.model)
+    upstream_lens: str = "entity_lifecycle"  # lens for stage 1
+
 
 # ---------------------------------------------------------------------------
 # Loader
 # ---------------------------------------------------------------------------
 
-_SUPPORTED_STAGES = frozenset({"stage1"})
+_SUPPORTED_STAGES = frozenset({"stage1", "stage4"})
 _SUPPORTED_RESOLUTIONS = frozenset(
     {"full", "resolution_iii", "resolution_iv", "resolution_v"}
 )
@@ -123,6 +126,10 @@ def load_doe_config(path: Path, *, project_root: Path | None = None) -> DoeConfi
     temperature = float(pipeline.get("temperature", 0.7))
     max_concurrent = _require_positive_int(pipeline, "max_concurrent", "[pipeline]")
 
+    # Optional upstream config
+    upstream_model = pipeline.get("upstream_model", model)
+    upstream_lens = pipeline.get("upstream_lens", "entity_lifecycle")
+
     # ---- [domains] ----
     domains_section = _require_section(raw, "domains")
     include = domains_section.get("include", "all")
@@ -178,6 +185,8 @@ def load_doe_config(path: Path, *, project_root: Path | None = None) -> DoeConfi
         model=model,
         temperature=temperature,
         max_concurrent=max_concurrent,
+        upstream_model=upstream_model,
+        upstream_lens=upstream_lens,
         domains=domains,
         mandatory_chunks=mandatory_chunks,
         factors=tuple(factors),

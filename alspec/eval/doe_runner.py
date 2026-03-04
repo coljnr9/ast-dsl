@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+from dataclasses import dataclass
 import json
 import logging
 import shutil
@@ -34,14 +35,42 @@ from langfuse import get_client, propagate_attributes  # noqa: E402
 from alspec.eval.doe_config import DoeConfig  # noqa: E402
 from alspec.eval.doe_design import TrialConfig, generate_trials  # noqa: E402
 from alspec.eval.stage1_score import Stage1Score, _make_zero_score, score_stage1_output  # noqa: E402
+from alspec.eval.stage4_score import Stage4Score, _make_zero_stage4_score, score_stage4_output  # noqa: E402
 from alspec.eval.domains import DOMAINS  # noqa: E402
 from alspec.llm import AsyncLLMClient  # noqa: E402
-from alspec.pipeline import _build_signature_user_prompt  # noqa: E402
+from alspec.obligation import build_obligation_table, ObligationTable  # noqa: E402
+from alspec.obligation_render import render_obligation_table  # noqa: E402
+from alspec.pipeline import (
+    _build_signature_user_prompt,
+    _build_axioms_user_prompt,
+    run_pipeline_signature_only,
+)  # noqa: E402
 from alspec.prompt_chunks import Stage, assemble_prompt  # noqa: E402
 from alspec.result import Err, Ok  # noqa: E402
+from alspec.signature import Signature  # noqa: E402
 
 logger = logging.getLogger(__name__)
 langfuse = get_client()
+
+# ---------------------------------------------------------------------------
+# Data types
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class UpstreamCache:
+    """Cached output from stages 1-2-3 for a single domain."""
+
+    domain: str
+    signature: Signature
+    obligation_table: ObligationTable
+    signature_code: str  # raw code string to include in Stage 4 user prompt
+    signature_analysis: str
+    obligation_table_rendered: str
+    analysis_text: str | None  # Stage 1 output (if lens used)
+    spec_name: str  # domain ID formatted as spec name
+    upstream_trace_name: str  # for Langfuse cross-referencing
+
 
 # ---------------------------------------------------------------------------
 # Domain description helper
@@ -65,7 +94,7 @@ def _get_domain_description(domain: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _build_prompt_cache(trials: list[TrialConfig]) -> dict[str, str]:
+def _build_prompt_cache(trials: list[TrialConfig], stage: str) -> dict[str, str]:
     """Pre-assemble one system prompt per unique chunk configuration.
 
     This avoids re-running assemble_prompt() for every (domain × replicate)
@@ -73,15 +102,17 @@ def _build_prompt_cache(trials: list[TrialConfig]) -> dict[str, str]:
     duplicate dependency-warning spam during execution — warnings fire at most
     once per unique design point here, not once per domain×replicate.
     """
+    target_stage = Stage.AXIOMS if stage == "stage4" else Stage.SIGNATURE
     cache: dict[str, str] = {}
     for trial in trials:
         if trial.config_hash in cache:
             continue
         try:
             prompt = assemble_prompt(
-                list(trial.chunk_ids), Stage.SIGNATURE,
+                list(trial.chunk_ids),
+                target_stage,
                 validate_deps=False,
-                validate_stage=False,   # cross-stage chunks are intentionally allowed
+                validate_stage=False,  # cross-stage chunks are intentionally allowed
             )
             cache[trial.config_hash] = prompt
         except Exception as exc:
@@ -96,7 +127,106 @@ def _build_prompt_cache(trials: list[TrialConfig]) -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
-# Single trial execution
+# Phase A: Upstream Cache Builder
+# ---------------------------------------------------------------------------
+
+
+async def _build_upstream_cache(
+    config: DoeConfig,
+    client: AsyncLLMClient,
+    domains: list[str],
+    session_id: str,
+) -> dict[str, UpstreamCache]:
+    """Run stages 1-2-3 for each domain and cache results."""
+    logger.info("Building upstream cache (Stages 1-2-3) for %d domains...", len(domains))
+    cache: dict[str, UpstreamCache] = {}
+    semaphore = asyncio.Semaphore(config.max_concurrent)
+
+    async def run_one(domain: str) -> UpstreamCache | None:
+        async with semaphore:
+            upstream_trace_name = f"doe/{config.name}/upstream/{domain}"
+            desc = _get_domain_description(domain)
+
+            with langfuse.start_as_current_observation(
+                as_type="span",
+                name=upstream_trace_name,
+            ):
+                with propagate_attributes(
+                    trace_name=upstream_trace_name,
+                    session_id=session_id,
+                    metadata={
+                        "doe_experiment": config.name,
+                        "phase": "upstream",
+                        "domain": domain,
+                        "model": config.upstream_model,
+                        "lens": config.upstream_lens,
+                    },
+                    tags=[
+                        f"doe:{config.name}",
+                        "phase:upstream",
+                        f"domain:{domain}",
+                    ],
+                ):
+                    langfuse.update_current_trace(input=desc)
+
+                    result = await run_pipeline_signature_only(
+                        client=client,
+                        domain_id=domain,
+                        domain_description=desc,
+                        model=config.upstream_model,
+                        lens=config.upstream_lens,
+                    )
+
+                    if not result.success:
+                        logger.warning(
+                            "Upstream failed for domain %s: %s", domain, result.error
+                        )
+                        langfuse.score_current_trace(name="upstream_parse", value=0.0)
+                        return None
+
+                    sig = result.signature
+                    assert sig is not None
+
+                    try:
+                        table = build_obligation_table(sig)
+                        table_md = render_obligation_table(sig, table)
+                    except Exception as e:
+                        logger.warning(
+                            "Upstream obligation table failed for domain %s: %s", domain, e
+                        )
+                        langfuse.score_current_trace(name="upstream_well_formed", value=0.0)
+                        return None
+
+                    langfuse.update_current_trace(output=result.signature_code)
+                    langfuse.score_current_trace(name="upstream_parse", value=1.0)
+                    langfuse.score_current_trace(name="upstream_well_formed", value=1.0)
+
+                    return UpstreamCache(
+                        domain=domain,
+                        signature=sig,
+                        obligation_table=table,
+                        signature_code=result.signature_code or "",
+                        signature_analysis=result.signature_analysis or "",
+                        obligation_table_rendered=table_md,
+                        analysis_text=result.domain_analysis,
+                        spec_name=domain.replace("-", " ").title().replace(" ", ""),
+                        upstream_trace_name=upstream_trace_name,
+                    )
+
+    tasks = [run_one(d) for d in domains]
+    results = await asyncio.gather(*tasks)
+
+    for r in results:
+        if r:
+            cache[r.domain] = r
+
+    await asyncio.to_thread(langfuse.flush)
+    logger.info("Upstream cache built: %d/%d succeeded", len(cache), len(domains))
+    return cache
+
+
+# ---------------------------------------------------------------------------
+# Single trial execution (Stage 1)
 # ---------------------------------------------------------------------------
 
 
@@ -121,7 +251,10 @@ async def execute_trial(
         elapsed = time.monotonic() - t0
         return (
             _make_zero_score(
-                domain, trial.trial_id, trial.replicate, config.model,
+                domain,
+                trial.trial_id,
+                trial.replicate,
+                config.model,
                 "assemble_prompt failed (empty prompt)",
                 trial.factor_levels,
             ),
@@ -137,127 +270,266 @@ async def execute_trial(
 
     # Langfuse span — Fix 1: all metadata values must be strings
     trace_name = (
-        f"doe/{config.name}/trial{trial.trial_id}"
-        f"/rep{trial.replicate}/{domain}"
+        f"doe/{config.name}/trial{trial.trial_id}" f"/rep{trial.replicate}/{domain}"
     )
     factor_levels_json = json.dumps(trial.factor_levels)
 
-    with propagate_attributes(
-        trace_name=trace_name,
-        session_id=session_id,
-        metadata={
-            "doe_experiment": config.name,
-            "doe_trial_id": str(trial.trial_id),
-            "doe_replicate": str(trial.replicate),
-            "doe_config_hash": trial.config_hash,
-            "doe_factor_levels": factor_levels_json,
-            "domain": domain,
-            "model": config.model,
-        },
-        tags=[
-            f"doe:{config.name}",
-            f"trial:{trial.trial_id}",
-            f"domain:{domain}",
-        ],
+    with langfuse.start_as_current_observation(
+        as_type="span",
+        name=trace_name,
     ):
-        result = await client.generate_with_tool_call(
-            messages, model=config.model, tool_name="submit_signature"
-        )
-
-        elapsed = time.monotonic() - t0
-
-        # Warn on suspiciously slow calls (possible rate limit / backoff)
-        if elapsed > 30.0:
-            logger.warning(
-                "Slow call: %.1fs for trial=%d domain=%s rep=%d — possible rate limit",
-                elapsed,
-                trial.trial_id,
-                domain,
-                trial.replicate,
+        with propagate_attributes(
+            trace_name=trace_name,
+            session_id=session_id,
+            metadata={
+                "doe_experiment": config.name,
+                "doe_trial_id": str(trial.trial_id),
+                "doe_replicate": str(trial.replicate),
+                "doe_config_hash": trial.config_hash,
+                "doe_factor_levels": factor_levels_json,
+                "domain": domain,
+                "model": config.model,
+            },
+            tags=[
+                f"doe:{config.name}",
+                f"trial:{trial.trial_id}",
+                f"domain:{domain}",
+                *[f"chunk:{c.name}" for c in trial.chunk_ids],
+            ],
+        ):
+            result = await client.generate_with_tool_call(
+                messages, model=config.model, tool_name="submit_signature"
             )
 
-        match result:
-            case Err(exc):
+            elapsed = time.monotonic() - t0
+
+            # Warn on suspiciously slow calls (possible rate limit / backoff)
+            if elapsed > 30.0:
                 logger.warning(
-                    "LLM call failed trial=%d domain=%s rep=%d: %s",
+                    "Slow call: %.1fs for trial=%d domain=%s rep=%d — possible rate limit",
+                    elapsed,
                     trial.trial_id,
                     domain,
                     trial.replicate,
-                    exc,
                 )
-                langfuse.score_current_trace(
-                    name="stage1_health",
-                    value=0.0,
-                    comment=f"LLM error: {exc}",
-                )
-                return (
-                    _make_zero_score(
-                        domain, trial.trial_id, trial.replicate, config.model,
-                        f"LLM error: {exc}",
-                        trial.factor_levels,
-                    ),
-                    elapsed,
-                )
-            case Ok((_, code, _)):
-                pass
 
-        score = score_stage1_output(
-            code=code,
-            domain=domain,
-            trial_id=trial.trial_id,
-            replicate=trial.replicate,
-            model=config.model,
-            golden_dir=golden_dir,
-            factor_levels=trial.factor_levels,
-        )
+            match result:
+                case Err(exc):
+                    logger.warning(
+                        "LLM call failed trial=%d domain=%s rep=%d: %s",
+                        trial.trial_id,
+                        domain,
+                        trial.replicate,
+                        exc,
+                    )
+                    langfuse.score_current_trace(
+                        name="stage1_health",
+                        value=0.0,
+                        comment=f"LLM error: {exc}",
+                    )
+                    return (
+                        _make_zero_score(
+                            domain,
+                            trial.trial_id,
+                            trial.replicate,
+                            config.model,
+                            f"LLM error: {exc}",
+                            trial.factor_levels,
+                        ),
+                        elapsed,
+                    )
+                case Ok((_, code, _)):
+                    pass
 
-        # score_current_trace must be called inside the propagate_attributes
-        # context — outside it there is no active span and the call is a no-op.
-        langfuse.score_current_trace(
-            name="stage1_health",
-            value=score.health,
-            comment=f"parse={score.parse_success} wf={score.well_formed}",
-        )
+            score = score_stage1_output(
+                code=code,
+                domain=domain,
+                trial_id=trial.trial_id,
+                replicate=trial.replicate,
+                model=config.model,
+                golden_dir=golden_dir,
+                factor_levels=trial.factor_levels,
+            )
+
+            # score_current_trace must be called inside the propagate_attributes
+            # context — outside it there is no active span and the call is a no-op.
+            langfuse.score_current_trace(
+                name="stage1_health",
+                value=score.health,
+                comment=f"parse={score.parse_success} wf={score.well_formed}",
+            )
 
     return score, elapsed
 
 
 # ---------------------------------------------------------------------------
-# Experiment runner
+# Phase B: Stage 4 Trial Execution
 # ---------------------------------------------------------------------------
 
 
-async def run_experiment(
+async def execute_stage4_trial(
+    client: AsyncLLMClient,
+    trial: TrialConfig,
+    domain: str,
+    config: DoeConfig,
+    upstream: UpstreamCache,
+    system_prompt: str,
+    session_id: str,
+    golden_dir: Path,
+) -> tuple[Stage4Score, float]:
+    """Execute one Stage 4 (trial, domain) pair."""
+    t0 = time.monotonic()
+    desc = _get_domain_description(domain)
+
+    if not system_prompt:
+        elapsed = time.monotonic() - t0
+        return (
+            _make_zero_stage4_score(
+                domain,
+                trial.trial_id,
+                trial.replicate,
+                config.model,
+                "assemble_prompt failed (empty prompt)",
+                trial.factor_levels,
+            ),
+            elapsed,
+        )
+
+    user_prompt = _build_axioms_user_prompt(
+        domain_description=desc,
+        spec_name=upstream.spec_name,
+        signature_code=upstream.signature_code,
+        signature_analysis=upstream.signature_analysis,
+        obligation_table_md=upstream.obligation_table_rendered,
+        domain_analysis=upstream.analysis_text,
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+
+    trace_name = (
+        f"doe/{config.name}/trial{trial.trial_id}" f"/rep{trial.replicate}/{domain}"
+    )
+    factor_levels_json = json.dumps(trial.factor_levels)
+
+    with langfuse.start_as_current_observation(
+        as_type="span",
+        name=trace_name,
+    ):
+        with propagate_attributes(
+            trace_name=trace_name,
+            session_id=session_id,
+            metadata={
+                "doe_experiment": config.name,
+                "doe_trial_id": str(trial.trial_id),
+                "doe_replicate": str(trial.replicate),
+                "doe_config_hash": trial.config_hash,
+                "doe_factor_levels": factor_levels_json,
+                "phase": "ablation",
+                "stage": "4",
+                "domain": domain,
+                "model": config.model,
+                "upstream_trace_name": upstream.upstream_trace_name,
+            },
+            tags=[
+                f"doe:{config.name}",
+                "phase:ablation",
+                "stage:axioms",
+                f"trial:{trial.trial_id}",
+                f"domain:{domain}",
+                *[f"chunk:{c.name}" for c in trial.chunk_ids],
+            ],
+        ):
+            langfuse.update_current_trace(
+                input={
+                    "domain": domain,
+                    "signature_code": upstream.signature_code,
+                    "obligation_table": upstream.obligation_table_rendered,
+                    "system_prompt_chunks": [c.name for c in trial.chunk_ids],
+                }
+            )
+
+            result = await client.generate_with_tool_call(
+                messages, model=config.model, tool_name="submit_spec"
+            )
+
+            elapsed = time.monotonic() - t0
+
+            match result:
+                case Err(exc):
+                    langfuse.score_current_trace(
+                        name="parse_success",
+                        value=0.0,
+                        comment=f"LLM error: {exc}",
+                    )
+                    return (
+                        _make_zero_stage4_score(
+                            domain,
+                            trial.trial_id,
+                            trial.replicate,
+                            config.model,
+                            f"LLM error: {exc}",
+                            trial.factor_levels,
+                        ),
+                        elapsed,
+                    )
+                case Ok((_, code, _)):
+                    langfuse.update_current_trace(output=code)
+
+            score = await score_stage4_output(
+                code=code,
+                domain=domain,
+                sig=upstream.signature,
+                trial_id=trial.trial_id,
+                replicate=trial.replicate,
+                model=config.model,
+                factor_levels=trial.factor_levels,
+                golden_dir=golden_dir,
+            )
+
+            # Scores
+            langfuse.score_current_trace(
+                name="parse_success",
+                value=1.0 if score.parse_success else 0.0,
+            )
+            langfuse.score_current_trace(
+                name="well_formed",
+                value=1.0 if score.well_formed else 0.0,
+            )
+            langfuse.score_current_trace(
+                name="intrinsic_health",
+                value=score.intrinsic_health,
+            )
+            langfuse.score_current_trace(
+                name="coverage",
+                value=score.coverage_ratio,
+                comment=f"{score.covered_cells}/{score.total_cells}",
+            )
+            langfuse.score_current_trace(
+                name="unmatched_count",
+                value=float(score.unmatched_axiom_count),
+            )
+
+    return score, elapsed
+
+
+# ---------------------------------------------------------------------------
+# Stage 1 Experiment runner
+# ---------------------------------------------------------------------------
+
+
+async def _run_stage1_experiment(
     config: DoeConfig,
     client: AsyncLLMClient,
-    *,
     golden_dir: Path,
+    session_id: str,
     progress_cb: object = None,
 ) -> list[Stage1Score]:
-    """Execute all trials and return all Stage1Score objects.
-
-    Parameters
-    ----------
-    config:
-        Parsed experiment configuration.
-    client:
-        Initialised LLM client.
-    golden_dir:
-        Path to the ``golden/`` directory for reference signatures.
-    progress_cb:
-        Optional callable(completed, total, score, elapsed) for progress reporting.
-    """
     trials = generate_trials(config)
     domains = list(config.domains)
-
-    # Fix 3b: pre-assemble one prompt per unique design point (avoids
-    # repeated assemble_prompt calls and duplicate warning spam during execution)
-    prompt_cache = _build_prompt_cache(trials)
-
-    # Fix 2: one session_id for the whole experiment
-    start_ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    session_id = f"doe/{config.name}/{start_ts}"
-    logger.info("Langfuse session_id: %s", session_id)
+    prompt_cache = _build_prompt_cache(trials, config.stage)
 
     semaphore = asyncio.Semaphore(config.max_concurrent)
     total = len(trials) * len(domains)
@@ -277,50 +549,52 @@ async def run_experiment(
             completed += 1
             all_scores.append(score)
 
-            # Fix 5: structured progress line with timing + status tag
-            if score.health == 0.0:
-                status = "FAIL"
-            elif score.health < 0.5:
-                status = "LOW "
-            else:
-                status = "OK  "
-
+            # Structured progress line
+            status = (
+                "FAIL"
+                if score.health == 0.0
+                else "LOW " if score.health < 0.5 else "OK  "
+            )
             logger.info(
                 "  Trial %4d/%d [%-22s trial=%d rep=%d] %s health=%.3f  %.1fs",
-                completed, total, domain,
-                trial.trial_id, trial.replicate,
-                status, score.health, elapsed,
+                completed,
+                total,
+                domain,
+                trial.trial_id,
+                trial.replicate,
+                status,
+                score.health,
+                elapsed,
             )
 
-            # Running summary every 50 completions
             if completed % 50 == 0:
                 elapsed_total = time.monotonic() - experiment_start
-                rate = completed / elapsed_total  # calls/sec
+                rate = completed / elapsed_total
                 eta = (total - completed) / rate if rate > 0 else 0
                 mean_health = sum(s.health for s in all_scores) / len(all_scores)
-                parse_rate = sum(1 for s in all_scores if s.parse_success) / len(all_scores)
+                parse_rate = sum(1 for s in all_scores if s.parse_success) / len(
+                    all_scores
+                )
                 logger.info(
                     "  --- Progress: %d/%d (%.0f%%) | %.1f calls/min | ETA %.0fm | "
                     "mean_health=%.3f | parse_rate=%.1f%% ---",
-                    completed, total, 100 * completed / total,
-                    rate * 60, eta / 60,
-                    mean_health, 100 * parse_rate,
+                    completed,
+                    total,
+                    100 * completed / total,
+                    rate * 60,
+                    eta / 60,
+                    mean_health,
+                    100 * parse_rate,
                 )
+                await asyncio.to_thread(langfuse.flush)
 
             if callable(progress_cb):
                 progress_cb(completed, total, score, elapsed)  # type: ignore[operator]
 
         return score
 
-    tasks = [
-        run_one(trial, domain)
-        for trial in trials
-        for domain in domains
-    ]
-
-    results: list[Stage1Score | BaseException] = await asyncio.gather(
-        *tasks, return_exceptions=True
-    )
+    tasks = [run_one(trial, domain) for trial in trials for domain in domains]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
     scores: list[Stage1Score] = []
     for r in results:
@@ -328,9 +602,177 @@ async def run_experiment(
             case Stage1Score():
                 scores.append(r)
             case BaseException() as exc:
-                logger.error("Unexpected exception in trial task: %s", exc)
+                import traceback
+                tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+                logger.error("Unexpected exception in trial task: %s\n%s", exc, tb)
 
-    langfuse.flush()
+    return scores
+
+
+# ---------------------------------------------------------------------------
+# Stage 4 Experiment runner
+# ---------------------------------------------------------------------------
+
+
+async def _run_stage4_experiment(
+    config: DoeConfig,
+    client: AsyncLLMClient,
+    golden_dir: Path,
+    session_id: str,
+    progress_cb: object = None,
+) -> list[Stage4Score]:
+    upstream_cache = await _build_upstream_cache(
+        config, client, list(config.domains), session_id
+    )
+    if not upstream_cache:
+        logger.error("All upstream runs failed. Aborting Stage 4 experiment.")
+        return []
+
+    # Filter domains to those that succeeded upstream
+    usable_domains = sorted(upstream_cache.keys())
+    trials = generate_trials(config)
+    prompt_cache = _build_prompt_cache(trials, config.stage)
+
+    semaphore = asyncio.Semaphore(config.max_concurrent)
+    total = len(trials) * len(usable_domains)
+    completed = 0
+    all_scores: list[Stage4Score] = []
+    lock = asyncio.Lock()
+    experiment_start = time.monotonic()
+
+    async def run_one(trial: TrialConfig, domain: str) -> Stage4Score:
+        nonlocal completed
+        system_prompt = prompt_cache.get(trial.config_hash, "")
+        upstream = upstream_cache[domain]
+        async with semaphore:
+            score, elapsed = await execute_stage4_trial(
+                client,
+                trial,
+                domain,
+                config,
+                upstream,
+                system_prompt,
+                session_id,
+                golden_dir,
+            )
+        async with lock:
+            completed += 1
+            all_scores.append(score)
+
+            status = (
+                "FAIL"
+                if not score.parse_success
+                else "LOW " if score.intrinsic_health < 0.5 else "OK  "
+            )
+            logger.info(
+                "  Trial %4d/%d [%-22s trial=%d rep=%d] %s health=%.3f  %.1fs",
+                completed,
+                total,
+                domain,
+                trial.trial_id,
+                trial.replicate,
+                status,
+                score.intrinsic_health,
+                elapsed,
+            )
+
+            if completed % 50 == 0:
+                elapsed_total = time.monotonic() - experiment_start
+                rate = completed / elapsed_total
+                eta = (total - completed) / rate if rate > 0 else 0
+                mean_health = sum(s.intrinsic_health for s in all_scores) / len(
+                    all_scores
+                )
+                parse_rate = sum(1 for s in all_scores if s.parse_success) / len(
+                    all_scores
+                )
+                logger.info(
+                    "  --- Progress: %d/%d (%.0f%%) | %.1f calls/min | ETA %.0fm | "
+                    "mean_health=%.3f | parse_rate=%.1f%% ---",
+                    completed,
+                    total,
+                    100 * completed / total,
+                    rate * 60,
+                    eta / 60,
+                    mean_health,
+                    100 * parse_rate,
+                )
+                await asyncio.to_thread(langfuse.flush)
+
+            if callable(progress_cb):
+                progress_cb(completed, total, score, elapsed)  # type: ignore[operator]
+
+        return score
+
+    tasks = [run_one(trial, domain) for trial in trials for domain in usable_domains]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    scores: list[Stage4Score] = []
+    for r in results:
+        match r:
+            case Stage4Score():
+                scores.append(r)
+            case BaseException() as exc:
+                import traceback
+                tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+                logger.error("Unexpected exception in trial task: %s\n%s", exc, tb)
+
+    _emit_stage4_session_scores(session_id, scores)
+    return scores
+
+
+def _emit_stage4_session_scores(session_id: str, scores: list[Stage4Score]) -> None:
+    successful = [s for s in scores if s.parse_success]
+
+    langfuse.create_score(
+        name="parse_rate",
+        value=len(successful) / len(scores) if scores else 0.0,
+        session_id=session_id,
+        comment=f"{len(successful)}/{len(scores)}",
+    )
+    langfuse.create_score(
+        name="mean_intrinsic_health",
+        value=(sum(s.intrinsic_health for s in successful) / len(successful))
+        if successful
+        else 0.0,
+        session_id=session_id,
+    )
+    langfuse.create_score(
+        name="mean_coverage",
+        value=(sum(s.coverage_ratio for s in successful) / len(successful))
+        if successful
+        else 0.0,
+        session_id=session_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Main Experiment runner
+# ---------------------------------------------------------------------------
+
+
+async def run_experiment(
+    config: DoeConfig,
+    client: AsyncLLMClient,
+    *,
+    golden_dir: Path,
+    progress_cb: object = None,
+) -> list[Stage1Score] | list[Stage4Score]:
+    """Execute all trials and return score objects."""
+    start_ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    session_id = f"doe/{config.name}/{start_ts}"
+    logger.info("Langfuse session_id: %s", session_id)
+
+    if config.stage == "stage4":
+        scores = await _run_stage4_experiment(
+            config, client, golden_dir, session_id, progress_cb
+        )
+    else:
+        scores = await _run_stage1_experiment(
+            config, client, golden_dir, session_id, progress_cb
+        )
+
+    await asyncio.to_thread(langfuse.flush)
     return scores
 
 
@@ -341,7 +783,7 @@ async def run_experiment(
 
 def write_results(
     config: DoeConfig,
-    scores: list[Stage1Score],
+    scores: list[Stage1Score] | list[Stage4Score],
     config_path: Path,
 ) -> None:
     """Write all results to the configured output directory."""
@@ -381,19 +823,34 @@ def write_results(
     logger.info("Results written to %s", out_dir)
 
 
-def _write_summary_csv(scores: list[Stage1Score], path: Path) -> None:
+def _write_summary_csv(
+    scores: list[Stage1Score] | list[Stage4Score], path: Path
+) -> None:
     """Aggregate scores by (trial_id, domain) and write summary CSV."""
     from collections import defaultdict
+    from typing import Any
 
-    grouped: dict[tuple[int, str], list[Stage1Score]] = defaultdict(list)
+    if not scores:
+        return
+
+    grouped: dict[tuple[int, str], list[Any]] = defaultdict(list)
     for s in scores:
         grouped[(s.trial_id, s.domain)].append(s)
 
-    header = (
-        "trial_id,domain,replicates,"
-        "parse_rate,wf_rate,mean_health,mean_sort_overlap,"
-        "mean_fn_overlap,mean_pred_overlap,mean_ctor_overlap,mean_cell_delta"
-    )
+    is_stage4 = isinstance(scores[0], Stage4Score)
+
+    if is_stage4:
+        header = (
+            "trial_id,domain,replicates,"
+            "parse_rate,wf_rate,mean_intrinsic_health,mean_coverage,"
+            "mean_unmatched,mean_uncovered"
+        )
+    else:
+        header = (
+            "trial_id,domain,replicates,"
+            "parse_rate,wf_rate,mean_health,mean_sort_overlap,"
+            "mean_fn_overlap,mean_pred_overlap,mean_ctor_overlap,mean_cell_delta"
+        )
 
     with path.open("w") as f:
         f.write(header + "\n")
@@ -401,15 +858,31 @@ def _write_summary_csv(scores: list[Stage1Score], path: Path) -> None:
             n = len(group)
             parse_rate = sum(1 for s in group if s.parse_success) / n
             wf_rate = sum(1 for s in group if s.well_formed) / n
-            mean_health = sum(s.health for s in group) / n
-            mean_sort = sum(s.sort_overlap for s in group) / n
-            mean_fn = sum(s.function_overlap for s in group) / n
-            mean_pred = sum(s.predicate_overlap for s in group) / n
-            mean_ctor = sum(s.constructor_overlap for s in group) / n
-            mean_delta = sum(s.cell_count_delta for s in group) / n
-            f.write(
-                f"{tid},{domain},{n},"
-                f"{parse_rate:.4f},{wf_rate:.4f},{mean_health:.4f},"
-                f"{mean_sort:.4f},{mean_fn:.4f},{mean_pred:.4f},"
-                f"{mean_ctor:.4f},{mean_delta:.2f}\n"
-            )
+
+            if is_stage4:
+                mean_intrinsic = sum(getattr(s, "intrinsic_health", 0.0) for s in group) / n
+                mean_coverage = sum(getattr(s, "coverage_ratio", 0.0) for s in group) / n
+                mean_unmatched = (
+                    sum(getattr(s, "unmatched_axiom_count", 0) for s in group) / n
+                )
+                mean_uncovered = (
+                    sum(getattr(s, "uncovered_cell_count", 0) for s in group) / n
+                )
+                f.write(
+                    f"{tid},{domain},{n},"
+                    f"{parse_rate:.4f},{wf_rate:.4f},{mean_intrinsic:.4f},"
+                    f"{mean_coverage:.4f},{mean_unmatched:.2f},{mean_uncovered:.2f}\n"
+                )
+            else:
+                mean_health = sum(getattr(s, "health", 0.0) for s in group) / n
+                mean_sort = sum(getattr(s, "sort_overlap", 0.0) for s in group) / n
+                mean_fn = sum(getattr(s, "function_overlap", 0.0) for s in group) / n
+                mean_pred = sum(getattr(s, "predicate_overlap", 0.0) for s in group) / n
+                mean_ctor = sum(getattr(s, "constructor_overlap", 0.0) for s in group) / n
+                mean_delta = sum(getattr(s, "cell_count_delta", 0) for s in group) / n
+                f.write(
+                    f"{tid},{domain},{n},"
+                    f"{parse_rate:.4f},{wf_rate:.4f},{mean_health:.4f},"
+                    f"{mean_sort:.4f},{mean_fn:.4f},{mean_pred:.4f},"
+                    f"{mean_ctor:.4f},{mean_delta:.2f}\n"
+                )

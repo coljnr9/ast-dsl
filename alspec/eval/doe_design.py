@@ -203,8 +203,9 @@ def generate_trials(config: DoeConfig) -> list[TrialConfig]:
 
         # Resolve dependency ordering + auto-include missing deps.
         # Pass row_idx so _resolve_dependencies can log once per design point.
+        target_stage = Stage.AXIOMS if config.stage == "stage4" else Stage.SIGNATURE
         ordered, auto_included = _resolve_dependencies(
-            active_chunks, Stage.SIGNATURE, row_idx
+            active_chunks, target_stage, row_idx
         )
 
         if auto_included:

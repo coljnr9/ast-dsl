@@ -1,0 +1,33 @@
+[experiment]
+name = "stage4-smoke"
+description = "Minimal 2-factor smoke test for Stage 4 DoE"
+output_dir = "results/stage4-smoke"
+
+[design]
+resolution = "full"
+replicates = 1
+
+[pipeline]
+stage = "stage4"
+model = "google/gemini-3-flash-preview"
+temperature = 0.7
+max_concurrent = 4
+upstream_model = "google/gemini-3-flash-preview"
+upstream_lens = "entity_lifecycle"
+
+[domains]
+include = ["counter", "stack"]
+
+[chunks]
+mandatory = [
+    "ROLE_PREAMBLE",
+    "TYPE_GRAMMAR",
+    "API_HELPERS",
+    "OBLIGATION_PATTERN",
+    "AXIOMS_METHODOLOGY",
+    "WF_CHECKLIST",
+]
+
+[chunks.factors]
+A_formal_frame = ["FORMAL_FRAME"]
+B_primary_examples = ["EXAMPLE_SESSION_STORE_SPEC", "EXAMPLE_RATE_LIMITER_SPEC", "EXAMPLE_DNS_ZONE_SPEC"]

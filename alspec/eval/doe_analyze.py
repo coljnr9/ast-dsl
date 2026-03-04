@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from alspec.eval.stage1_score import Stage1Score
+from alspec.eval.stage4_score import Stage4Score
 
 
 # ---------------------------------------------------------------------------
@@ -39,7 +40,7 @@ class MainEffect:
 
     factor_label: str
     chunk_names: tuple[str, ...]
-    response: str  # "health", "parse_rate", "wf_rate"
+    response: str  # "health", "parse_rate", "wf_rate", "intrinsic_health", "coverage"
     effect: float
     se: float
     p_value: float | None
@@ -96,20 +97,26 @@ def _normal_cdf(x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
 
-def _extract_response(score: Stage1Score, response: str) -> float:
+def _extract_response(score: Stage1Score | Stage4Score, response: str) -> float:
     match response:
         case "health":
+            if isinstance(score, Stage4Score):
+                return score.intrinsic_health
             return score.health
+        case "intrinsic_health":
+            return score.intrinsic_health
         case "parse_rate":
             return 1.0 if score.parse_success else 0.0
         case "wf_rate":
             return 1.0 if score.well_formed else 0.0
+        case "coverage":
+            return getattr(score, "coverage_ratio", 0.0)
         case _:
             raise ValueError(f"Unknown response: {response!r}")
 
 
 def compute_main_effects(
-    scores: list[Stage1Score],
+    scores: list[Stage1Score | Stage4Score],
     factor_labels: list[str],
     chunk_names_by_label: dict[str, list[str]],
     responses: list[str] | None = None,
@@ -119,17 +126,28 @@ def compute_main_effects(
     Parameters
     ----------
     scores:
-        All Stage1Score objects from the experiment.
+        All Stage1Score or Stage4Score objects from the experiment.
     factor_labels:
         Ordered list of factor labels (e.g. ["A", "B", ...]).
     chunk_names_by_label:
         Maps factor label → list of chunk names it controls.
     responses:
         List of response names to estimate effects for.
-        Defaults to ["health", "parse_rate", "wf_rate"].
+        Defaults to ["health", "intrinsic_health", "parse_rate", "wf_rate", "coverage"].
     """
     if responses is None:
-        responses = ["health", "parse_rate", "wf_rate"]
+        responses = ["health", "intrinsic_health", "parse_rate", "wf_rate", "coverage"]
+        # Remove responses that don't exist on the score objects
+        if responses:
+            first = scores[0]
+            valid = []
+            for r in responses:
+                try:
+                    _extract_response(first, r)
+                    valid.append(r)
+                except (ValueError, AttributeError):
+                    pass
+            responses = valid
 
     effects: list[MainEffect] = []
 
@@ -182,13 +200,24 @@ def compute_main_effects(
 
 
 def compute_interactions(
-    scores: list[Stage1Score],
+    scores: list[Stage1Score | Stage4Score],
     factor_labels: list[str],
     responses: list[str] | None = None,
 ) -> list[InteractionEffect]:
     """Compute all 2-factor interaction effects."""
     if responses is None:
-        responses = ["health", "parse_rate", "wf_rate"]
+        responses = ["health", "intrinsic_health", "parse_rate", "wf_rate", "coverage"]
+        # Remove responses that don't exist on the score objects
+        if responses:
+            first = scores[0]
+            valid = []
+            for r in responses:
+                try:
+                    _extract_response(first, r)
+                    valid.append(r)
+                except (ValueError, AttributeError):
+                    pass
+            responses = valid
 
     interactions: list[InteractionEffect] = []
     n = len(factor_labels)
@@ -258,16 +287,19 @@ def compute_interactions(
 # ---------------------------------------------------------------------------
 
 
-def load_scores_from_jsonl(path: Path) -> list[Stage1Score]:
-    """Load all Stage1Score objects from a scores.jsonl file."""
-    scores: list[Stage1Score] = []
+def load_scores_from_jsonl(path: Path) -> list[Stage1Score | Stage4Score]:
+    """Load all score objects from a scores.jsonl file."""
+    scores: list[Stage1Score | Stage4Score] = []
     with path.open() as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
             data = json.loads(line)
-            scores.append(Stage1Score(**data))
+            if "intrinsic_health" in data and "coverage_ratio" in data:
+                scores.append(Stage4Score(**data))
+            else:
+                scores.append(Stage1Score(**data))
     return scores
 
 

@@ -494,11 +494,12 @@ async def handle_doe_run(config_path: Path, *, dry_run: bool) -> int:
         nonlocal completed_count
         completed_count = done
         if hasattr(score, "domain") and hasattr(score, "trial_id"):
+            health = getattr(score, "health", getattr(score, "intrinsic_health", 0.0))
             print(
                 f"  Trial {done:>4}/{total} "
                 f"[domain={score.domain:<20} trial={score.trial_id} "  # type: ignore[union-attr]
                 f"rep={score.replicate}] "  # type: ignore[union-attr]
-                f"health={score.health:.3f}  {elapsed:.1f}s",  # type: ignore[union-attr]
+                f"health={health:.3f}  {elapsed:.1f}s",
                 flush=True,
             )
 
