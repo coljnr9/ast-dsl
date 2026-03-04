@@ -185,6 +185,36 @@ class TestChunkContent:
         assert "def dns_zone_spec" not in content
 
 
+class TestStageMethodologyChunks:
+    """Verify the new stage methodology chunks."""
+
+    def test_signature_methodology_in_default_config(self):
+        from alspec.prompt_chunks import Stage, build_default_prompt
+        prompt = build_default_prompt(Stage.SIGNATURE)
+        assert "Classify predicates" in prompt
+        assert "Observer predicate" in prompt or "observer predicate" in prompt
+        assert "Helper predicate" in prompt or "helper predicate" in prompt
+        assert "submit_signature" in prompt
+
+    def test_axioms_methodology_in_default_config(self):
+        from alspec.prompt_chunks import Stage, build_default_prompt
+        prompt = build_default_prompt(Stage.AXIOMS)
+        assert "MISS cells" in prompt
+        assert "submit_spec" in prompt
+
+    def test_signature_methodology_stage_restriction(self):
+        from alspec.prompt_chunks import get_chunk, ChunkId, Stage
+        chunk = get_chunk(ChunkId.SIGNATURE_METHODOLOGY)
+        assert Stage.SIGNATURE in chunk.stages
+        assert Stage.AXIOMS not in chunk.stages
+
+    def test_axioms_methodology_stage_restriction(self):
+        from alspec.prompt_chunks import get_chunk, ChunkId, Stage
+        chunk = get_chunk(ChunkId.AXIOMS_METHODOLOGY)
+        assert Stage.AXIOMS in chunk.stages
+        assert Stage.SIGNATURE not in chunk.stages
+
+
 class TestConceptCoverage:
     """Verify that important concepts are covered by at least one chunk per stage."""
     
@@ -304,3 +334,27 @@ class TestDomainAnalysisInPrompts:
             obligation_table_md="| obs | ctor |",
         )
         assert "Domain Analysis" not in prompt
+
+    def test_signature_user_prompt_has_no_methodology(self):
+        """Verify generic methodology was moved to system prompt."""
+        from alspec.pipeline import _build_signature_user_prompt
+        prompt = _build_signature_user_prompt("A bank account system")
+        # These should NOT be in the user prompt anymore
+        assert "Classify functions" not in prompt
+        assert "Mark partial functions" not in prompt
+        assert "submit_signature" not in prompt
+
+    def test_axioms_user_prompt_has_no_methodology(self):
+        """Verify generic methodology was moved to system prompt."""
+        from alspec.pipeline import _build_axioms_user_prompt
+        prompt = _build_axioms_user_prompt(
+            domain_description="A bank account system",
+            spec_name="BankAccount",
+            signature_code="sig = Signature(...)",
+            signature_analysis="Step 1: ...",
+            obligation_table_md="| obs | ctor |",
+        )
+        # These should NOT be in the user prompt anymore
+        assert "Axiom writing rules" not in prompt
+        assert "submit_spec" not in prompt
+        assert "MISS cells" not in prompt

@@ -9,33 +9,4 @@ The following structured domain analysis was produced in a prior stage. Use it t
 {{ domain_analysis }}
 
 {% endif %}
-Follow the methodology from the worked examples to analyze the domain:
-1. Identify all sorts (state sort, parameter sorts, result sorts)
-2. Classify functions: constructors, observers, constants, uninterpreted
-3. Mark partial functions
-4. Identify equality predicates for key dispatch
-5. Determine the generated sort(s) and their constructors
-
-Output Python code that assigns `sig = Signature(...)` **at the top level** (no function wrapper).
-Include all necessary imports at the top.
-
-Your code should look like:
-```
-from alspec import Signature, atomic, fn, pred, GeneratedSortInfo
-
-sig = Signature(
-    sorts={...},
-    functions={...},
-    predicates={...},
-    generated_sorts={...},
-)
-```
-
-- `sorts`: all sort declarations using `atomic(name)`
-- `functions`: all function symbols using `fn(name, params, result, total=True/False)`
-- `predicates`: all predicate symbols using `pred(name, params)`
-- `generated_sorts`: for each generated sort, use `GeneratedSortInfo(constructors=(...), selectors={...})`
-
-Do NOT wrap the code in a function definition.
-Do NOT write any axioms — a later stage will handle axiom generation.
-Call the submit_signature tool with your analysis and signature code.
+Design the signature following the methodology and output format described in the system prompt.

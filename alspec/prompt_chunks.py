@@ -114,6 +114,10 @@ class ChunkId(Enum):
     EXAMPLE_RATE_LIMITER_SPEC = auto()
     EXAMPLE_DNS_ZONE_SPEC = auto()
 
+    # Stage-specific methodology (output format + analysis steps)
+    SIGNATURE_METHODOLOGY = auto()
+    AXIOMS_METHODOLOGY = auto()
+
 
 # Convenience sets for chunk registration (only SIGNATURE and AXIOMS use chunks)
 SIG = frozenset({Stage.SIGNATURE})
@@ -306,6 +310,7 @@ _DEFAULT_CONFIGS: dict[Stage, list[ChunkId]] = {
         ChunkId.OBLIGATION_PATTERN,
         ChunkId.GENERATED_SORTS_ROLES,
         ChunkId.DISPATCH_RULES,
+        ChunkId.SIGNATURE_METHODOLOGY,
     ],
     Stage.AXIOMS: [
         ChunkId.ROLE_PREAMBLE,
@@ -325,5 +330,6 @@ _DEFAULT_CONFIGS: dict[Stage, list[ChunkId]] = {
         ChunkId.EXAMPLE_SESSION_STORE_SPEC,
         ChunkId.EXAMPLE_RATE_LIMITER_SPEC,
         ChunkId.EXAMPLE_DNS_ZONE_SPEC,
+        ChunkId.AXIOMS_METHODOLOGY,
     ],
 }
