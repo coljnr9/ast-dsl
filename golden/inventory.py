@@ -32,7 +32,7 @@
 | `eq_id` (basis)    | —           | —    | `eq_id_refl`| reflexivity |
 | `eq_id` (basis)    | —           | —    | `eq_id_sym` | symmetry |
 | `eq_id` (basis)    | —           | —    | `eq_id_trans`| transitivity |
-| Definedness domain | `remove_stock`| —  | `remove_stock_def`| `Definedness(remove_stock(...)) ⇔ leq(q, get_qty(i, k))` |
+| Definedness domain | `remove_stock`| —  | `remove_stock_def`| `definedness(remove_stock(...)) ⇔ leq(q, get_qty(i, k))` |
 | `get_qty`          | `empty`       | —    | `get_qty_empty` | `zero` |
 | `get_qty`          | `add_stock`   | hit  | `get_qty_add_hit` | `add(get_qty(i, k2), q)` |
 | `get_qty`          | `add_stock`   | miss | `get_qty_add_miss`| delegates back to `get_qty(i, k2)` |
@@ -48,9 +48,25 @@
 
 def inventory_spec():
     from alspec import (
-        Axiom, Conjunction, GeneratedSortInfo, Implication, Negation, PredApp,
-        Signature, Spec, atomic, fn, pred, var, app, const, eq, forall, iff, Definedness
-    )
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    conjunction,
+    const,
+    definedness,
+    eq,
+    fn,
+    forall,
+    iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
+)
 
     # Variables for equations
     i = var("i", "Inventory")
@@ -101,23 +117,21 @@ def inventory_spec():
         # ━━ eq_id basis ━━
         Axiom(
             label="eq_id_refl",
-            formula=forall([k], PredApp("eq_id", (k, k)))
+            formula=forall([k], pred_app("eq_id", k, k))
         ),
         Axiom(
             label="eq_id_sym",
-            formula=forall([k, k2], Implication(
-                PredApp("eq_id", (k, k2)),
-                PredApp("eq_id", (k2, k))
+            formula=forall([k, k2], implication(
+                pred_app("eq_id", k, k2),
+                pred_app("eq_id", k2, k)
             ))
         ),
         Axiom(
             label="eq_id_trans",
-            formula=forall([k, k2, k3], Implication(
-                Conjunction((
-                    PredApp("eq_id", (k, k2)),
-                    PredApp("eq_id", (k2, k3))
-                )),
-                PredApp("eq_id", (k, k3))
+            formula=forall([k, k2, k3], implication(
+                conjunction(pred_app("eq_id", k, k2),
+                    pred_app("eq_id", k2, k3)),
+                pred_app("eq_id", k, k3)
             ))
         ),
 
@@ -125,8 +139,8 @@ def inventory_spec():
         Axiom(
             label="remove_stock_def",
             formula=forall([i, k, q], iff(
-                Definedness(app("remove_stock", i, k, q)),
-                PredApp("leq", (q, app("get_qty", i, k)))
+                definedness(app("remove_stock", i, k, q)),
+                pred_app("leq", q, app("get_qty", i, k))
             ))
         ),
 
@@ -142,8 +156,8 @@ def inventory_spec():
         # Add Hit
         Axiom(
             label="get_qty_add_hit",
-            formula=forall([i, k, k2, q], Implication(
-                PredApp("eq_id", (k, k2)),
+            formula=forall([i, k, k2, q], implication(
+                pred_app("eq_id", k, k2),
                 eq(
                     app("get_qty", app("add_stock", i, k, q), k2),
                     app("add", app("get_qty", i, k2), q)
@@ -154,8 +168,8 @@ def inventory_spec():
         # Add Miss
         Axiom(
             label="get_qty_add_miss",
-            formula=forall([i, k, k2, q], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([i, k, k2, q], implication(
+                negation(pred_app("eq_id", k, k2)),
                 eq(
                     app("get_qty", app("add_stock", i, k, q), k2),
                     app("get_qty", i, k2)
@@ -166,10 +180,10 @@ def inventory_spec():
         # Remove Hit (Guarded by leq condition since remove_stock is partial)
         Axiom(
             label="get_qty_remove_hit",
-            formula=forall([i, k, k2, q], Implication(
-                PredApp("eq_id", (k, k2)),
-                Implication(
-                    PredApp("leq", (q, app("get_qty", i, k))),
+            formula=forall([i, k, k2, q], implication(
+                pred_app("eq_id", k, k2),
+                implication(
+                    pred_app("leq", q, app("get_qty", i, k)),
                     eq(
                         app("get_qty", app("remove_stock", i, k, q), k2),
                         app("sub", app("get_qty", i, k2), q)
@@ -181,10 +195,10 @@ def inventory_spec():
         # Remove Miss (Also guarded: an undefined function prevents equating its value to a valid Nat)
         Axiom(
             label="get_qty_remove_miss",
-            formula=forall([i, k, k2, q], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
-                Implication(
-                    PredApp("leq", (q, app("get_qty", i, k))),
+            formula=forall([i, k, k2, q], implication(
+                negation(pred_app("eq_id", k, k2)),
+                implication(
+                    pred_app("leq", q, app("get_qty", i, k)),
                     eq(
                         app("get_qty", app("remove_stock", i, k, q), k2),
                         app("get_qty", i, k2)

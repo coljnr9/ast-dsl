@@ -43,9 +43,20 @@ Unlike a LIFO stack where `pop(push(S, e)) = S`, the FIFO restriction means we c
 
 def queue_spec():
     from alspec import (
-        Axiom, Definedness, GeneratedSortInfo, Negation, Signature, Spec,
-        atomic, fn, var, app, const, eq, forall
-    )
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    const,
+    definedness,
+    eq,
+    fn,
+    forall,
+    negation,
+    var,
+)
 
     # Variables for our axioms
     q = var("q", "Queue")
@@ -83,7 +94,7 @@ def queue_spec():
         # dequeue × empty: explicit undefinedness required (DOMAIN, partial obs × base ctor)
         Axiom(
             label="dequeue_empty_undef",
-            formula=Negation(Definedness(app("dequeue", const("empty"))))
+            formula=negation(definedness(app("dequeue", const("empty"))))
         ),
         # Dequeueing a queue with 1 element leaves it empty
         Axiom(
@@ -111,7 +122,7 @@ def queue_spec():
         # front × empty: explicit undefinedness required (DOMAIN, partial obs × base ctor)
         Axiom(
             label="front_empty_undef",
-            formula=Negation(Definedness(app("front", const("empty"))))
+            formula=negation(definedness(app("front", const("empty"))))
         ),
         # Front of a queue with 1 element is that element
         Axiom(

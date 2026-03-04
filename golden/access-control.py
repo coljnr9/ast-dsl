@@ -50,9 +50,24 @@
 """
 
 from alspec import (
-    Axiom, Conjunction, Disjunction, GeneratedSortInfo, Implication, Negation, PredApp,
-    Signature, Spec,
-    atomic, fn, pred, var, app, const, eq, forall, iff
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    conjunction,
+    const,
+    disjunction,
+    eq,
+    fn,
+    forall,
+    iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 def access_control_spec() -> Spec:
@@ -108,45 +123,45 @@ def access_control_spec() -> Spec:
     # Axioms
     axioms = (
         # --- Helper: eq_user basis ---
-        Axiom("eq_user_refl", forall([u], PredApp("eq_user", (u, u)))),
-        Axiom("eq_user_sym", forall([u1, u2], Implication(
-            PredApp("eq_user", (u1, u2)),
-            PredApp("eq_user", (u2, u1))
+        Axiom("eq_user_refl", forall([u], pred_app("eq_user", u, u))),
+        Axiom("eq_user_sym", forall([u1, u2], implication(
+            pred_app("eq_user", u1, u2),
+            pred_app("eq_user", u2, u1)
         ))),
-        Axiom("eq_user_trans", forall([u1, u2, u3], Implication(
-            Conjunction((PredApp("eq_user", (u1, u2)), PredApp("eq_user", (u2, u3)))),
-            PredApp("eq_user", (u1, u3))
+        Axiom("eq_user_trans", forall([u1, u2, u3], implication(
+            conjunction(pred_app("eq_user", u1, u2), pred_app("eq_user", u2, u3)),
+            pred_app("eq_user", u1, u3)
         ))),
 
         # --- Helper: eq_res basis ---
-        Axiom("eq_res_refl", forall([r], PredApp("eq_res", (r, r)))),
-        Axiom("eq_res_sym", forall([r1, r2], Implication(
-            PredApp("eq_res", (r1, r2)),
-            PredApp("eq_res", (r2, r1))
+        Axiom("eq_res_refl", forall([r], pred_app("eq_res", r, r))),
+        Axiom("eq_res_sym", forall([r1, r2], implication(
+            pred_app("eq_res", r1, r2),
+            pred_app("eq_res", r2, r1)
         ))),
-        Axiom("eq_res_trans", forall([r1, r2, r3], Implication(
-            Conjunction((PredApp("eq_res", (r1, r2)), PredApp("eq_res", (r2, r3)))),
-            PredApp("eq_res", (r1, r3))
+        Axiom("eq_res_trans", forall([r1, r2, r3], implication(
+            conjunction(pred_app("eq_res", r1, r2), pred_app("eq_res", r2, r3)),
+            pred_app("eq_res", r1, r3)
         ))),
 
         # --- Role distinctness (enumeration) ---
         # Without these, a model where regular = admin is valid,
         # which would grant all regular users admin access.
-        Axiom("role_admin_ne_regular", Negation(eq(const("admin"), const("regular")))),
-        Axiom("role_admin_ne_none", Negation(eq(const("admin"), const("none")))),
-        Axiom("role_regular_ne_none", Negation(eq(const("regular"), const("none")))),
+        Axiom("role_admin_ne_regular", negation(eq(const("admin"), const("regular")))),
+        Axiom("role_admin_ne_none", negation(eq(const("admin"), const("none")))),
+        Axiom("role_regular_ne_none", negation(eq(const("regular"), const("none")))),
 
         # --- Observer: get_role ---
         Axiom("get_role_init", forall([u], eq(
             app("get_role", const("init"), u),
             const("none")
         ))),
-        Axiom("get_role_set_hit", forall([s, u1, u2, role], Implication(
-            PredApp("eq_user", (u1, u2)),
+        Axiom("get_role_set_hit", forall([s, u1, u2, role], implication(
+            pred_app("eq_user", u1, u2),
             eq(app("get_role", app("set_role", s, u1, role), u2), role)
         ))),
-        Axiom("get_role_set_miss", forall([s, u1, u2, role], Implication(
-            Negation(PredApp("eq_user", (u1, u2))),
+        Axiom("get_role_set_miss", forall([s, u1, u2, role], implication(
+            negation(pred_app("eq_user", u1, u2)),
             eq(
                 app("get_role", app("set_role", s, u1, role), u2),
                 app("get_role", s, u2)
@@ -162,49 +177,47 @@ def access_control_spec() -> Spec:
         ))),
 
         # --- Observer: has_permission ---
-        Axiom("has_perm_init", forall([u, r], Negation(
-            PredApp("has_permission", (const("init"), u, r))
+        Axiom("has_perm_init", forall([u, r], negation(
+            pred_app("has_permission", const("init"), u, r)
         ))),
         Axiom("has_perm_set", forall([s, u1, u2, role, r], iff(
-            PredApp("has_permission", (app("set_role", s, u1, role), u2, r)),
-            PredApp("has_permission", (s, u2, r))
+            pred_app("has_permission", app("set_role", s, u1, role), u2, r),
+            pred_app("has_permission", s, u2, r)
         ))),
         
         # granting hit requires BOTH user and resource to match
-        Axiom("has_perm_grant_hit", forall([s, u1, u2, r1, r2], Implication(
-            Conjunction((PredApp("eq_user", (u1, u2)), PredApp("eq_res", (r1, r2)))),
-            PredApp("has_permission", (app("grant", s, u1, r1), u2, r2))
+        Axiom("has_perm_grant_hit", forall([s, u1, u2, r1, r2], implication(
+            conjunction(pred_app("eq_user", u1, u2), pred_app("eq_res", r1, r2)),
+            pred_app("has_permission", app("grant", s, u1, r1), u2, r2)
         ))),
         # granting miss means at least one doesn't match
-        Axiom("has_perm_grant_miss", forall([s, u1, u2, r1, r2], Implication(
-            Negation(Conjunction((PredApp("eq_user", (u1, u2)), PredApp("eq_res", (r1, r2))))),
+        Axiom("has_perm_grant_miss", forall([s, u1, u2, r1, r2], implication(
+            negation(conjunction(pred_app("eq_user", u1, u2), pred_app("eq_res", r1, r2))),
             iff(
-                PredApp("has_permission", (app("grant", s, u1, r1), u2, r2)),
-                PredApp("has_permission", (s, u2, r2))
+                pred_app("has_permission", app("grant", s, u1, r1), u2, r2),
+                pred_app("has_permission", s, u2, r2)
             )
         ))),
         
         # revoking hit requires BOTH user and resource to match
-        Axiom("has_perm_revoke_hit", forall([s, u1, u2, r1, r2], Implication(
-            Conjunction((PredApp("eq_user", (u1, u2)), PredApp("eq_res", (r1, r2)))),
-            Negation(PredApp("has_permission", (app("revoke", s, u1, r1), u2, r2)))
+        Axiom("has_perm_revoke_hit", forall([s, u1, u2, r1, r2], implication(
+            conjunction(pred_app("eq_user", u1, u2), pred_app("eq_res", r1, r2)),
+            negation(pred_app("has_permission", app("revoke", s, u1, r1), u2, r2))
         ))),
         # revoking miss
-        Axiom("has_perm_revoke_miss", forall([s, u1, u2, r1, r2], Implication(
-            Negation(Conjunction((PredApp("eq_user", (u1, u2)), PredApp("eq_res", (r1, r2))))),
+        Axiom("has_perm_revoke_miss", forall([s, u1, u2, r1, r2], implication(
+            negation(conjunction(pred_app("eq_user", u1, u2), pred_app("eq_res", r1, r2))),
             iff(
-                PredApp("has_permission", (app("revoke", s, u1, r1), u2, r2)),
-                PredApp("has_permission", (s, u2, r2))
+                pred_app("has_permission", app("revoke", s, u1, r1), u2, r2),
+                pred_app("has_permission", s, u2, r2)
             )
         ))),
 
         # --- Derived Observer: can_access ---
         Axiom("can_access_def", forall([s, u, r], iff(
-            PredApp("can_access", (s, u, r)),
-            Disjunction((
-                eq(app("get_role", s, u), const("admin")),
-                PredApp("has_permission", (s, u, r))
-            ))
+            pred_app("can_access", s, u, r),
+            disjunction(eq(app("get_role", s, u), const("admin")),
+                pred_app("has_permission", s, u, r))
         )))
     )
 

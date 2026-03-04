@@ -34,8 +34,19 @@ For our single observer `is_enabled`, we generate obligations against every cons
 """
 
 from alspec import (
-    Axiom, GeneratedSortInfo, Negation, PredApp,
-    Signature, Spec, atomic, fn, pred, var, app, const, forall
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    const,
+    fn,
+    forall,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 def boolean_flag_spec() -> Spec:
@@ -67,19 +78,19 @@ def boolean_flag_spec() -> Spec:
         # init constructor: A new flag is disabled by default
         Axiom(
             label="is_enabled_init",
-            formula=Negation(PredApp("is_enabled", (const("init"),)))
+            formula=negation(pred_app("is_enabled", const("init")))
         ),
         
         # enable constructor: enabling the flag makes it enabled
         Axiom(
             label="is_enabled_enable",
-            formula=forall([f], PredApp("is_enabled", (app("enable", f),)))
+            formula=forall([f], pred_app("is_enabled", app("enable", f)))
         ),
         
         # disable constructor: disabling the flag makes it disabled
         Axiom(
             label="is_enabled_disable",
-            formula=forall([f], Negation(PredApp("is_enabled", (app("disable", f),))))
+            formula=forall([f], negation(pred_app("is_enabled", app("disable", f))))
         ),
     )
     

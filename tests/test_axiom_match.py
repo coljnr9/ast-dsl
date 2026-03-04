@@ -12,22 +12,22 @@ import pytest
 from alspec import (
     Axiom,
     Biconditional,
-    Conjunction,
-    Definedness,
     Equation,
     ExistentialQuant,
     FnApp,
-    Implication,
-    Negation,
-    PredApp,
     Spec,
     UniversalQuant,
     Var,
     app,
+    conjunction,
     const,
+    definedness,
     eq,
     fn,
     forall,
+    implication,
+    negation,
+    pred_app,
     var,
 )
 from alspec.axiom_match import (
@@ -108,18 +108,18 @@ class TestPeelQuantifiers:
 
 class TestPeelImplications:
     def test_single_implication(self):
-        g1 = PredApp("eq_id", (var("k", "K"), var("k2", "K")))
+        g1 = pred_app("eq_id", var("k", "K"), var("k2", "K"))
         conclusion = eq(app("f", var("x", "X")), var("x", "X"))
-        f = Implication(g1, conclusion)
+        f = implication(g1, conclusion)
         guards, conc = _peel_implications(f)
         assert guards == [g1]
         assert conc is conclusion
 
     def test_nested_implications(self):
-        g1 = PredApp("eq_id", (var("k", "K"), var("k2", "K")))
-        g2 = PredApp("has_ticket", (var("s", "S"), var("k", "K")))
+        g1 = pred_app("eq_id", var("k", "K"), var("k2", "K"))
+        g2 = pred_app("has_ticket", var("s", "S"), var("k", "K"))
         conclusion = eq(app("f", var("x", "X")), var("x", "X"))
-        f = Implication(g1, Implication(g2, conclusion))
+        f = implication(g1, implication(g2, conclusion))
         guards, conc = _peel_implications(f)
         assert len(guards) == 2
         assert guards[0] is g1
@@ -171,18 +171,18 @@ class TestClassifyGuard:
     """Tests for _classify_guard."""
 
     def test_positive_eq_pred_returns_hit(self):
-        guard = PredApp("eq_id", (var("k", "K"), var("k2", "K")))
+        guard = pred_app("eq_id", var("k", "K"), var("k2", "K"))
         assert _classify_guard([guard], {"eq_id"}) == CellDispatch.HIT
 
     def test_negated_eq_pred_returns_miss(self):
-        guard = Negation(PredApp("eq_id", (var("k", "K"), var("k2", "K"))))
+        guard = negation(pred_app("eq_id", var("k", "K"), var("k2", "K")))
         assert _classify_guard([guard], {"eq_id"}) == CellDispatch.MISS
 
     def test_no_guard_returns_none(self):
         assert _classify_guard([], {"eq_id"}) is None
 
     def test_non_eq_pred_guard_returns_none(self):
-        guard = PredApp("has_ticket", (var("s", "S"), var("k", "K")))
+        guard = pred_app("has_ticket", var("s", "S"), var("k", "K"))
         assert _classify_guard([guard], {"eq_id"}) is None
 
     def test_domain_eq_pred_not_in_cell_preds_returns_none(self):
@@ -191,27 +191,27 @@ class TestClassifyGuard:
         This is the door-lock scenario: eq_code appears in a guard
         but the cell has no eq_pred (PLAIN dispatch).
         """
-        guard = PredApp("eq_code", (var("c", "Code"), app("get_code", var("l", "Lock"))))
+        guard = pred_app("eq_code", var("c", "Code"), app("get_code", var("l", "Lock")))
         assert _classify_guard([guard], {"eq_id"}) is None
 
     def test_conjunction_with_eq_pred_member_returns_hit(self):
         """Conjunction containing the eq_pred → HIT."""
-        eq_guard = PredApp("eq_id", (var("k", "K"), var("k2", "K")))
-        state_guard = PredApp("has_ticket", (var("s", "S"), var("k", "K")))
-        guard = Conjunction((eq_guard, state_guard))
+        eq_guard = pred_app("eq_id", var("k", "K"), var("k2", "K"))
+        state_guard = pred_app("has_ticket", var("s", "S"), var("k", "K"))
+        guard = conjunction(eq_guard, state_guard)
         assert _classify_guard([guard], {"eq_id"}) == CellDispatch.HIT
 
     def test_negated_conjunction_with_eq_pred_returns_miss(self):
         """Negated conjunction containing the eq_pred → MISS."""
-        eq_guard = PredApp("eq_id", (var("k", "K"), var("k2", "K")))
-        state_guard = PredApp("has_ticket", (var("s", "S"), var("k", "K")))
-        guard = Negation(Conjunction((eq_guard, state_guard)))
+        eq_guard = pred_app("eq_id", var("k", "K"), var("k2", "K"))
+        state_guard = pred_app("has_ticket", var("s", "S"), var("k", "K"))
+        guard = negation(conjunction(eq_guard, state_guard))
         assert _classify_guard([guard], {"eq_id"}) == CellDispatch.MISS
 
     def test_first_matching_guard_wins(self):
         """Returns on first matching guard, not last."""
-        eq_guard = PredApp("eq_id", (var("k", "K"), var("k2", "K")))
-        other_guard = PredApp("eq_other", (var("k", "K"), var("k2", "K")))
+        eq_guard = pred_app("eq_id", var("k", "K"), var("k2", "K"))
+        other_guard = pred_app("eq_other", var("k", "K"), var("k2", "K"))
         guards = [eq_guard, other_guard]
         assert _classify_guard(guards, {"eq_id"}) == CellDispatch.HIT
 
@@ -229,8 +229,8 @@ class TestIsConstructorDef:
         roles = self._make_roles()
         c = var("c", "Counter")
         f = Biconditional(
-            Definedness(app("inc", c)),
-            Negation(PredApp("is_at_max", (c,))),
+            definedness(app("inc", c)),
+            negation(pred_app("is_at_max", c)),
         )
         assert _is_constructor_def(f, roles)
 
@@ -238,8 +238,8 @@ class TestIsConstructorDef:
         roles = self._make_roles()
         c = var("c", "Counter")
         f = Biconditional(
-            Negation(PredApp("is_at_max", (c,))),
-            Definedness(app("inc", c)),
+            negation(pred_app("is_at_max", c)),
+            definedness(app("inc", c)),
         )
         assert _is_constructor_def(f, roles)
 
@@ -248,8 +248,8 @@ class TestIsConstructorDef:
         c = var("c", "Counter")
         # Definedness of an OBSERVER (not a constructor)
         f = Biconditional(
-            Definedness(app("is_at_max", c)),
-            PredApp("something", (c,)),
+            definedness(app("is_at_max", c)),
+            pred_app("something", c),
         )
         assert not _is_constructor_def(f, roles)
 
@@ -272,14 +272,14 @@ class TestIsBasisAxiom:
     def test_reflexivity_is_basis(self):
         roles = self._make_pred_roles()
         k = var("k", "TicketId")
-        f = PredApp("eq_id", (k, k))
+        f = pred_app("eq_id", k, k)
         assert _is_basis_axiom(f, roles)
 
     def test_symmetry_is_basis(self):
         roles = self._make_pred_roles()
         k1 = var("k1", "TicketId")
         k2 = var("k2", "TicketId")
-        f = Implication(PredApp("eq_id", (k1, k2)), PredApp("eq_id", (k2, k1)))
+        f = implication(pred_app("eq_id", k1, k2), pred_app("eq_id", k2, k1))
         assert _is_basis_axiom(f, roles)
 
     def test_transitivity_is_basis(self):
@@ -287,9 +287,9 @@ class TestIsBasisAxiom:
         k1 = var("k1", "TicketId")
         k2 = var("k2", "TicketId")
         k3 = var("k3", "TicketId")
-        f = Implication(
-            Conjunction((PredApp("eq_id", (k1, k2)), PredApp("eq_id", (k2, k3)))),
-            PredApp("eq_id", (k1, k3)),
+        f = implication(
+            conjunction(pred_app("eq_id", k1, k2), pred_app("eq_id", k2, k3)),
+            pred_app("eq_id", k1, k3),
         )
         assert _is_basis_axiom(f, roles)
 
@@ -297,7 +297,7 @@ class TestIsBasisAxiom:
         roles = self._make_pred_roles()
         s = var("s", "Store")
         k = var("k", "TicketId")
-        f = PredApp("has_ticket", (s, k))
+        f = pred_app("has_ticket", s, k)
         assert not _is_basis_axiom(f, roles)
 
     def test_mixed_preds_not_basis(self):
@@ -305,10 +305,8 @@ class TestIsBasisAxiom:
         roles = self._make_pred_roles()
         k = var("k", "TicketId")
         s = var("s", "Store")
-        f = Conjunction((
-            PredApp("eq_id", (k, k)),
-            PredApp("has_ticket", (s, k)),
-        ))
+        f = conjunction(pred_app("eq_id", k, k),
+            pred_app("has_ticket", s, k))
         assert not _is_basis_axiom(f, roles)
 
     def test_no_eq_preds_in_roles_not_basis(self):
@@ -317,7 +315,7 @@ class TestIsBasisAxiom:
             "has_ticket": PredRole("has_ticket", PredKind.OBSERVER, "Store"),
         }
         k = var("k", "TicketId")
-        f = PredApp("has_ticket", (const("empty"), k))
+        f = pred_app("has_ticket", const("empty"), k)
         assert not _is_basis_axiom(f, roles)
 
 
@@ -340,7 +338,7 @@ class TestIsDistinctness:
             generated_sorts={},  # Color is NOT generated
         )
         # Build a minimal spec with just this axiom
-        ax = Axiom("color_distinct_rg", Negation(eq(const("red"), const("green"))))
+        ax = Axiom("color_distinct_rg", negation(eq(const("red"), const("green"))))
         spec = Spec(name="Test", signature=sig, axioms=(ax,))
         table = build_obligation_table(sig)
         report = match_spec_sync(spec, table, sig)
@@ -363,7 +361,7 @@ class TestIsDistinctness:
             predicates={},
             generated_sorts={},
         )
-        ax = Axiom("cross_sort", Negation(eq(const("red"), const("zero"))))
+        ax = Axiom("cross_sort", negation(eq(const("red"), const("zero"))))
         spec = Spec(name="Test", signature=sig, axioms=(ax,))
         table = build_obligation_table(sig)
         report = match_spec_sync(spec, table, sig)
@@ -384,7 +382,7 @@ class TestIsDistinctness:
             generated_sorts={},
         )
         x = var("x", "S")
-        ax = Axiom("not_distinct", Negation(eq(app("f", x), app("g", x))))
+        ax = Axiom("not_distinct", negation(eq(app("f", x), app("g", x))))
         spec = Spec(name="Test", signature=sig, axioms=(ax,))
         table = build_obligation_table(sig)
         report = match_spec_sync(spec, table, sig)
@@ -405,7 +403,7 @@ class TestIsDistinctness:
             generated_sorts={},
         )
         # Some models wrap distinctness in a vacuous forall
-        ax = Axiom("bool_distinct", Negation(eq(const("high"), const("low"))))
+        ax = Axiom("bool_distinct", negation(eq(const("high"), const("low"))))
         spec = Spec(name="Test", signature=sig, axioms=(ax,))
         table = build_obligation_table(sig)
         report = match_spec_sync(spec, table, sig)
@@ -436,7 +434,7 @@ class TestIsDistinctness:
         pred_roles = {
             "eq_color": PredRole("eq_color", PredKind.EQUALITY, "Color"),
         }
-        f = Negation(PredApp("eq_color", (const("red"), const("green"))))
+        f = negation(pred_app("eq_color", const("red"), const("green")))
         assert _is_distinctness_axiom(f, fn_roles, sig, pred_roles=pred_roles)
 
     def test_negated_eq_predapp_cross_sort_not_distinctness(self):
@@ -463,7 +461,7 @@ class TestIsDistinctness:
         pred_roles = {
             "eq_color": PredRole("eq_color", PredKind.EQUALITY, "Color"),
         }
-        f = Negation(PredApp("eq_color", (const("red"), const("zero"))))
+        f = negation(pred_app("eq_color", const("red"), const("zero")))
         assert not _is_distinctness_axiom(f, fn_roles, sig, pred_roles=pred_roles)
 
     def test_negated_non_eq_predapp_not_distinctness(self):
@@ -479,7 +477,7 @@ class TestIsDistinctness:
         pred_roles = {
             "has_ticket": PredRole("has_ticket", PredKind.OBSERVER, "Store"),
         }
-        f = Negation(PredApp("has_ticket", (const("a"), const("b"))))
+        f = negation(pred_app("has_ticket", const("a"), const("b")))
         assert not _is_distinctness_axiom(f, fn_roles, sig=None, pred_roles=pred_roles)
 
     def test_negated_eq_predapp_three_args_not_distinctness(self):
@@ -492,7 +490,7 @@ class TestIsDistinctness:
         pred_roles = {
             "eq_color": PredRole("eq_color", PredKind.EQUALITY, "Color"),
         }
-        f = Negation(PredApp("eq_color", (const("a"), const("b"), const("c"))))
+        f = negation(pred_app("eq_color", const("a"), const("b"), const("c")))
         assert not _is_distinctness_axiom(f, fn_roles, sig=None, pred_roles=pred_roles)
 
     def test_negated_eq_predapp_no_pred_roles_backward_compat(self):
@@ -506,7 +504,7 @@ class TestIsDistinctness:
             "green": FnRole("green", FnKind.CONSTANT, None),
         }
         # PredApp form, but pred_roles not passed → should NOT match
-        f = Negation(PredApp("eq_color", (const("red"), const("green"))))
+        f = negation(pred_app("eq_color", const("red"), const("green")))
         assert not _is_distinctness_axiom(f, fn_roles, sig=None)
 
     def test_negated_eq_predapp_same_constant_not_distinctness(self):
@@ -523,7 +521,7 @@ class TestIsDistinctness:
         )
         fn_roles = {"red": FnRole("red", FnKind.CONSTANT, None)}
         pred_roles = {"eq_color": PredRole("eq_color", PredKind.EQUALITY, "Color")}
-        f = Negation(PredApp("eq_color", (const("red"), const("red"))))
+        f = negation(pred_app("eq_color", const("red"), const("red")))
         assert not _is_distinctness_axiom(f, fn_roles, sig, pred_roles=pred_roles)
 
     def test_predapp_distinctness_full_match(self):
@@ -544,7 +542,7 @@ class TestIsDistinctness:
             },
             generated_sorts={},
         )
-        ax = Axiom("color_distinct_rg", Negation(PredApp("eq_color", (const("red"), const("green")))))
+        ax = Axiom("color_distinct_rg", negation(pred_app("eq_color", const("red"), const("green"))))
         spec = Spec(name="Test", signature=sig, axioms=(ax,))
         table = build_obligation_table(sig)
         report = match_spec_sync(spec, table, sig)
@@ -577,7 +575,7 @@ class TestIsDistinctness:
         pred_roles = {
             "eq_color": PredRole("eq_color", PredKind.EQUALITY, "Color"),
         }
-        f = Negation(PredApp("eq_color", (const("red"), const("green"))))
+        f = negation(pred_app("eq_color", const("red"), const("green")))
         assert _is_distinctness_axiom(f, fn_roles, sig, pred_roles=pred_roles)
 
     def test_conjunction_of_equation_distinctness(self):
@@ -602,11 +600,9 @@ class TestIsDistinctness:
             "amber": FnRole("amber", FnKind.CONSTANT, None),
             "green": FnRole("green", FnKind.CONSTANT, None),
         }
-        f = Conjunction((
-            Negation(eq(const("red"), const("amber"))),
-            Negation(eq(const("amber"), const("green"))),
-            Negation(eq(const("red"), const("green"))),
-        ))
+        f = conjunction(negation(eq(const("red"), const("amber"))),
+            negation(eq(const("amber"), const("green"))),
+            negation(eq(const("red"), const("green"))))
         assert _is_distinctness_axiom(f, fn_roles, sig)
 
     def test_conjunction_of_predapp_distinctness(self):
@@ -635,11 +631,9 @@ class TestIsDistinctness:
         pred_roles = {
             "eq_phase": PredRole("eq_phase", PredKind.EQUALITY, "Phase"),
         }
-        f = Conjunction((
-            Negation(PredApp("eq_phase", (const("red"), const("yellow")))),
-            Negation(PredApp("eq_phase", (const("yellow"), const("green")))),
-            Negation(PredApp("eq_phase", (const("red"), const("green")))),
-        ))
+        f = conjunction(negation(pred_app("eq_phase", const("red"), const("yellow"))),
+            negation(pred_app("eq_phase", const("yellow"), const("green"))),
+            negation(pred_app("eq_phase", const("red"), const("green"))))
         assert _is_distinctness_axiom(f, fn_roles, sig, pred_roles=pred_roles)
 
     def test_conjunction_with_non_distinctness_conjunct(self):
@@ -653,10 +647,10 @@ class TestIsDistinctness:
             "red": FnRole("red", FnKind.CONSTANT, None),
             "green": FnRole("green", FnKind.CONSTANT, None),
         }
-        f = Conjunction((
-            Negation(eq(const("red"), const("green"))),
-            PredApp("some_pred", (const("red"),)),  # not distinctness
-        ))
+        f = conjunction(
+            negation(eq(const("red"), const("green"))),
+            pred_app("some_pred", const("red")),  # not distinctness
+        )
         assert not _is_distinctness_axiom(f, fn_roles, sig=None)
 
     def test_empty_conjunction_not_distinctness(self):
@@ -664,7 +658,7 @@ class TestIsDistinctness:
         from alspec import Conjunction
         from alspec.axiom_match import _is_distinctness_axiom
 
-        f = Conjunction(())
+        f = conjunction()
         assert not _is_distinctness_axiom(f, {}, sig=None)
 
     def test_singleton_conjunction_distinctness(self):
@@ -687,9 +681,7 @@ class TestIsDistinctness:
             "true": FnRole("true", FnKind.CONSTANT, None),
             "false": FnRole("false", FnKind.CONSTANT, None),
         }
-        f = Conjunction((
-            Negation(eq(const("true"), const("false"))),
-        ))
+        f = conjunction(negation(eq(const("true"), const("false"))))
         assert _is_distinctness_axiom(f, fn_roles, sig)
 
     def test_conjunction_distinctness_full_match(self):
@@ -709,11 +701,9 @@ class TestIsDistinctness:
             predicates={},
             generated_sorts={},
         )
-        ax = Axiom("distinct_phases", Conjunction((
-            Negation(eq(const("red"), const("amber"))),
-            Negation(eq(const("amber"), const("green"))),
-            Negation(eq(const("red"), const("green"))),
-        )))
+        ax = Axiom("distinct_phases", conjunction(negation(eq(const("red"), const("amber"))),
+            negation(eq(const("amber"), const("green"))),
+            negation(eq(const("red"), const("green")))))
         spec = Spec(name="Test", signature=sig, axioms=(ax,))
         table = build_obligation_table(sig)
         report = match_spec_sync(spec, table, sig)
@@ -739,12 +729,8 @@ class TestIsDistinctness:
             generated_sorts={},
         )
         axioms = (
-            Axiom("distinct_phases", Conjunction((
-                Negation(eq(const("red"), const("green"))),
-            ))),
-            Axiom("distinct_modes", Conjunction((
-                Negation(eq(const("normal"), const("flashing"))),
-            ))),
+            Axiom("distinct_phases", conjunction(negation(eq(const("red"), const("green"))))),
+            Axiom("distinct_modes", conjunction(negation(eq(const("normal"), const("flashing"))))),
         )
         spec = Spec(name="Test", signature=sig, axioms=axioms)
         table = build_obligation_table(sig)
@@ -782,13 +768,13 @@ class TestFindObsCtor:
         assert result == ("get_value", False, "inc")
 
     def test_negation_definedness(self):
-        """Negation(Definedness(obs(ctor(...)))) — used for partial selectors."""
+        """negation(definedness(obs(ctor(...)))) — used for partial selectors."""
         fn_roles = {
             "new": FnRole("new", FnKind.CONSTRUCTOR, "Stack"),
             "pop": FnRole("pop", FnKind.SELECTOR, "Stack"),
         }
         pred_roles: dict[str, PredRole] = {}
-        f = Negation(Definedness(app("pop", const("new"))))
+        f = negation(definedness(app("pop", const("new"))))
         result = _find_obs_ctor(f, fn_roles, pred_roles)
         assert result == ("pop", False, "new")
 
@@ -801,12 +787,12 @@ class TestFindObsCtor:
         pred_roles = {
             "empty": PredRole("empty", PredKind.OBSERVER, "Stack"),
         }
-        f = PredApp("empty", (const("new"),))
+        f = pred_app("empty", const("new"))
         result = _find_obs_ctor(f, fn_roles, pred_roles)
         assert result == ("empty", True, "new")
 
     def test_negated_predapp_observer(self):
-        """Negation(PredApp(obs, (ctor(...),))) — used for push/new predicates."""
+        """negation(PredApp(obs, (ctor(...),))) — used for push/new predicates."""
         fn_roles = {
             "push": FnRole("push", FnKind.CONSTRUCTOR, "Stack"),
         }
@@ -815,7 +801,7 @@ class TestFindObsCtor:
         }
         s = var("s", "Stack")
         e = var("e", "Elem")
-        f = Negation(PredApp("empty", (app("push", s, e),)))
+        f = negation(pred_app("empty", app("push", s, e)))
         result = _find_obs_ctor(f, fn_roles, pred_roles)
         assert result == ("empty", True, "push")
 
@@ -829,8 +815,8 @@ class TestFindObsCtor:
             "lt": PredRole("lt", PredKind.OTHER, None),
         }
         f = Biconditional(
-            PredApp("heater_on", (const("new"),)),
-            PredApp("lt", (const("init_current"), const("init_target"))),
+            pred_app("heater_on", const("new")),
+            pred_app("lt", const("init_current"), const("init_target")),
         )
         result = _find_obs_ctor(f, fn_roles, pred_roles)
         assert result == ("heater_on", True, "new")
@@ -846,8 +832,8 @@ class TestFindObsCtor:
         }
         # Observer on RHS — non-standard but should still be found
         f = Biconditional(
-            PredApp("lt", (const("a"), const("b"))),
-            PredApp("heater_on", (const("new"),)),
+            pred_app("lt", const("a"), const("b")),
+            pred_app("heater_on", const("new")),
         )
         result = _find_obs_ctor(f, fn_roles, pred_roles)
         assert result == ("heater_on", True, "new")
@@ -860,7 +846,7 @@ class TestFindObsCtor:
         pred_roles = {
             "lt": PredRole("lt", PredKind.OTHER, None),
         }
-        f = PredApp("lt", (const("new"), const("new")))
+        f = pred_app("lt", const("new"), const("new"))
         assert _find_obs_ctor(f, fn_roles, pred_roles) is None
 
     def test_unrecognized_formula_returns_none(self):
@@ -877,8 +863,8 @@ class TestWalkFormulaFnsDefensive:
 
     def test_fnapp_in_negation_does_not_crash(self):
         """FnApp inside Negation (LLM error) should extract fn names, not crash."""
-        # Simulates: Negation(app("is_read", app("receive", i, m), m2))
-        malformed = Negation(app("is_read", app("receive", var("i", "Inbox"), var("m", "Msg")), var("m2", "Msg")))
+        # Simulates: negation(app("is_read", app("receive", i, m), m2))
+        malformed = negation(app("is_read", app("receive", var("i", "Inbox"), var("m", "Msg")), var("m2", "Msg")))
         # Should not raise TypeError
         names = _collect_fn_names(malformed)
         assert "is_read" in names
@@ -886,10 +872,10 @@ class TestWalkFormulaFnsDefensive:
 
     def test_fnapp_in_conjunction_does_not_crash(self):
         """FnApp inside Conjunction should not crash."""
-        malformed = Conjunction((
-            PredApp("some_pred", (var("x", "X"),)),
+        malformed = conjunction(
+            pred_app("some_pred", var("x", "X")),
             app("some_fn", var("y", "Y")),  # FnApp where Formula expected
-        ))
+        )
         names = _collect_fn_names(malformed)
         assert "some_fn" in names
         assert "some_pred" not in names  # _collect_fn_names doesn't collect pred names
@@ -1256,7 +1242,7 @@ GOLDEN_STEMS = [
 
 # Specs where the matcher handles every axiom pattern (strict assertion).
 # Specs NOT in this set have known exceptional axiom patterns:
-#   - access-control: distinctness axioms (Negation(Equation(const, const)))
+#   - access-control: distinctness axioms (negation(Equation(const, const)))
 #                     and can_access_def (derived pred with Var first arg).
 #   - email-inbox: pred_zero/pred_suc (Nat helper axioms for uninterpreted fns).
 # These are legitimately UNMATCHED — they don't follow the obs(ctor(...)) pattern.
@@ -1360,7 +1346,7 @@ class TestEdgeCases:
         assert CellDispatch.MISS in dispatches
 
     def test_constructor_def_not_matched_as_cell(self):
-        """iff(Definedness(ctor), guard) should NOT match any cell."""
+        """iff(definedness(ctor), guard) should NOT match any cell."""
         mod = _load_golden("bounded-counter")
         spec = mod.bounded_counter_spec()
         table = build_obligation_table(spec.signature)
@@ -1391,7 +1377,7 @@ class TestEdgeCases:
         # This axiom has no obs(ctor(...)) pattern recognizable by the matcher
         unrecognizable = Axiom(
             label="mystery_axiom",
-            formula=PredApp("some_random_pred", (x,)),
+            formula=pred_app("some_random_pred", x),
         )
         spec = Spec(
             name="TestSpec",
@@ -1408,10 +1394,10 @@ class TestEdgeCases:
 
     def test_collect_pred_names_traverses_all_connectives(self):
         """_collect_pred_names should find preds in nested formulas."""
-        p1 = PredApp("pred_a", (var("x", "X"),))
-        p2 = PredApp("pred_b", (var("y", "Y"),))
-        f = Implication(
-            Conjunction((p1,)),
+        p1 = pred_app("pred_a", var("x", "X"))
+        p2 = pred_app("pred_b", var("y", "Y"))
+        f = implication(
+            conjunction(p1),
             Biconditional(p2, p1),
         )
         names = _collect_pred_names(f)
@@ -1447,9 +1433,21 @@ class TestInfrastructureAxioms:
 
     def test_geq_zero_base_is_infrastructure(self):
         from alspec import (
-            Signature, GeneratedSortInfo, Spec, Axiom, atomic, fn, pred, var,
-            const, forall, PredApp,
-        )
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    atomic,
+    const,
+    definedness,
+    fn,
+    forall,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
+)
         from alspec.obligation import build_obligation_table
         from alspec.axiom_match import match_spec_sync, MatchKind
 
@@ -1474,7 +1472,7 @@ class TestInfrastructureAxioms:
             name="Test",
             signature=sig,
             axioms=(
-                Axiom("geq_zero_base", forall([n], PredApp("geq", (n, const("zero"))))),
+                Axiom("geq_zero_base", forall([n], pred_app("geq", n, const("zero")))),
             ),
         )
         table = build_obligation_table(sig)
@@ -1486,9 +1484,22 @@ class TestInfrastructureAxioms:
     def test_infrastructure_with_observer_is_not_infrastructure(self):
         """A formula that uses an observer fn should NOT be INFRASTRUCTURE."""
         from alspec import (
-            Signature, GeneratedSortInfo, Spec, Axiom, atomic, fn, pred, var,
-            app, const, forall, PredApp,
-        )
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    const,
+    definedness,
+    fn,
+    forall,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
+)
         from alspec.obligation import build_obligation_table
         from alspec.axiom_match import match_spec_sync, MatchKind
 
@@ -1512,7 +1523,7 @@ class TestInfrastructureAxioms:
             signature=sig,
             axioms=(
                 # geq(get(s), zero) — uses observer 'get', so NOT infrastructure
-                Axiom("not_infra", forall([s], PredApp("geq", (app("get", s), const("zero"))))),
+                Axiom("not_infra", forall([s], pred_app("geq", app("get", s), const("zero")))),
             ),
         )
         table = build_obligation_table(sig)
@@ -1526,8 +1537,19 @@ class TestDistinctnessAxioms:
 
     def test_negation_of_constructor_equality_is_distinctness(self):
         from alspec import (
-            Signature, GeneratedSortInfo, Spec, Axiom, Negation, atomic, fn, const, eq,
-        )
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    atomic,
+    const,
+    definedness,
+    eq,
+    fn,
+    implication,
+    negation,
+    pred_app,
+)
         from alspec.obligation import build_obligation_table
         from alspec.axiom_match import match_spec_sync, MatchKind
 
@@ -1546,7 +1568,7 @@ class TestDistinctnessAxioms:
             name="Test",
             signature=sig,
             axioms=(
-                Axiom("red_neq_green", Negation(eq(const("red"), const("green")))),
+                Axiom("red_neq_green", negation(eq(const("red"), const("green")))),
             ),
         )
         table = build_obligation_table(sig)
@@ -1557,8 +1579,19 @@ class TestDistinctnessAxioms:
     def test_same_constructor_negation_is_not_distinctness(self):
         """¬(red = red) is not a valid distinctness axiom."""
         from alspec import (
-            Signature, GeneratedSortInfo, Spec, Axiom, Negation, atomic, fn, const, eq,
-        )
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    atomic,
+    const,
+    definedness,
+    eq,
+    fn,
+    implication,
+    negation,
+    pred_app,
+)
         from alspec.obligation import build_obligation_table
         from alspec.axiom_match import match_spec_sync, MatchKind
 
@@ -1577,7 +1610,7 @@ class TestDistinctnessAxioms:
             name="Test",
             signature=sig,
             axioms=(
-                Axiom("red_neq_red", Negation(eq(const("red"), const("red")))),
+                Axiom("red_neq_red", negation(eq(const("red"), const("red")))),
             ),
         )
         table = build_obligation_table(sig)
@@ -1592,10 +1625,22 @@ class TestBuriedObsCtorPattern:
     def test_succ_wrapping_obs_ctor(self):
         """succ(get_cv(decrement(c))) = get_cv(c) should match get_cv × decrement."""
         from alspec import (
-            Signature, GeneratedSortInfo, Spec, Axiom,
-            Implication, Definedness,
-            atomic, fn, var, app, const, eq, forall,
-        )
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    const,
+    definedness,
+    eq,
+    fn,
+    forall,
+    implication,
+    negation,
+    pred_app,
+    var,
+)
         from alspec.obligation import build_obligation_table
         from alspec.axiom_match import match_spec_sync, MatchKind
 
@@ -1624,8 +1669,8 @@ class TestBuriedObsCtorPattern:
                     "get_cv_decrement",
                     forall(
                         [c],
-                        Implication(
-                            Definedness(app("decrement", c)),
+                        implication(
+                            definedness(app("decrement", c)),
                             eq(
                                 app("succ", app("get_cv", app("decrement", c))),
                                 app("get_cv", c),
@@ -1651,10 +1696,23 @@ class TestDefinitionAxioms:
     def test_pred_observer_biconditional_is_definition(self):
         """is_red(l) ↔ eq_color(get_color(l), red) should be DEFINITION."""
         from alspec import (
-            Signature, GeneratedSortInfo, Spec, Axiom,
-            PredApp, Biconditional,
-            atomic, fn, pred, var, app, const, forall,
-        )
+    Axiom,
+    Biconditional,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    const,
+    definedness,
+    fn,
+    forall,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
+)
         from alspec.obligation import build_obligation_table
         from alspec.axiom_match import match_spec_sync, MatchKind
 
@@ -1686,8 +1744,8 @@ class TestDefinitionAxioms:
                     forall(
                         [l],
                         Biconditional(
-                            PredApp("is_red", (l,)),
-                            PredApp("eq_color", (app("get_color", l), const("red"))),
+                            pred_app("is_red", l),
+                            pred_app("eq_color", app("get_color", l), const("red")),
                         ),
                     ),
                 ),
@@ -1701,10 +1759,22 @@ class TestDefinitionAxioms:
     def test_contains_def_lookup_is_definition(self):
         """contains(b, n) ↔ def(lookup(b, n)) should be DEFINITION."""
         from alspec import (
-            Signature, GeneratedSortInfo, Spec, Axiom,
-            PredApp, Biconditional, Definedness,
-            atomic, fn, pred, var, app, forall,
-        )
+    Axiom,
+    Biconditional,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    definedness,
+    fn,
+    forall,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
+)
         from alspec.obligation import build_obligation_table
         from alspec.axiom_match import match_spec_sync, MatchKind
 
@@ -1734,8 +1804,8 @@ class TestDefinitionAxioms:
                     forall(
                         [b, n],
                         Biconditional(
-                            PredApp("contains", (b, n)),
-                            Definedness(app("lookup", b, n)),
+                            pred_app("contains", b, n),
+                            definedness(app("lookup", b, n)),
                         ),
                     ),
                 ),
@@ -1749,10 +1819,23 @@ class TestDefinitionAxioms:
     def test_obs_ctor_biconditional_is_not_definition(self):
         """A biconditional with obs(ctor(...)) should match cells, not DEFINITION."""
         from alspec import (
-            Signature, GeneratedSortInfo, Spec, Axiom,
-            PredApp, Biconditional,
-            atomic, fn, pred, var, app, const, forall,
-        )
+    Axiom,
+    Biconditional,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    const,
+    definedness,
+    fn,
+    forall,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
+)
         from alspec.obligation import build_obligation_table
         from alspec.axiom_match import match_spec_sync, MatchKind
 
@@ -1785,8 +1868,8 @@ class TestDefinitionAxioms:
                     forall(
                         [l],
                         Biconditional(
-                            PredApp("is_red", (app("advance", l),)),
-                            PredApp("eq_color", (app("get_color", app("advance", l)), const("red"))),
+                            pred_app("is_red", app("advance", l)),
+                            pred_app("eq_color", app("get_color", app("advance", l)), const("red")),
                         ),
                     ),
                 ),
@@ -1806,10 +1889,23 @@ class TestCompositionalObserver:
     def test_is_true_get_q_init(self):
         """is_true(get_q(init)) should match cell get_q × init."""
         from alspec import (
-            Signature, GeneratedSortInfo, Spec, Axiom,
-            PredApp, Biconditional,
-            atomic, fn, pred, var, app, const, forall,
-        )
+    Axiom,
+    Biconditional,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    const,
+    definedness,
+    fn,
+    forall,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
+)
         from alspec.obligation import build_obligation_table
         from alspec.axiom_match import match_spec_sync, MatchKind
 
@@ -1845,8 +1941,8 @@ class TestCompositionalObserver:
                 Axiom(
                     "get_q_init",
                     Biconditional(
-                        PredApp("is_true", (app("get_q", const("init")),)),
-                        PredApp("geq", (app("get_cv", const("init")), const("zero"))),
+                        pred_app("is_true", app("get_q", const("init"))),
+                        pred_app("geq", app("get_cv", const("init")), const("zero")),
                     ),
                 ),
             ),
@@ -1863,10 +1959,21 @@ class TestCompositionalObserver:
     def test_negated_is_true_get_q_init(self):
         """¬is_true(get_q(init)) should also match cell get_q × init."""
         from alspec import (
-            Signature, GeneratedSortInfo, Spec, Axiom,
-            PredApp, Negation,
-            atomic, fn, pred, var, app, const,
-        )
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    const,
+    definedness,
+    fn,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
+)
         from alspec.obligation import build_obligation_table
         from alspec.axiom_match import match_spec_sync, MatchKind
 
@@ -1896,7 +2003,7 @@ class TestCompositionalObserver:
             axioms=(
                 Axiom(
                     "get_q_init_false",
-                    Negation(PredApp("is_true", (app("get_q", const("init")),))),
+                    negation(pred_app("is_true", app("get_q", const("init")))),
                 ),
             ),
         )
@@ -1912,10 +2019,22 @@ class TestCompositionalObserver:
     def test_is_true_get_q_step_with_guards(self):
         """is_true(get_q(step(c, cu))) ↔ ... should match cell get_q × step."""
         from alspec import (
-            Signature, GeneratedSortInfo, Spec, Axiom,
-            PredApp, Biconditional,
-            atomic, fn, pred, var, app, const, forall,
-        )
+    Axiom,
+    Biconditional,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    const,
+    definedness,
+    fn,
+    forall,
+    implication,
+    pred,
+    pred_app,
+    var,
+)
         from alspec.obligation import build_obligation_table
         from alspec.axiom_match import match_spec_sync, MatchKind
 
@@ -1956,11 +2075,9 @@ class TestCompositionalObserver:
                     forall(
                         [c, cu],
                         Biconditional(
-                            PredApp("is_true", (app("get_q", app("step", c, cu)),)),
-                            PredApp("geq", (
-                                app("get_cv", app("step", c, cu)),
-                                app("get_pv", app("step", c, cu)),
-                            )),
+                            pred_app("is_true", app("get_q", app("step", c, cu))),
+                            pred_app("geq", app("get_cv", app("step", c, cu)),
+                                app("get_pv", app("step", c, cu))),
                         ),
                     ),
                 ),
@@ -1978,10 +2095,21 @@ class TestCompositionalObserver:
     def test_direct_pred_obs_still_works(self):
         """alarm_flag(convert_t(d, temp)) should still match directly (no peeling)."""
         from alspec import (
-            Signature, GeneratedSortInfo, Spec, Axiom,
-            PredApp, Biconditional,
-            atomic, fn, pred, var, app, forall,
-        )
+    Axiom,
+    Biconditional,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    definedness,
+    fn,
+    forall,
+    implication,
+    pred,
+    pred_app,
+    var,
+)
         from alspec.obligation import build_obligation_table
         from alspec.axiom_match import match_spec_sync, MatchKind
 
@@ -2013,8 +2141,8 @@ class TestCompositionalObserver:
                     forall(
                         [d, t],
                         Biconditional(
-                            PredApp("alarm_flag", (app("convert_t", d, t),)),
-                            PredApp("is_hot", (app("get_temp", app("convert_t", d, t)),)),
+                            pred_app("alarm_flag", app("convert_t", d, t)),
+                            pred_app("is_hot", app("get_temp", app("convert_t", d, t))),
                         ),
                     ),
                 ),
@@ -2037,10 +2165,20 @@ class TestCompositionalObserver:
         (Fix C), it finds the buried get_highest_bid × reveal.
         """
         from alspec import (
-            Signature, GeneratedSortInfo, Spec, Axiom,
-            PredApp, Implication, Definedness,
-            atomic, fn, pred, var, app, forall,
-        )
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    definedness,
+    fn,
+    forall,
+    implication,
+    pred,
+    pred_app,
+    var,
+)
         from alspec.obligation import build_obligation_table
         from alspec.axiom_match import match_spec_sync, MatchKind
 
@@ -2074,12 +2212,10 @@ class TestCompositionalObserver:
                     "hbid_reveal_logic",
                     forall(
                         [a],
-                        Implication(
-                            Definedness(app("get_highest_bid", app("reveal", a))),
-                            PredApp("geq", (
-                                app("get_highest_bid", app("reveal", a)),
-                                app("get_reserve", a),
-                            )),
+                        implication(
+                            definedness(app("get_highest_bid", app("reveal", a))),
+                            pred_app("geq", app("get_highest_bid", app("reveal", a)),
+                                app("get_reserve", a)),
                         ),
                     ),
                 ),
@@ -2110,7 +2246,7 @@ class TestCompositionalObserver:
         }
         # is_true(get_q(init(w))) — is_true is OTHER but get_q(init) is obs×ctor
         w = var("w", "Word")
-        f = PredApp("is_true", (app("get_q", app("init", w)),))
+        f = pred_app("is_true", app("get_q", app("init", w)))
         result = _find_obs_ctor(f, fn_roles, pred_roles)
         assert result == ("get_q", False, "init")
 
@@ -2130,10 +2266,8 @@ class TestCompositionalObserver:
         a = var("a", "Auction")
         # geq(get_highest_bid(reveal(a)), get_reserve(a))
         # First arg has obs×ctor, second has obs(var) — first should match
-        f = PredApp("geq", (
-            app("get_highest_bid", app("reveal", a)),
-            app("get_reserve", a),
-        ))
+        f = pred_app("geq", app("get_highest_bid", app("reveal", a)),
+            app("get_reserve", a))
         result = _find_obs_ctor(f, fn_roles, pred_roles)
         assert result == ("get_highest_bid", False, "reveal")
 
@@ -2153,8 +2287,8 @@ class TestCompositionalObserver:
         }
         w = var("w", "Word")
         f = Biconditional(
-            PredApp("is_true", (app("get_q", app("init", w)),)),
-            PredApp("ge", (const("zero"), w)),
+            pred_app("is_true", app("get_q", app("init", w))),
+            pred_app("ge", const("zero"), w),
         )
         result = _find_obs_ctor(f, fn_roles, pred_roles)
         assert result == ("get_q", False, "init")

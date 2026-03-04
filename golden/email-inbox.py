@@ -38,9 +38,23 @@
 """
 
 from alspec import (
-    Axiom, Conjunction, Disjunction, GeneratedSortInfo, Implication, Negation, PredApp,
-    Signature, Spec,
-    atomic, fn, pred, var, app, const, eq, forall, iff,
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    conjunction,
+    const,
+    eq,
+    fn,
+    forall,
+    iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 def email_inbox_spec() -> Spec:
@@ -90,173 +104,173 @@ def email_inbox_spec() -> Spec:
 
     axioms = (
         # ━━ Basis: eq_id and pred ━━
-        Axiom(label="eq_id_refl", formula=forall([m], PredApp("eq_id", (m, m)))),
-        Axiom(label="eq_id_sym", formula=forall([m, m2], Implication(PredApp("eq_id", (m, m2)), PredApp("eq_id", (m2, m))))),
-        Axiom(label="eq_id_trans", formula=forall([m, m2, m3], Implication(
-            Conjunction((PredApp("eq_id", (m, m2)), PredApp("eq_id", (m2, m3)))),
-            PredApp("eq_id", (m, m3))
+        Axiom(label="eq_id_refl", formula=forall([m], pred_app("eq_id", m, m))),
+        Axiom(label="eq_id_sym", formula=forall([m, m2], implication(pred_app("eq_id", m, m2), pred_app("eq_id", m2, m)))),
+        Axiom(label="eq_id_trans", formula=forall([m, m2, m3], implication(
+            conjunction(pred_app("eq_id", m, m2), pred_app("eq_id", m2, m3)),
+            pred_app("eq_id", m, m3)
         ))),
         Axiom(label="pred_zero", formula=eq(app("pred", const("zero")), const("zero"))),
         Axiom(label="pred_suc", formula=forall([n], eq(app("pred", app("suc", n)), n))),
 
         # ━━ has_msg ━━
-        Axiom(label="has_msg_empty", formula=forall([m], Negation(PredApp("has_msg", (const("empty"), m))))),
+        Axiom(label="has_msg_empty", formula=forall([m], negation(pred_app("has_msg", const("empty"), m)))),
         
-        Axiom(label="has_msg_receive_hit", formula=forall([i, m, m2], Implication(
-            PredApp("eq_id", (m, m2)),
-            PredApp("has_msg", (app("receive", i, m), m2))
+        Axiom(label="has_msg_receive_hit", formula=forall([i, m, m2], implication(
+            pred_app("eq_id", m, m2),
+            pred_app("has_msg", app("receive", i, m), m2)
         ))),
-        Axiom(label="has_msg_receive_miss", formula=forall([i, m, m2], Implication(
-            Negation(PredApp("eq_id", (m, m2))),
-            iff(PredApp("has_msg", (app("receive", i, m), m2)), PredApp("has_msg", (i, m2)))
+        Axiom(label="has_msg_receive_miss", formula=forall([i, m, m2], implication(
+            negation(pred_app("eq_id", m, m2)),
+            iff(pred_app("has_msg", app("receive", i, m), m2), pred_app("has_msg", i, m2))
         ))),
         
         Axiom(label="has_msg_mark_read", formula=forall([i, m, m2], iff(
-            PredApp("has_msg", (app("mark_read", i, m), m2)), PredApp("has_msg", (i, m2))
+            pred_app("has_msg", app("mark_read", i, m), m2), pred_app("has_msg", i, m2)
         ))),
         Axiom(label="has_msg_mark_unread", formula=forall([i, m, m2], iff(
-            PredApp("has_msg", (app("mark_unread", i, m), m2)), PredApp("has_msg", (i, m2))
+            pred_app("has_msg", app("mark_unread", i, m), m2), pred_app("has_msg", i, m2)
         ))),
         
-        Axiom(label="has_msg_delete_hit", formula=forall([i, m, m2], Implication(
-            PredApp("eq_id", (m, m2)),
-            Negation(PredApp("has_msg", (app("delete", i, m), m2)))
+        Axiom(label="has_msg_delete_hit", formula=forall([i, m, m2], implication(
+            pred_app("eq_id", m, m2),
+            negation(pred_app("has_msg", app("delete", i, m), m2))
         ))),
-        Axiom(label="has_msg_delete_miss", formula=forall([i, m, m2], Implication(
-            Negation(PredApp("eq_id", (m, m2))),
-            iff(PredApp("has_msg", (app("delete", i, m), m2)), PredApp("has_msg", (i, m2)))
+        Axiom(label="has_msg_delete_miss", formula=forall([i, m, m2], implication(
+            negation(pred_app("eq_id", m, m2)),
+            iff(pred_app("has_msg", app("delete", i, m), m2), pred_app("has_msg", i, m2))
         ))),
         
         Axiom(label="has_msg_star", formula=forall([i, m, m2], iff(
-            PredApp("has_msg", (app("star", i, m), m2)), PredApp("has_msg", (i, m2))
+            pred_app("has_msg", app("star", i, m), m2), pred_app("has_msg", i, m2)
         ))),
 
         # ━━ is_read ━━
-        Axiom(label="is_read_empty", formula=forall([m], Negation(PredApp("is_read", (const("empty"), m))))),
+        Axiom(label="is_read_empty", formula=forall([m], negation(pred_app("is_read", const("empty"), m)))),
         
-        Axiom(label="is_read_receive_hit", formula=forall([i, m, m2], Implication(
-            PredApp("eq_id", (m, m2)),
+        Axiom(label="is_read_receive_hit", formula=forall([i, m, m2], implication(
+            pred_app("eq_id", m, m2),
             iff(
-                PredApp("is_read", (app("receive", i, m), m2)),
-                Conjunction((PredApp("has_msg", (i, m2)), PredApp("is_read", (i, m2))))
+                pred_app("is_read", app("receive", i, m), m2),
+                conjunction(pred_app("has_msg", i, m2), pred_app("is_read", i, m2))
             )
         ))),
-        Axiom(label="is_read_receive_miss", formula=forall([i, m, m2], Implication(
-            Negation(PredApp("eq_id", (m, m2))),
-            iff(PredApp("is_read", (app("receive", i, m), m2)), PredApp("is_read", (i, m2)))
+        Axiom(label="is_read_receive_miss", formula=forall([i, m, m2], implication(
+            negation(pred_app("eq_id", m, m2)),
+            iff(pred_app("is_read", app("receive", i, m), m2), pred_app("is_read", i, m2))
         ))),
 
-        Axiom(label="is_read_mark_read_hit", formula=forall([i, m, m2], Implication(
-            PredApp("eq_id", (m, m2)),
-            iff(PredApp("is_read", (app("mark_read", i, m), m2)), PredApp("has_msg", (i, m2)))
+        Axiom(label="is_read_mark_read_hit", formula=forall([i, m, m2], implication(
+            pred_app("eq_id", m, m2),
+            iff(pred_app("is_read", app("mark_read", i, m), m2), pred_app("has_msg", i, m2))
         ))),
-        Axiom(label="is_read_mark_read_miss", formula=forall([i, m, m2], Implication(
-            Negation(PredApp("eq_id", (m, m2))),
-            iff(PredApp("is_read", (app("mark_read", i, m), m2)), PredApp("is_read", (i, m2)))
-        ))),
-
-        Axiom(label="is_read_mark_unread_hit", formula=forall([i, m, m2], Implication(
-            PredApp("eq_id", (m, m2)),
-            Negation(PredApp("is_read", (app("mark_unread", i, m), m2)))
-        ))),
-        Axiom(label="is_read_mark_unread_miss", formula=forall([i, m, m2], Implication(
-            Negation(PredApp("eq_id", (m, m2))),
-            iff(PredApp("is_read", (app("mark_unread", i, m), m2)), PredApp("is_read", (i, m2)))
+        Axiom(label="is_read_mark_read_miss", formula=forall([i, m, m2], implication(
+            negation(pred_app("eq_id", m, m2)),
+            iff(pred_app("is_read", app("mark_read", i, m), m2), pred_app("is_read", i, m2))
         ))),
 
-        Axiom(label="is_read_delete_hit", formula=forall([i, m, m2], Implication(
-            PredApp("eq_id", (m, m2)),
-            Negation(PredApp("is_read", (app("delete", i, m), m2)))
+        Axiom(label="is_read_mark_unread_hit", formula=forall([i, m, m2], implication(
+            pred_app("eq_id", m, m2),
+            negation(pred_app("is_read", app("mark_unread", i, m), m2))
         ))),
-        Axiom(label="is_read_delete_miss", formula=forall([i, m, m2], Implication(
-            Negation(PredApp("eq_id", (m, m2))),
-            iff(PredApp("is_read", (app("delete", i, m), m2)), PredApp("is_read", (i, m2)))
+        Axiom(label="is_read_mark_unread_miss", formula=forall([i, m, m2], implication(
+            negation(pred_app("eq_id", m, m2)),
+            iff(pred_app("is_read", app("mark_unread", i, m), m2), pred_app("is_read", i, m2))
+        ))),
+
+        Axiom(label="is_read_delete_hit", formula=forall([i, m, m2], implication(
+            pred_app("eq_id", m, m2),
+            negation(pred_app("is_read", app("delete", i, m), m2))
+        ))),
+        Axiom(label="is_read_delete_miss", formula=forall([i, m, m2], implication(
+            negation(pred_app("eq_id", m, m2)),
+            iff(pred_app("is_read", app("delete", i, m), m2), pred_app("is_read", i, m2))
         ))),
 
         Axiom(label="is_read_star", formula=forall([i, m, m2], iff(
-            PredApp("is_read", (app("star", i, m), m2)), PredApp("is_read", (i, m2))
+            pred_app("is_read", app("star", i, m), m2), pred_app("is_read", i, m2)
         ))),
 
         # ━━ is_starred ━━
-        Axiom(label="is_starred_empty", formula=forall([m], Negation(PredApp("is_starred", (const("empty"), m))))),
+        Axiom(label="is_starred_empty", formula=forall([m], negation(pred_app("is_starred", const("empty"), m)))),
         
-        Axiom(label="is_starred_receive_hit", formula=forall([i, m, m2], Implication(
-            PredApp("eq_id", (m, m2)),
+        Axiom(label="is_starred_receive_hit", formula=forall([i, m, m2], implication(
+            pred_app("eq_id", m, m2),
             iff(
-                PredApp("is_starred", (app("receive", i, m), m2)),
-                Conjunction((PredApp("has_msg", (i, m2)), PredApp("is_starred", (i, m2))))
+                pred_app("is_starred", app("receive", i, m), m2),
+                conjunction(pred_app("has_msg", i, m2), pred_app("is_starred", i, m2))
             )
         ))),
-        Axiom(label="is_starred_receive_miss", formula=forall([i, m, m2], Implication(
-            Negation(PredApp("eq_id", (m, m2))),
-            iff(PredApp("is_starred", (app("receive", i, m), m2)), PredApp("is_starred", (i, m2)))
+        Axiom(label="is_starred_receive_miss", formula=forall([i, m, m2], implication(
+            negation(pred_app("eq_id", m, m2)),
+            iff(pred_app("is_starred", app("receive", i, m), m2), pred_app("is_starred", i, m2))
         ))),
 
         Axiom(label="is_starred_mark_read", formula=forall([i, m, m2], iff(
-            PredApp("is_starred", (app("mark_read", i, m), m2)), PredApp("is_starred", (i, m2))
+            pred_app("is_starred", app("mark_read", i, m), m2), pred_app("is_starred", i, m2)
         ))),
         Axiom(label="is_starred_mark_unread", formula=forall([i, m, m2], iff(
-            PredApp("is_starred", (app("mark_unread", i, m), m2)), PredApp("is_starred", (i, m2))
+            pred_app("is_starred", app("mark_unread", i, m), m2), pred_app("is_starred", i, m2)
         ))),
 
-        Axiom(label="is_starred_delete_hit", formula=forall([i, m, m2], Implication(
-            PredApp("eq_id", (m, m2)),
-            Negation(PredApp("is_starred", (app("delete", i, m), m2)))
+        Axiom(label="is_starred_delete_hit", formula=forall([i, m, m2], implication(
+            pred_app("eq_id", m, m2),
+            negation(pred_app("is_starred", app("delete", i, m), m2))
         ))),
-        Axiom(label="is_starred_delete_miss", formula=forall([i, m, m2], Implication(
-            Negation(PredApp("eq_id", (m, m2))),
-            iff(PredApp("is_starred", (app("delete", i, m), m2)), PredApp("is_starred", (i, m2)))
+        Axiom(label="is_starred_delete_miss", formula=forall([i, m, m2], implication(
+            negation(pred_app("eq_id", m, m2)),
+            iff(pred_app("is_starred", app("delete", i, m), m2), pred_app("is_starred", i, m2))
         ))),
 
-        Axiom(label="is_starred_star_hit", formula=forall([i, m, m2], Implication(
-            PredApp("eq_id", (m, m2)),
-            iff(PredApp("is_starred", (app("star", i, m), m2)), PredApp("has_msg", (i, m2)))
+        Axiom(label="is_starred_star_hit", formula=forall([i, m, m2], implication(
+            pred_app("eq_id", m, m2),
+            iff(pred_app("is_starred", app("star", i, m), m2), pred_app("has_msg", i, m2))
         ))),
-        Axiom(label="is_starred_star_miss", formula=forall([i, m, m2], Implication(
-            Negation(PredApp("eq_id", (m, m2))),
-            iff(PredApp("is_starred", (app("star", i, m), m2)), PredApp("is_starred", (i, m2)))
+        Axiom(label="is_starred_star_miss", formula=forall([i, m, m2], implication(
+            negation(pred_app("eq_id", m, m2)),
+            iff(pred_app("is_starred", app("star", i, m), m2), pred_app("is_starred", i, m2))
         ))),
 
         # ━━ unread_count (state-dispatch) ━━
         Axiom(label="unread_count_empty", formula=eq(app("unread_count", const("empty")), const("zero"))),
 
         # receive
-        Axiom(label="unread_count_receive_preserve", formula=forall([i, m], Implication(
-            PredApp("has_msg", (i, m)),
+        Axiom(label="unread_count_receive_preserve", formula=forall([i, m], implication(
+            pred_app("has_msg", i, m),
             eq(app("unread_count", app("receive", i, m)), app("unread_count", i))
         ))),
-        Axiom(label="unread_count_receive_change", formula=forall([i, m], Implication(
-            Negation(PredApp("has_msg", (i, m))),
+        Axiom(label="unread_count_receive_change", formula=forall([i, m], implication(
+            negation(pred_app("has_msg", i, m)),
             eq(app("unread_count", app("receive", i, m)), app("suc", app("unread_count", i)))
         ))),
 
         # mark_read
-        Axiom(label="unread_count_mark_read_change", formula=forall([i, m], Implication(
-            Conjunction((PredApp("has_msg", (i, m)), Negation(PredApp("is_read", (i, m))))),
+        Axiom(label="unread_count_mark_read_change", formula=forall([i, m], implication(
+            conjunction(pred_app("has_msg", i, m), negation(pred_app("is_read", i, m))),
             eq(app("unread_count", app("mark_read", i, m)), app("pred", app("unread_count", i)))
         ))),
-        Axiom(label="unread_count_mark_read_preserve", formula=forall([i, m], Implication(
-            Negation(Conjunction((PredApp("has_msg", (i, m)), Negation(PredApp("is_read", (i, m)))))),
+        Axiom(label="unread_count_mark_read_preserve", formula=forall([i, m], implication(
+            negation(conjunction(pred_app("has_msg", i, m), negation(pred_app("is_read", i, m)))),
             eq(app("unread_count", app("mark_read", i, m)), app("unread_count", i))
         ))),
 
         # mark_unread
-        Axiom(label="unread_count_mark_unread_change", formula=forall([i, m], Implication(
-            Conjunction((PredApp("has_msg", (i, m)), PredApp("is_read", (i, m)))),
+        Axiom(label="unread_count_mark_unread_change", formula=forall([i, m], implication(
+            conjunction(pred_app("has_msg", i, m), pred_app("is_read", i, m)),
             eq(app("unread_count", app("mark_unread", i, m)), app("suc", app("unread_count", i)))
         ))),
-        Axiom(label="unread_count_mark_unread_preserve", formula=forall([i, m], Implication(
-            Negation(Conjunction((PredApp("has_msg", (i, m)), PredApp("is_read", (i, m))))),
+        Axiom(label="unread_count_mark_unread_preserve", formula=forall([i, m], implication(
+            negation(conjunction(pred_app("has_msg", i, m), pred_app("is_read", i, m))),
             eq(app("unread_count", app("mark_unread", i, m)), app("unread_count", i))
         ))),
 
         # delete
-        Axiom(label="unread_count_delete_change", formula=forall([i, m], Implication(
-            Conjunction((PredApp("has_msg", (i, m)), Negation(PredApp("is_read", (i, m))))),
+        Axiom(label="unread_count_delete_change", formula=forall([i, m], implication(
+            conjunction(pred_app("has_msg", i, m), negation(pred_app("is_read", i, m))),
             eq(app("unread_count", app("delete", i, m)), app("pred", app("unread_count", i)))
         ))),
-        Axiom(label="unread_count_delete_preserve", formula=forall([i, m], Implication(
-            Negation(Conjunction((PredApp("has_msg", (i, m)), Negation(PredApp("is_read", (i, m)))))),
+        Axiom(label="unread_count_delete_preserve", formula=forall([i, m], implication(
+            negation(conjunction(pred_app("has_msg", i, m), negation(pred_app("is_read", i, m)))),
             eq(app("unread_count", app("delete", i, m)), app("unread_count", i))
         ))),
 

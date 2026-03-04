@@ -26,8 +26,8 @@ To model the library lending system, we need to carefully define the sorts:
 
 **3. Design Decisions & Tricky Cases**
 - **Conditional Actions via Guards:** The specification requires that borrowing "only succeed if available" and returning "only succeed if borrowed." Rather than enforcing equality constraint on the library state (e.g. `borrow(...) = L` on fail), we manage this observationally using key-dispatch methodology with condition branching (Hit Success vs Hit Failure). E.g., if a book is not `available`, the hit failure axiom preserves the existing state (`get_status(borrow(...), b2) = get_status(L, b2)`).
-- **Undefined Evaluations:** By evaluating `eq(get_status(L, b), available)`, we handle non-existent books elegantly. If `b` isn't in `L`, `get_status(L, b)` is undefined, failing the strict equality equation, naturally routing to the unmutating hit-fail preserving path via negation mechanism `Negation(eq(...))`.
-- **Doubly Partial `get_borrower`:** `get_borrower` is inherently partial when a book isn't registered, and also must become explicitly undefined when a book is newly registered (no borrower yet) or returned (borrower released). We use `Negation(Definedness(...))` to assert undefinedness in these cases, since under loose semantics mere omission of an axiom leaves the interpretation unconstrained rather than forcing undefinedness.
+- **Undefined Evaluations:** By evaluating `eq(get_status(L, b), available)`, we handle non-existent books elegantly. If `b` isn't in `L`, `get_status(L, b)` is undefined, failing the strict equality equation, naturally routing to the unmutating hit-fail preserving path via negation mechanism `negation(eq(...))`.
+- **Doubly Partial `get_borrower`:** `get_borrower` is inherently partial when a book isn't registered, and also must become explicitly undefined when a book is newly registered (no borrower yet) or returned (borrower released). We use `negation(definedness(...))` to assert undefinedness in these cases, since under loose semantics mere omission of an axiom leaves the interpretation unconstrained rather than forcing undefinedness.
 
 **4. Axiom Obligation Table**
 - **Basis `eq_id`**: refl, sym, trans (3 axioms)
@@ -62,8 +62,24 @@ To model the library lending system, we need to carefully define the sorts:
 """
 
 from alspec import (
-    Axiom, Conjunction, Definedness, GeneratedSortInfo, Implication, Negation, PredApp,
-    Signature, Spec, atomic, fn, pred, var, app, const, eq, forall, iff
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    conjunction,
+    const,
+    definedness,
+    eq,
+    fn,
+    forall,
+    iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 def library_lending_spec() -> Spec:
@@ -109,143 +125,143 @@ def library_lending_spec() -> Spec:
 
     axioms = (
         # ━━ eq_id basis ━━
-        Axiom("eq_id_refl", forall([b], PredApp("eq_id", (b, b)))),
-        Axiom("eq_id_sym", forall([b, b2], Implication(
-            PredApp("eq_id", (b, b2)),
-            PredApp("eq_id", (b2, b))
+        Axiom("eq_id_refl", forall([b], pred_app("eq_id", b, b))),
+        Axiom("eq_id_sym", forall([b, b2], implication(
+            pred_app("eq_id", b, b2),
+            pred_app("eq_id", b2, b)
         ))),
-        Axiom("eq_id_trans", forall([b, b2, b3], Implication(
-            Conjunction((PredApp("eq_id", (b, b2)), PredApp("eq_id", (b2, b3)))),
-            PredApp("eq_id", (b, b3))
+        Axiom("eq_id_trans", forall([b, b2, b3], implication(
+            conjunction(pred_app("eq_id", b, b2), pred_app("eq_id", b2, b3)),
+            pred_app("eq_id", b, b3)
         ))),
 
         # ━━ has_book (5 axioms) ━━
-        Axiom("has_book_empty", forall([b], Negation(
-            PredApp("has_book", (const("empty"), b))
+        Axiom("has_book_empty", forall([b], negation(
+            pred_app("has_book", const("empty"), b)
         ))),
-        Axiom("has_book_register_hit", forall([L, b, b2], Implication(
-            PredApp("eq_id", (b, b2)),
-            PredApp("has_book", (app("register", L, b), b2))
+        Axiom("has_book_register_hit", forall([L, b, b2], implication(
+            pred_app("eq_id", b, b2),
+            pred_app("has_book", app("register", L, b), b2)
         ))),
-        Axiom("has_book_register_miss", forall([L, b, b2], Implication(
-            Negation(PredApp("eq_id", (b, b2))),
+        Axiom("has_book_register_miss", forall([L, b, b2], implication(
+            negation(pred_app("eq_id", b, b2)),
             iff(
-                PredApp("has_book", (app("register", L, b), b2)),
-                PredApp("has_book", (L, b2))
+                pred_app("has_book", app("register", L, b), b2),
+                pred_app("has_book", L, b2)
             )
         ))),
         Axiom("has_book_borrow_univ", forall([L, b, b2, u], iff(
-            PredApp("has_book", (app("borrow", L, b, u), b2)),
-            PredApp("has_book", (L, b2))
+            pred_app("has_book", app("borrow", L, b, u), b2),
+            pred_app("has_book", L, b2)
         ))),
         Axiom("has_book_return_univ", forall([L, b, b2], iff(
-            PredApp("has_book", (app("return_book", L, b), b2)),
-            PredApp("has_book", (L, b2))
+            pred_app("has_book", app("return_book", L, b), b2),
+            pred_app("has_book", L, b2)
         ))),
 
         # ━━ get_status (8 + 1 = 9 axioms) ━━
         # empty: partial observer undefined on base constructor (explicit required)
-        Axiom("get_status_empty_undef", forall([b], Negation(Definedness(
+        Axiom("get_status_empty_undef", forall([b], negation(definedness(
             app("get_status", const("empty"), b)
         )))),
-        Axiom("get_status_register_hit", forall([L, b, b2], Implication(
-            PredApp("eq_id", (b, b2)),
+        Axiom("get_status_register_hit", forall([L, b, b2], implication(
+            pred_app("eq_id", b, b2),
             eq(app("get_status", app("register", L, b), b2), const("available"))
         ))),
-        Axiom("get_status_register_miss", forall([L, b, b2], Implication(
-            Negation(PredApp("eq_id", (b, b2))),
+        Axiom("get_status_register_miss", forall([L, b, b2], implication(
+            negation(pred_app("eq_id", b, b2)),
             eq(app("get_status", app("register", L, b), b2), app("get_status", L, b2))
         ))),
         
-        Axiom("get_status_borrow_hit_succ", forall([L, b, b2, u], Implication(
-            PredApp("eq_id", (b, b2)),
-            Implication(
+        Axiom("get_status_borrow_hit_succ", forall([L, b, b2, u], implication(
+            pred_app("eq_id", b, b2),
+            implication(
                 eq(app("get_status", L, b), const("available")),
                 eq(app("get_status", app("borrow", L, b, u), b2), const("borrowed"))
             )
         ))),
-        Axiom("get_status_borrow_hit_fail", forall([L, b, b2, u], Implication(
-            PredApp("eq_id", (b, b2)),
-            Implication(
-                Negation(eq(app("get_status", L, b), const("available"))),
+        Axiom("get_status_borrow_hit_fail", forall([L, b, b2, u], implication(
+            pred_app("eq_id", b, b2),
+            implication(
+                negation(eq(app("get_status", L, b), const("available"))),
                 eq(app("get_status", app("borrow", L, b, u), b2), app("get_status", L, b2))
             )
         ))),
-        Axiom("get_status_borrow_miss", forall([L, b, b2, u], Implication(
-            Negation(PredApp("eq_id", (b, b2))),
+        Axiom("get_status_borrow_miss", forall([L, b, b2, u], implication(
+            negation(pred_app("eq_id", b, b2)),
             eq(app("get_status", app("borrow", L, b, u), b2), app("get_status", L, b2))
         ))),
 
-        Axiom("get_status_return_hit_succ", forall([L, b, b2], Implication(
-            PredApp("eq_id", (b, b2)),
-            Implication(
+        Axiom("get_status_return_hit_succ", forall([L, b, b2], implication(
+            pred_app("eq_id", b, b2),
+            implication(
                 eq(app("get_status", L, b), const("borrowed")),
                 eq(app("get_status", app("return_book", L, b), b2), const("available"))
             )
         ))),
-        Axiom("get_status_return_hit_fail", forall([L, b, b2], Implication(
-            PredApp("eq_id", (b, b2)),
-            Implication(
-                Negation(eq(app("get_status", L, b), const("borrowed"))),
+        Axiom("get_status_return_hit_fail", forall([L, b, b2], implication(
+            pred_app("eq_id", b, b2),
+            implication(
+                negation(eq(app("get_status", L, b), const("borrowed"))),
                 eq(app("get_status", app("return_book", L, b), b2), app("get_status", L, b2))
             )
         ))),
-        Axiom("get_status_return_miss", forall([L, b, b2], Implication(
-            Negation(PredApp("eq_id", (b, b2))),
+        Axiom("get_status_return_miss", forall([L, b, b2], implication(
+            negation(pred_app("eq_id", b, b2)),
             eq(app("get_status", app("return_book", L, b), b2), app("get_status", L, b2))
         ))),
 
         # ━━ get_borrower (8 + 1 = 9 axioms) ━━
         # empty: partial observer undefined on base constructor (explicit required)
-        Axiom("get_borrower_empty_undef", forall([b], Negation(Definedness(
+        Axiom("get_borrower_empty_undef", forall([b], negation(definedness(
             app("get_borrower", const("empty"), b)
         )))),
         # Newly registered books have no borrower — explicitly undefined
-        Axiom("get_borrower_register_hit", forall([L, b, b2], Implication(
-            PredApp("eq_id", (b, b2)),
-            Negation(Definedness(app("get_borrower", app("register", L, b), b2)))
+        Axiom("get_borrower_register_hit", forall([L, b, b2], implication(
+            pred_app("eq_id", b, b2),
+            negation(definedness(app("get_borrower", app("register", L, b), b2)))
         ))),
-        Axiom("get_borrower_register_miss", forall([L, b, b2], Implication(
-            Negation(PredApp("eq_id", (b, b2))),
+        Axiom("get_borrower_register_miss", forall([L, b, b2], implication(
+            negation(pred_app("eq_id", b, b2)),
             eq(app("get_borrower", app("register", L, b), b2), app("get_borrower", L, b2))
         ))),
         
-        Axiom("get_borrower_borrow_hit_succ", forall([L, b, b2, u], Implication(
-            PredApp("eq_id", (b, b2)),
-            Implication(
+        Axiom("get_borrower_borrow_hit_succ", forall([L, b, b2, u], implication(
+            pred_app("eq_id", b, b2),
+            implication(
                 eq(app("get_status", L, b), const("available")),
                 eq(app("get_borrower", app("borrow", L, b, u), b2), u)
             )
         ))),
-        Axiom("get_borrower_borrow_hit_fail", forall([L, b, b2, u], Implication(
-            PredApp("eq_id", (b, b2)),
-            Implication(
-                Negation(eq(app("get_status", L, b), const("available"))),
+        Axiom("get_borrower_borrow_hit_fail", forall([L, b, b2, u], implication(
+            pred_app("eq_id", b, b2),
+            implication(
+                negation(eq(app("get_status", L, b), const("available"))),
                 eq(app("get_borrower", app("borrow", L, b, u), b2), app("get_borrower", L, b2))
             )
         ))),
-        Axiom("get_borrower_borrow_miss", forall([L, b, b2, u], Implication(
-            Negation(PredApp("eq_id", (b, b2))),
+        Axiom("get_borrower_borrow_miss", forall([L, b, b2, u], implication(
+            negation(pred_app("eq_id", b, b2)),
             eq(app("get_borrower", app("borrow", L, b, u), b2), app("get_borrower", L, b2))
         ))),
         
         # Returned books lose their borrower — explicitly undefined
-        Axiom("get_borrower_return_hit_succ", forall([L, b, b2], Implication(
-            PredApp("eq_id", (b, b2)),
-            Implication(
+        Axiom("get_borrower_return_hit_succ", forall([L, b, b2], implication(
+            pred_app("eq_id", b, b2),
+            implication(
                 eq(app("get_status", L, b), const("borrowed")),
-                Negation(Definedness(app("get_borrower", app("return_book", L, b), b2)))
+                negation(definedness(app("get_borrower", app("return_book", L, b), b2)))
             )
         ))),
-        Axiom("get_borrower_return_hit_fail", forall([L, b, b2], Implication(
-            PredApp("eq_id", (b, b2)),
-            Implication(
-                Negation(eq(app("get_status", L, b), const("borrowed"))),
+        Axiom("get_borrower_return_hit_fail", forall([L, b, b2], implication(
+            pred_app("eq_id", b, b2),
+            implication(
+                negation(eq(app("get_status", L, b), const("borrowed"))),
                 eq(app("get_borrower", app("return_book", L, b), b2), app("get_borrower", L, b2))
             )
         ))),
-        Axiom("get_borrower_return_miss", forall([L, b, b2], Implication(
-            Negation(PredApp("eq_id", (b, b2))),
+        Axiom("get_borrower_return_miss", forall([L, b, b2], implication(
+            negation(pred_app("eq_id", b, b2)),
             eq(app("get_borrower", app("return_book", L, b), b2), app("get_borrower", L, b2))
         ))),
     )

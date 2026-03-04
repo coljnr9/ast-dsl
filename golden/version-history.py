@@ -66,8 +66,24 @@ Axioms must be split based on the combination of `v1` and `v2`.
 """
 
 from alspec import (
-    Axiom, Conjunction, Definedness, Disjunction, GeneratedSortInfo, Implication, Negation, PredApp,
-    Signature, Spec, atomic, fn, pred, var, app, const, eq, forall, iff
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    conjunction,
+    const,
+    definedness,
+    eq,
+    fn,
+    forall,
+    iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 def version_history_spec() -> Spec:
@@ -115,35 +131,35 @@ def version_history_spec() -> Spec:
 
     axioms = (
         # -- Basis: eq_id --
-        Axiom("eq_id_refl", forall([v], PredApp("eq_id", (v, v)))),
-        Axiom("eq_id_sym", forall([v1, v2], Implication(
-            PredApp("eq_id", (v1, v2)), 
-            PredApp("eq_id", (v2, v1))
+        Axiom("eq_id_refl", forall([v], pred_app("eq_id", v, v))),
+        Axiom("eq_id_sym", forall([v1, v2], implication(
+            pred_app("eq_id", v1, v2), 
+            pred_app("eq_id", v2, v1)
         ))),
-        Axiom("eq_id_trans", forall([v1, v2, v3], Implication(
-            Conjunction((PredApp("eq_id", (v1, v2)), PredApp("eq_id", (v2, v3)))),
-            PredApp("eq_id", (v1, v3))
+        Axiom("eq_id_trans", forall([v1, v2, v3], implication(
+            conjunction(pred_app("eq_id", v1, v2), pred_app("eq_id", v2, v3)),
+            pred_app("eq_id", v1, v3)
         ))),
 
         # -- has_version --
         Axiom("has_version_init", forall([c, v, v2], iff(
-            PredApp("has_version", (app("init", c, v), v2)),
-            PredApp("eq_id", (v, v2))
+            pred_app("has_version", app("init", c, v), v2),
+            pred_app("eq_id", v, v2)
         ))),
-        Axiom("has_version_commit_hit", forall([r, c, v, v2], Implication(
-            PredApp("eq_id", (v, v2)),
-            PredApp("has_version", (app("commit", r, c, v), v2))
+        Axiom("has_version_commit_hit", forall([r, c, v, v2], implication(
+            pred_app("eq_id", v, v2),
+            pred_app("has_version", app("commit", r, c, v), v2)
         ))),
-        Axiom("has_version_commit_miss", forall([r, c, v, v2], Implication(
-            Negation(PredApp("eq_id", (v, v2))),
+        Axiom("has_version_commit_miss", forall([r, c, v, v2], implication(
+            negation(pred_app("eq_id", v, v2)),
             iff(
-                PredApp("has_version", (app("commit", r, c, v), v2)),
-                PredApp("has_version", (r, v2))
+                pred_app("has_version", app("commit", r, c, v), v2),
+                pred_app("has_version", r, v2)
             )
         ))),
         Axiom("has_version_revert", forall([r, v, v2], iff(
-            PredApp("has_version", (app("revert", r, v), v2)),
-            PredApp("has_version", (r, v2))
+            pred_app("has_version", app("revert", r, v), v2),
+            pred_app("has_version", r, v2)
         ))),
 
         # -- current_content --
@@ -153,12 +169,12 @@ def version_history_spec() -> Spec:
         Axiom("current_content_commit", forall([r, c, v], eq(
             app("current_content", app("commit", r, c, v)), c
         ))),
-        Axiom("current_content_revert_hit", forall([r, v], Implication(
-            PredApp("has_version", (r, v)),
+        Axiom("current_content_revert_hit", forall([r, v], implication(
+            pred_app("has_version", r, v),
             eq(app("current_content", app("revert", r, v)), app("get_content", r, v))
         ))),
-        Axiom("current_content_revert_miss", forall([r, v], Implication(
-            Negation(PredApp("has_version", (r, v))),
+        Axiom("current_content_revert_miss", forall([r, v], implication(
+            negation(pred_app("has_version", r, v)),
             eq(app("current_content", app("revert", r, v)), app("current_content", r))
         ))),
 
@@ -169,31 +185,31 @@ def version_history_spec() -> Spec:
         Axiom("current_version_commit", forall([r, c, v], eq(
             app("current_version", app("commit", r, c, v)), v
         ))),
-        Axiom("current_version_revert_hit", forall([r, v], Implication(
-            PredApp("has_version", (r, v)),
+        Axiom("current_version_revert_hit", forall([r, v], implication(
+            pred_app("has_version", r, v),
             eq(app("current_version", app("revert", r, v)), v)
         ))),
-        Axiom("current_version_revert_miss", forall([r, v], Implication(
-            Negation(PredApp("has_version", (r, v))),
+        Axiom("current_version_revert_miss", forall([r, v], implication(
+            negation(pred_app("has_version", r, v)),
             eq(app("current_version", app("revert", r, v)), app("current_version", r))
         ))),
 
         # -- get_content --
-        Axiom("get_content_init_hit", forall([c, v, v2], Implication(
-            PredApp("eq_id", (v, v2)),
+        Axiom("get_content_init_hit", forall([c, v, v2], implication(
+            pred_app("eq_id", v, v2),
             eq(app("get_content", app("init", c, v), v2), c)
         ))),
         # Version not in freshly initialized repo — explicitly undefined
-        Axiom("get_content_init_miss", forall([c, v, v2], Implication(
-            Negation(PredApp("eq_id", (v, v2))),
-            Negation(Definedness(app("get_content", app("init", c, v), v2)))
+        Axiom("get_content_init_miss", forall([c, v, v2], implication(
+            negation(pred_app("eq_id", v, v2)),
+            negation(definedness(app("get_content", app("init", c, v), v2)))
         ))),
-        Axiom("get_content_commit_hit", forall([r, c, v, v2], Implication(
-            PredApp("eq_id", (v, v2)),
+        Axiom("get_content_commit_hit", forall([r, c, v, v2], implication(
+            pred_app("eq_id", v, v2),
             eq(app("get_content", app("commit", r, c, v), v2), c)
         ))),
-        Axiom("get_content_commit_miss", forall([r, c, v, v2], Implication(
-            Negation(PredApp("eq_id", (v, v2))),
+        Axiom("get_content_commit_miss", forall([r, c, v, v2], implication(
+            negation(pred_app("eq_id", v, v2)),
             eq(
                 app("get_content", app("commit", r, c, v), v2),
                 app("get_content", r, v2)
@@ -205,31 +221,31 @@ def version_history_spec() -> Spec:
         ))),
 
         # -- diff --
-        Axiom("diff_init_hit_hit", forall([c, v, v1, v2], Implication(
-            Conjunction((PredApp("eq_id", (v, v1)), PredApp("eq_id", (v, v2)))),
+        Axiom("diff_init_hit_hit", forall([c, v, v1, v2], implication(
+            conjunction(pred_app("eq_id", v, v1), pred_app("eq_id", v, v2)),
             eq(app("diff", app("init", c, v), v1, v2), app("compute_diff", c, c))
         ))),
         # init with one or both versions missing — undefined
-        Axiom("diff_init_hit_miss", forall([c, v, v1, v2], Implication(
-            Conjunction((PredApp("eq_id", (v, v1)), Negation(PredApp("eq_id", (v, v2))))),
-            Negation(Definedness(app("diff", app("init", c, v), v1, v2)))
+        Axiom("diff_init_hit_miss", forall([c, v, v1, v2], implication(
+            conjunction(pred_app("eq_id", v, v1), negation(pred_app("eq_id", v, v2))),
+            negation(definedness(app("diff", app("init", c, v), v1, v2)))
         ))),
-        Axiom("diff_init_miss_hit", forall([c, v, v1, v2], Implication(
-            Conjunction((Negation(PredApp("eq_id", (v, v1))), PredApp("eq_id", (v, v2)))),
-            Negation(Definedness(app("diff", app("init", c, v), v1, v2)))
+        Axiom("diff_init_miss_hit", forall([c, v, v1, v2], implication(
+            conjunction(negation(pred_app("eq_id", v, v1)), pred_app("eq_id", v, v2)),
+            negation(definedness(app("diff", app("init", c, v), v1, v2)))
         ))),
-        Axiom("diff_init_miss_miss", forall([c, v, v1, v2], Implication(
-            Conjunction((Negation(PredApp("eq_id", (v, v1))), Negation(PredApp("eq_id", (v, v2))))),
-            Negation(Definedness(app("diff", app("init", c, v), v1, v2)))
+        Axiom("diff_init_miss_miss", forall([c, v, v1, v2], implication(
+            conjunction(negation(pred_app("eq_id", v, v1)), negation(pred_app("eq_id", v, v2))),
+            negation(definedness(app("diff", app("init", c, v), v1, v2)))
         ))),
-        Axiom("diff_commit_hit_hit", forall([r, c, v, v1, v2], Implication(
-            Conjunction((PredApp("eq_id", (v, v1)), PredApp("eq_id", (v, v2)))),
+        Axiom("diff_commit_hit_hit", forall([r, c, v, v1, v2], implication(
+            conjunction(pred_app("eq_id", v, v1), pred_app("eq_id", v, v2)),
             eq(app("diff", app("commit", r, c, v), v1, v2), app("compute_diff", c, c))
         ))),
-        Axiom("diff_commit_hit_miss", forall([r, c, v, v1, v2], Implication(
-            Conjunction((PredApp("eq_id", (v, v1)), Negation(PredApp("eq_id", (v, v2))))),
-            Implication(
-                PredApp("has_version", (r, v2)),
+        Axiom("diff_commit_hit_miss", forall([r, c, v, v1, v2], implication(
+            conjunction(pred_app("eq_id", v, v1), negation(pred_app("eq_id", v, v2))),
+            implication(
+                pred_app("has_version", r, v2),
                 eq(
                     app("diff", app("commit", r, c, v), v1, v2),
                     app("compute_diff", c, app("get_content", r, v2))
@@ -237,17 +253,17 @@ def version_history_spec() -> Spec:
             )
         ))),
         # v2 not in previous repo — diff undefined
-        Axiom("diff_commit_hit_miss_noversion", forall([r, c, v, v1, v2], Implication(
-            Conjunction((PredApp("eq_id", (v, v1)), Negation(PredApp("eq_id", (v, v2))))),
-            Implication(
-                Negation(PredApp("has_version", (r, v2))),
-                Negation(Definedness(app("diff", app("commit", r, c, v), v1, v2)))
+        Axiom("diff_commit_hit_miss_noversion", forall([r, c, v, v1, v2], implication(
+            conjunction(pred_app("eq_id", v, v1), negation(pred_app("eq_id", v, v2))),
+            implication(
+                negation(pred_app("has_version", r, v2)),
+                negation(definedness(app("diff", app("commit", r, c, v), v1, v2)))
             )
         ))),
-        Axiom("diff_commit_miss_hit", forall([r, c, v, v1, v2], Implication(
-            Conjunction((Negation(PredApp("eq_id", (v, v1))), PredApp("eq_id", (v, v2)))),
-            Implication(
-                PredApp("has_version", (r, v1)),
+        Axiom("diff_commit_miss_hit", forall([r, c, v, v1, v2], implication(
+            conjunction(negation(pred_app("eq_id", v, v1)), pred_app("eq_id", v, v2)),
+            implication(
+                pred_app("has_version", r, v1),
                 eq(
                     app("diff", app("commit", r, c, v), v1, v2),
                     app("compute_diff", app("get_content", r, v1), c)
@@ -255,15 +271,15 @@ def version_history_spec() -> Spec:
             )
         ))),
         # v1 not in previous repo — diff undefined
-        Axiom("diff_commit_miss_hit_noversion", forall([r, c, v, v1, v2], Implication(
-            Conjunction((Negation(PredApp("eq_id", (v, v1))), PredApp("eq_id", (v, v2)))),
-            Implication(
-                Negation(PredApp("has_version", (r, v1))),
-                Negation(Definedness(app("diff", app("commit", r, c, v), v1, v2)))
+        Axiom("diff_commit_miss_hit_noversion", forall([r, c, v, v1, v2], implication(
+            conjunction(negation(pred_app("eq_id", v, v1)), pred_app("eq_id", v, v2)),
+            implication(
+                negation(pred_app("has_version", r, v1)),
+                negation(definedness(app("diff", app("commit", r, c, v), v1, v2)))
             )
         ))),
-        Axiom("diff_commit_miss_miss", forall([r, c, v, v1, v2], Implication(
-            Conjunction((Negation(PredApp("eq_id", (v, v1))), Negation(PredApp("eq_id", (v, v2))))),
+        Axiom("diff_commit_miss_miss", forall([r, c, v, v1, v2], implication(
+            conjunction(negation(pred_app("eq_id", v, v1)), negation(pred_app("eq_id", v, v2))),
             eq(
                 app("diff", app("commit", r, c, v), v1, v2),
                 app("diff", r, v1, v2)

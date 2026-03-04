@@ -40,8 +40,17 @@ For our single total observer (`get_value`), we must consider each of the 4 cons
 """
 
 from alspec import (
-    Axiom, GeneratedSortInfo, Signature, Spec,
-    atomic, fn, var, app, const, eq, forall
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    const,
+    eq,
+    fn,
+    forall,
+    var,
 )
 
 def counter_spec() -> Spec:

@@ -38,20 +38,20 @@ Because `record` replaces whatever history the sensor had, we only need basic ax
 
 from alspec import (
     Axiom,
-    Definedness,
     GeneratedSortInfo,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
+    definedness,
     eq,
+    fn,
     forall,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -87,17 +87,17 @@ def temperature_sensor_spec() -> Spec:
         # has_reading x init -> false
         Axiom(
             label="has_reading_init",
-            formula=Negation(PredApp("has_reading", (const("init"),))),
+            formula=negation(pred_app("has_reading", const("init"))),
         ),
         # has_reading x record -> true
         Axiom(
             label="has_reading_record",
-            formula=forall([s, t], PredApp("has_reading", (app("record", s, t),))),
+            formula=forall([s, t], pred_app("has_reading", app("record", s, t))),
         ),
         # read x init -> explicitly undefined (partial observer on base constructor)
         Axiom(
             label="read_init_undef",
-            formula=Negation(Definedness(app("read", const("init")))),
+            formula=negation(definedness(app("read", const("init")))),
         ),
         # read x record -> returns the newly recorded reading (discards old state)
         Axiom(

@@ -87,18 +87,18 @@ Implementation follows the obligation table row-by-row with universal quantifica
 from alspec import (
     Axiom,
     GeneratedSortInfo,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
     eq,
+    fn,
     forall,
     iff,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -199,8 +199,8 @@ def thermostat_spec() -> Spec:
         Axiom(
             label="heater_on_new",
             formula=iff(
-                PredApp("heater_on", (const("new"),)),
-                PredApp("lt", (const("init_current"), const("init_target"))),
+                pred_app("heater_on", const("new")),
+                pred_app("lt", const("init_current"), const("init_target")),
             ),
         ),
         Axiom(
@@ -208,8 +208,8 @@ def thermostat_spec() -> Spec:
             formula=forall(
                 [th, t],
                 iff(
-                    PredApp("heater_on", (app("set_target", th, t),)),
-                    PredApp("lt", (app("get_current", th), t)),
+                    pred_app("heater_on", app("set_target", th, t)),
+                    pred_app("lt", app("get_current", th), t),
                 ),
             ),
         ),
@@ -218,8 +218,8 @@ def thermostat_spec() -> Spec:
             formula=forall(
                 [th, r],
                 iff(
-                    PredApp("heater_on", (app("read_temp", th, r),)),
-                    PredApp("lt", (r, app("get_target", th))),
+                    pred_app("heater_on", app("read_temp", th, r)),
+                    pred_app("lt", r, app("get_target", th)),
                 ),
             ),
         ),

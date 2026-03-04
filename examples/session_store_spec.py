@@ -1,22 +1,22 @@
 from alspec import (
     Axiom,
-    Conjunction,
-    Definedness,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
+    conjunction,
     const,
+    definedness,
     eq,
+    fn,
     forall,
     iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -117,7 +117,7 @@ def session_store_spec() -> Spec:
             label="last_input_create_undef",
             formula=forall(
                 [t],
-                Negation(Definedness(app("last_input", app("create", t)))),
+                negation(definedness(app("last_input", app("create", t)))),
             ),
         ),
         # ==================================================================
@@ -127,16 +127,16 @@ def session_store_spec() -> Spec:
             label="eq_token_refl",
             formula=forall(
                 [t],
-                PredApp("eq_token", (t, t)),
+                pred_app("eq_token", t, t),
             ),
         ),
         Axiom(
             label="eq_token_sym",
             formula=forall(
                 [t, t2],
-                Implication(
-                    PredApp("eq_token", (t, t2)),
-                    PredApp("eq_token", (t2, t)),
+                implication(
+                    pred_app("eq_token", t, t2),
+                    pred_app("eq_token", t2, t),
                 ),
             ),
         ),
@@ -144,12 +144,10 @@ def session_store_spec() -> Spec:
             label="eq_token_trans",
             formula=forall(
                 [t, t2, t3],
-                Implication(
-                    Conjunction((
-                        PredApp("eq_token", (t, t2)),
-                        PredApp("eq_token", (t2, t3)),
-                    )),
-                    PredApp("eq_token", (t, t3)),
+                implication(
+                    conjunction(pred_app("eq_token", t, t2),
+                        pred_app("eq_token", t2, t3)),
+                    pred_app("eq_token", t, t3),
                 ),
             ),
         ),
@@ -161,7 +159,7 @@ def session_store_spec() -> Spec:
             formula=forall(
                 [s],
                 iff(
-                    Definedness(app("refresh", s)),
+                    definedness(app("refresh", s)),
                     eq(app("get_status", s), const("active")),
                 ),
             ),
@@ -173,7 +171,7 @@ def session_store_spec() -> Spec:
         # ==================================================================
         Axiom(
             label="active_expired_distinct",
-            formula=Negation(eq(const("active"), const("expired"))),
+            formula=negation(eq(const("active"), const("expired"))),
         ),
         # ==================================================================
         # DOMAIN CELLS — get_token (preservation)
@@ -208,8 +206,8 @@ def session_store_spec() -> Spec:
             label="get_token_refresh",
             formula=forall(
                 [s],
-                Implication(
-                    Definedness(app("refresh", s)),
+                implication(
+                    definedness(app("refresh", s)),
                     eq(
                         app("get_token", app("refresh", s)),
                         app("get_token", s),
@@ -252,8 +250,8 @@ def session_store_spec() -> Spec:
             label="get_status_refresh",
             formula=forall(
                 [s],
-                Implication(
-                    Definedness(app("refresh", s)),
+                implication(
+                    definedness(app("refresh", s)),
                     eq(
                         app("get_status", app("refresh", s)),
                         const("active"),
@@ -281,8 +279,8 @@ def session_store_spec() -> Spec:
             label="last_input_refresh",
             formula=forall(
                 [s],
-                Implication(
-                    Definedness(app("refresh", s)),
+                implication(
+                    definedness(app("refresh", s)),
                     eq(
                         app("last_input", app("refresh", s)),
                         app("last_input", s),
@@ -298,7 +296,7 @@ def session_store_spec() -> Spec:
             label="is_verified_create",
             formula=forall(
                 [t],
-                Negation(PredApp("is_verified", (app("create", t),))),
+                negation(pred_app("is_verified", app("create", t))),
             ),
         ),
         # Cell 14a: is_verified × verify — POSITIVE guard polarity.
@@ -312,12 +310,10 @@ def session_store_spec() -> Spec:
             label="is_verified_verify_pos",
             formula=forall(
                 [s, t],
-                Implication(
-                    Conjunction((
-                        PredApp("eq_token", (t, app("get_token", s))),
-                        eq(app("get_status", s), const("active")),
-                    )),
-                    PredApp("is_verified", (app("verify", s, t),)),
+                implication(
+                    conjunction(pred_app("eq_token", t, app("get_token", s)),
+                        eq(app("get_status", s), const("active"))),
+                    pred_app("is_verified", app("verify", s, t)),
                 ),
             ),
         ),
@@ -330,16 +326,14 @@ def session_store_spec() -> Spec:
             label="is_verified_verify_neg",
             formula=forall(
                 [s, t],
-                Implication(
-                    Negation(
-                        Conjunction((
-                            PredApp("eq_token", (t, app("get_token", s))),
-                            eq(app("get_status", s), const("active")),
-                        )),
+                implication(
+                    negation(
+                        conjunction(pred_app("eq_token", t, app("get_token", s)),
+                            eq(app("get_status", s), const("active"))),
                     ),
                     iff(
-                        PredApp("is_verified", (app("verify", s, t),)),
-                        PredApp("is_verified", (s,)),
+                        pred_app("is_verified", app("verify", s, t)),
+                        pred_app("is_verified", s),
                     ),
                 ),
             ),
@@ -349,7 +343,7 @@ def session_store_spec() -> Spec:
             label="is_verified_expire",
             formula=forall(
                 [s],
-                Negation(PredApp("is_verified", (app("expire", s),))),
+                negation(pred_app("is_verified", app("expire", s))),
             ),
         ),
         # Cell 16: is_verified × refresh — definedness-guarded
@@ -357,10 +351,10 @@ def session_store_spec() -> Spec:
             label="is_verified_refresh",
             formula=forall(
                 [s],
-                Implication(
-                    Definedness(app("refresh", s)),
-                    Negation(
-                        PredApp("is_verified", (app("refresh", s),)),
+                implication(
+                    definedness(app("refresh", s)),
+                    negation(
+                        pred_app("is_verified", app("refresh", s)),
                     ),
                 ),
             ),
@@ -377,7 +371,7 @@ def session_store_spec() -> Spec:
             label="needs_auth_create",
             formula=forall(
                 [t],
-                PredApp("needs_auth", (app("create", t),)),
+                pred_app("needs_auth", app("create", t)),
             ),
         ),
         # Cell 18a: needs_auth × verify — POSITIVE guard → ¬needs_auth
@@ -385,12 +379,10 @@ def session_store_spec() -> Spec:
             label="needs_auth_verify_pos",
             formula=forall(
                 [s, t],
-                Implication(
-                    Conjunction((
-                        PredApp("eq_token", (t, app("get_token", s))),
-                        eq(app("get_status", s), const("active")),
-                    )),
-                    Negation(PredApp("needs_auth", (app("verify", s, t),))),
+                implication(
+                    conjunction(pred_app("eq_token", t, app("get_token", s)),
+                        eq(app("get_status", s), const("active"))),
+                    negation(pred_app("needs_auth", app("verify", s, t))),
                 ),
             ),
         ),
@@ -399,16 +391,14 @@ def session_store_spec() -> Spec:
             label="needs_auth_verify_neg",
             formula=forall(
                 [s, t],
-                Implication(
-                    Negation(
-                        Conjunction((
-                            PredApp("eq_token", (t, app("get_token", s))),
-                            eq(app("get_status", s), const("active")),
-                        )),
+                implication(
+                    negation(
+                        conjunction(pred_app("eq_token", t, app("get_token", s)),
+                            eq(app("get_status", s), const("active"))),
                     ),
                     iff(
-                        PredApp("needs_auth", (app("verify", s, t),)),
-                        PredApp("needs_auth", (s,)),
+                        pred_app("needs_auth", app("verify", s, t)),
+                        pred_app("needs_auth", s),
                     ),
                 ),
             ),
@@ -418,7 +408,7 @@ def session_store_spec() -> Spec:
             label="needs_auth_expire",
             formula=forall(
                 [s],
-                Negation(PredApp("needs_auth", (app("expire", s),))),
+                negation(pred_app("needs_auth", app("expire", s))),
             ),
         ),
         # Cell 20: needs_auth × refresh — definedness-guarded
@@ -426,9 +416,9 @@ def session_store_spec() -> Spec:
             label="needs_auth_refresh",
             formula=forall(
                 [s],
-                Implication(
-                    Definedness(app("refresh", s)),
-                    PredApp("needs_auth", (app("refresh", s),)),
+                implication(
+                    definedness(app("refresh", s)),
+                    pred_app("needs_auth", app("refresh", s)),
                 ),
             ),
         ),
@@ -444,11 +434,9 @@ def session_store_spec() -> Spec:
             formula=forall(
                 [s],
                 iff(
-                    PredApp("needs_auth", (s,)),
-                    Conjunction((
-                        eq(app("get_status", s), const("active")),
-                        Negation(PredApp("is_verified", (s,))),
-                    )),
+                    pred_app("needs_auth", s),
+                    conjunction(eq(app("get_status", s), const("active")),
+                        negation(pred_app("is_verified", s))),
                 ),
             ),
         ),

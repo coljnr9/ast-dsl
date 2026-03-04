@@ -26,7 +26,7 @@ Additionally, because `withdraw` is a partial constructor, we need a definedness
 | `balance` | `empty` | — | `balance_empty` | `zero` |
 | `balance` | `deposit` | — | `balance_deposit` | `add(balance(a), m)` |
 | `balance` | `withdraw` | hit (defined) | `balance_withdraw` | `sub(balance(a), m)` |
-| `withdraw` (domain) | — | — | `withdraw_definedness` | `Definedness(withdraw(a, m)) ⇔ geq(balance(a), m)` |
+| `withdraw` (domain) | — | — | `withdraw_definedness` | `definedness(withdraw(a, m)) ⇔ geq(balance(a), m)` |
 
 ### Completeness Count & Tricky Cases
 - **Completeness Count**: 1 observer × 3 constructors = 3 axioms + 1 domain definedness axiom = **4 axioms total**.
@@ -35,8 +35,22 @@ Additionally, because `withdraw` is a partial constructor, we need a definedness
 """
 
 from alspec import (
-    Axiom, GeneratedSortInfo, Implication, PredApp, Definedness,
-    Signature, Spec, atomic, fn, pred, var, app, const, eq, forall, iff
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    const,
+    definedness,
+    eq,
+    fn,
+    forall,
+    iff,
+    implication,
+    pred,
+    pred_app,
+    var,
 )
 
 def bank_account_spec() -> Spec:
@@ -93,16 +107,16 @@ def bank_account_spec() -> Spec:
         Axiom(
             label="withdraw_definedness",
             formula=forall([a, m], iff(
-                Definedness(app("withdraw", a, m)),
-                PredApp("geq", (app("balance", a), m)),
+                definedness(app("withdraw", a, m)),
+                pred_app("geq", app("balance", a), m),
             )),
         ),
         
         # balance × withdraw (must be guarded because withdraw is partial)
         Axiom(
             label="balance_withdraw",
-            formula=forall([a, m], Implication(
-                PredApp("geq", (app("balance", a), m)),
+            formula=forall([a, m], implication(
+                pred_app("geq", app("balance", a), m),
                 eq(
                     app("balance", app("withdraw", a, m)),
                     app("sub", app("balance", a), m),

@@ -33,7 +33,7 @@ Dispatch: Because `lookup` searches by `Name`, and both `add` and `remove` take 
 | `lookup` | `remove` | miss | `lookup_remove_miss`| Delegates to `lookup(pb, ...)` |
 
 ### Step 4: Design Decisions & Tricky Cases
-- **Explicit undefinedness**: Under loose semantics, omitting an axiom leaves the interpretation unconstrained rather than forcing undefinedness. The `empty` constructor case and the `remove` hit case use `Negation(Definedness(...))` to explicitly assert that `lookup` is undefined in those contexts.
+- **Explicit undefinedness**: Under loose semantics, omitting an axiom leaves the interpretation unconstrained rather than forcing undefinedness. The `empty` constructor case and the `remove` hit case use `negation(definedness(...))` to explicitly assert that `lookup` is undefined in those contexts.
 - **Update via Add**: Standard finite-map patterns handle key reassignment automatically through the `add` operator — a new `add` over an existing key will naturally short-circuit and shadow previous writes due to the structural recursive matching on the outermost term.
 - **Total vs Partial removal**: Removing a name that does not exist remains total. Since `lookup_remove_miss` maintains previous lookups for non-matching keys, removing an already absent key essentially constructs a structurally thicker but logically identical map.
 
@@ -44,8 +44,23 @@ Dispatch: Because `lookup` searches by `Name`, and both `add` and `remove` take 
 """
 
 from alspec import (
-    Axiom, Conjunction, Definedness, GeneratedSortInfo, Implication, Negation, PredApp,
-    Signature, Spec, atomic, fn, pred, var, app, const, eq, forall
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    conjunction,
+    const,
+    definedness,
+    eq,
+    fn,
+    forall,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 def phone_book_spec() -> Spec:
@@ -86,23 +101,21 @@ def phone_book_spec() -> Spec:
         # ━━ eq_name basis ━━
         Axiom(
             label="eq_name_refl",
-            formula=forall([n], PredApp("eq_name", (n, n)))
+            formula=forall([n], pred_app("eq_name", n, n))
         ),
         Axiom(
             label="eq_name_sym",
-            formula=forall([n, n2], Implication(
-                PredApp("eq_name", (n, n2)),
-                PredApp("eq_name", (n2, n))
+            formula=forall([n, n2], implication(
+                pred_app("eq_name", n, n2),
+                pred_app("eq_name", n2, n)
             ))
         ),
         Axiom(
             label="eq_name_trans",
-            formula=forall([n, n2, n3], Implication(
-                Conjunction((
-                    PredApp("eq_name", (n, n2)),
-                    PredApp("eq_name", (n2, n3))
-                )),
-                PredApp("eq_name", (n, n3))
+            formula=forall([n, n2, n3], implication(
+                conjunction(pred_app("eq_name", n, n2),
+                    pred_app("eq_name", n2, n3)),
+                pred_app("eq_name", n, n3)
             ))
         ),
 
@@ -110,7 +123,7 @@ def phone_book_spec() -> Spec:
         # Empty phone book has no entries — lookup is explicitly undefined
         Axiom(
             label="lookup_empty",
-            formula=forall([n], Negation(Definedness(
+            formula=forall([n], negation(definedness(
                 app("lookup", const("empty"), n)
             )))
         ),
@@ -118,8 +131,8 @@ def phone_book_spec() -> Spec:
         # add hit: return the inserted number
         Axiom(
             label="lookup_add_hit",
-            formula=forall([pb, n, n2, num], Implication(
-                PredApp("eq_name", (n, n2)),
+            formula=forall([pb, n, n2, num], implication(
+                pred_app("eq_name", n, n2),
                 eq(
                     app("lookup", app("add", pb, n, num), n2),
                     num
@@ -130,8 +143,8 @@ def phone_book_spec() -> Spec:
         # add miss: delegate to the previous phone book state
         Axiom(
             label="lookup_add_miss",
-            formula=forall([pb, n, n2, num], Implication(
-                Negation(PredApp("eq_name", (n, n2))),
+            formula=forall([pb, n, n2, num], implication(
+                negation(pred_app("eq_name", n, n2)),
                 eq(
                     app("lookup", app("add", pb, n, num), n2),
                     app("lookup", pb, n2)
@@ -142,17 +155,17 @@ def phone_book_spec() -> Spec:
         # remove hit: removed key is explicitly undefined
         Axiom(
             label="lookup_remove_hit",
-            formula=forall([pb, n, n2], Implication(
-                PredApp("eq_name", (n, n2)),
-                Negation(Definedness(app("lookup", app("remove", pb, n), n2)))
+            formula=forall([pb, n, n2], implication(
+                pred_app("eq_name", n, n2),
+                negation(definedness(app("lookup", app("remove", pb, n), n2)))
             ))
         ),
 
         # remove miss: delegate to the previous phone book state
         Axiom(
             label="lookup_remove_miss",
-            formula=forall([pb, n, n2], Implication(
-                Negation(PredApp("eq_name", (n, n2))),
+            formula=forall([pb, n, n2], implication(
+                negation(pred_app("eq_name", n, n2)),
                 eq(
                     app("lookup", app("remove", pb, n), n2),
                     app("lookup", pb, n2)

@@ -40,8 +40,23 @@ Expected Total Axioms: 7 (1 definedness boundary + 6 observer obligations).
 """
 
 from alspec import (
-    Axiom, Definedness, GeneratedSortInfo, Implication, Negation, PredApp,
-    Signature, Spec, atomic, fn, pred, var, app, const, eq, forall, iff
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    const,
+    definedness,
+    eq,
+    fn,
+    forall,
+    iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 def bounded_counter_spec() -> Spec:
@@ -86,8 +101,8 @@ def bounded_counter_spec() -> Spec:
             label="inc_def",
             formula=forall([c],
                 iff(
-                    Definedness(app("inc", c)),
-                    Negation(PredApp("is_at_max", (c,)))
+                    definedness(app("inc", c)),
+                    negation(pred_app("is_at_max", c))
                 )
             )
         ),
@@ -102,8 +117,8 @@ def bounded_counter_spec() -> Spec:
         Axiom(
             label="val_inc",
             formula=forall([c],
-                Implication(
-                    Negation(PredApp("is_at_max", (c,))),
+                implication(
+                    negation(pred_app("is_at_max", c)),
                     eq(
                         app("val", app("inc", c)),
                         app("suc", app("val", c))
@@ -122,8 +137,8 @@ def bounded_counter_spec() -> Spec:
         Axiom(
             label="max_val_inc",
             formula=forall([c],
-                Implication(
-                    Negation(PredApp("is_at_max", (c,))),
+                implication(
+                    negation(pred_app("is_at_max", c)),
                     eq(
                         app("max_val", app("inc", c)),
                         app("max_val", c)
@@ -137,7 +152,7 @@ def bounded_counter_spec() -> Spec:
             label="is_at_max_new",
             formula=forall([m],
                 iff(
-                    PredApp("is_at_max", (app("new", m),)),
+                    pred_app("is_at_max", app("new", m)),
                     eq(const("zero"), m)
                 )
             )
@@ -145,10 +160,10 @@ def bounded_counter_spec() -> Spec:
         Axiom(
             label="is_at_max_inc",
             formula=forall([c],
-                Implication(
-                    Negation(PredApp("is_at_max", (c,))),
+                implication(
+                    negation(pred_app("is_at_max", c)),
                     iff(
-                        PredApp("is_at_max", (app("inc", c),)),
+                        pred_app("is_at_max", app("inc", c)),
                         eq(app("suc", app("val", c)), app("max_val", c))
                     )
                 )

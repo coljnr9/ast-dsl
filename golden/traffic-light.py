@@ -37,8 +37,17 @@ Following the rule that every observer must be defined against every constructor
 """
 
 from alspec import (
-    Axiom, GeneratedSortInfo, Signature, Spec,
-    atomic, fn, var, app, const, eq, forall
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    const,
+    eq,
+    fn,
+    forall,
+    var,
 )
 
 def traffic_light_spec() -> Spec:

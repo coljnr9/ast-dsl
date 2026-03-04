@@ -49,13 +49,13 @@ COUNTER = WorkedExample(
     GeneratedSortInfo,
     Signature,
     Spec,
-    atomic,
-    fn,
-    var,
     app,
+    atomic,
     const,
     eq,
+    fn,
     forall,
+    var,
 )
 
 
@@ -179,13 +179,13 @@ TRAFFIC_LIGHT = WorkedExample(
     GeneratedSortInfo,
     Signature,
     Spec,
-    atomic,
-    fn,
-    var,
     app,
+    atomic,
     const,
     eq,
+    fn,
     forall,
+    var,
 )
 
 
@@ -302,17 +302,17 @@ BOOLEAN_FLAG = WorkedExample(
     code='''from alspec import (
     Axiom,
     GeneratedSortInfo,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
+    fn,
     forall,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -346,17 +346,17 @@ def boolean_flag_spec() -> Spec:
         # observer x constructor: BASIS - New flag starts in disabled state
         Axiom(
             label="is_enabled_init",
-            formula=Negation(PredApp("is_enabled", (const("init"),))),
+            formula=negation(pred_app("is_enabled", const("init"))),
         ),
         # observer x constructor: KEY_HIT - Enabling flag makes it enabled
         Axiom(
             label="is_enabled_enable",
-            formula=forall([f], PredApp("is_enabled", (app("enable", f),))),
+            formula=forall([f], pred_app("is_enabled", app("enable", f))),
         ),
         # observer x constructor: KEY_MISS - Disabling flag makes it disabled
         Axiom(
             label="is_enabled_disable",
-            formula=forall([f], Negation(PredApp("is_enabled", (app("disable", f),)))),
+            formula=forall([f], negation(pred_app("is_enabled", app("disable", f)))),
         ),
     )
 
@@ -403,18 +403,18 @@ FIFO_QUEUE = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Definedness,
     GeneratedSortInfo,
-    Negation,
     Signature,
     Spec,
-    atomic,
-    fn,
-    var,
     app,
+    atomic,
     const,
+    definedness,
     eq,
+    fn,
     forall,
+    negation,
+    var,
 )
 
 
@@ -453,7 +453,7 @@ def fifo_queue_spec() -> Spec:
         # dequeue × empty: DOMAIN - undefined for empty queue
         Axiom(
             label="dequeue_empty_undef",
-            formula=Negation(Definedness(app("dequeue", const("empty")))),
+            formula=negation(definedness(app("dequeue", const("empty")))),
         ),
         # dequeue × enqueue(empty): DOMAIN - single element becomes empty
         Axiom(
@@ -481,7 +481,7 @@ def fifo_queue_spec() -> Spec:
         # front × empty: DOMAIN - undefined for empty queue
         Axiom(
             label="front_empty_undef",
-            formula=Negation(Definedness(app("front", const("empty")))),
+            formula=negation(definedness(app("front", const("empty")))),
         ),
         # front × enqueue(empty): DOMAIN - single element is front
         Axiom(
@@ -545,22 +545,22 @@ BOUNDED_COUNTER = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Definedness,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
+    definedness,
     eq,
+    fn,
     forall,
     iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -607,8 +607,8 @@ def bounded_counter_spec() -> Spec:
             formula=forall(
                 [c],
                 iff(
-                    Definedness(app("inc", c)),
-                    Negation(PredApp("is_at_max", (c,))),
+                    definedness(app("inc", c)),
+                    negation(pred_app("is_at_max", c)),
                 ),
             ),
         ),
@@ -626,8 +626,8 @@ def bounded_counter_spec() -> Spec:
             label="val_inc",
             formula=forall(
                 [c],
-                Implication(
-                    Negation(PredApp("is_at_max", (c,))),
+                implication(
+                    negation(pred_app("is_at_max", c)),
                     eq(
                         app("val", app("inc", c)),
                         app("suc", app("val", c)),
@@ -649,8 +649,8 @@ def bounded_counter_spec() -> Spec:
             label="max_val_inc",
             formula=forall(
                 [c],
-                Implication(
-                    Negation(PredApp("is_at_max", (c,))),
+                implication(
+                    negation(pred_app("is_at_max", c)),
                     eq(
                         app("max_val", app("inc", c)),
                         app("max_val", c),
@@ -665,7 +665,7 @@ def bounded_counter_spec() -> Spec:
             formula=forall(
                 [m],
                 iff(
-                    PredApp("is_at_max", (app("new", m),)),
+                    pred_app("is_at_max", app("new", m)),
                     eq(const("zero"), m),
                 ),
             ),
@@ -675,10 +675,10 @@ def bounded_counter_spec() -> Spec:
             label="is_at_max_inc",
             formula=forall(
                 [c],
-                Implication(
-                    Negation(PredApp("is_at_max", (c,))),
+                implication(
+                    negation(pred_app("is_at_max", c)),
                     iff(
-                        PredApp("is_at_max", (app("inc", c),)),
+                        pred_app("is_at_max", app("inc", c)),
                         eq(app("suc", app("val", c)), app("max_val", c)),
                     ),
                 ),
@@ -728,22 +728,21 @@ PHONE_BOOK = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Conjunction,
-    Definedness,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
+    definedness,
     eq,
+    fn,
     forall,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -793,16 +792,16 @@ def phone_book_spec() -> Spec:
         # eq_name x reflexive: BASIS — name equals itself
         Axiom(
             label="eq_name_refl",
-            formula=forall([n], PredApp("eq_name", (n, n))),
+            formula=forall([n], pred_app("eq_name", n, n)),
         ),
         # eq_name x symmetric: BASIS — if n1=n2 then n2=n1
         Axiom(
             label="eq_name_sym",
             formula=forall(
                 [n, n2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    PredApp("eq_name", (n2, n)),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    pred_app("eq_name", n2, n),
                 ),
             ),
         ),
@@ -811,14 +810,10 @@ def phone_book_spec() -> Spec:
             label="eq_name_trans",
             formula=forall(
                 [n, n2, n3],
-                Implication(
-                    Conjunction(
-                        (
-                            PredApp("eq_name", (n, n2)),
-                            PredApp("eq_name", (n2, n3)),
-                        )
-                    ),
-                    PredApp("eq_name", (n, n3)),
+                implication(
+                    conjunction(pred_app("eq_name", n, n2),
+                            pred_app("eq_name", n2, n3)),
+                    pred_app("eq_name", n, n3),
                 ),
             ),
         ),
@@ -828,8 +823,8 @@ def phone_book_spec() -> Spec:
             label="lookup_empty",
             formula=forall(
                 [n],
-                Negation(
-                    Definedness(
+                negation(
+                    definedness(
                         app("lookup", const("empty"), n),
                     )
                 ),
@@ -840,8 +835,8 @@ def phone_book_spec() -> Spec:
             label="lookup_add_hit",
             formula=forall(
                 [pb, n, n2, num],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
+                implication(
+                    pred_app("eq_name", n, n2),
                     eq(app("lookup", app("add", pb, n, num), n2), num),
                 ),
             ),
@@ -851,8 +846,8 @@ def phone_book_spec() -> Spec:
             label="lookup_add_miss",
             formula=forall(
                 [pb, n, n2, num],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     eq(
                         app("lookup", app("add", pb, n, num), n2),
                         app("lookup", pb, n2),
@@ -865,9 +860,9 @@ def phone_book_spec() -> Spec:
             label="lookup_remove_hit",
             formula=forall(
                 [pb, n, n2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Negation(Definedness(app("lookup", app("remove", pb, n), n2))),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    negation(definedness(app("lookup", app("remove", pb, n), n2))),
                 ),
             ),
         ),
@@ -876,8 +871,8 @@ def phone_book_spec() -> Spec:
             label="lookup_remove_miss",
             formula=forall(
                 [pb, n, n2],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     eq(
                         app("lookup", app("remove", pb, n), n2),
                         app("lookup", pb, n2),
@@ -924,20 +919,20 @@ TEMPERATURE_SENSOR = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Definedness,
     GeneratedSortInfo,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
+    definedness,
     eq,
+    fn,
     forall,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -974,18 +969,18 @@ def temperature_sensor_spec() -> Spec:
         # has_reading x init: BASIS — newly initialized sensors have no reading
         Axiom(
             label="has_reading_init",
-            formula=Negation(PredApp("has_reading", (const("init"),))),
+            formula=negation(pred_app("has_reading", const("init"))),
         ),
         # has_reading x record: BASIS — recording always creates a valid reading
         Axiom(
             label="has_reading_record",
-            formula=forall([s, t], PredApp("has_reading", (app("record", s, t),))),
+            formula=forall([s, t], pred_app("has_reading", app("record", s, t))),
         ),
         # == Partiality ==
         # read x init: UNDEF — cannot read from uninitialized sensor
         Axiom(
             label="read_init_undef",
-            formula=Negation(Definedness(app("read", const("init")))),
+            formula=negation(definedness(app("read", const("init")))),
         ),
         # == Selectors ==
         # read x record: SELECTOR_EXTRACT — extract temperature from record constructor
@@ -1041,18 +1036,18 @@ THERMOSTAT = WorkedExample(
     code='''from alspec import (
     Axiom,
     GeneratedSortInfo,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
     eq,
+    fn,
     forall,
     iff,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -1150,8 +1145,8 @@ def thermostat_spec() -> Spec:
         Axiom(
             label="heater_on_new",
             formula=iff(
-                PredApp("heater_on", (const("new"),)),
-                PredApp("lt", (const("init_current"), const("init_target"))),
+                pred_app("heater_on", const("new")),
+                pred_app("lt", const("init_current"), const("init_target")),
             ),
         ),
         # heater_on x set_target: BICOND_CHAR — Heater activates if current < new target
@@ -1160,8 +1155,8 @@ def thermostat_spec() -> Spec:
             formula=forall(
                 [th, t],
                 iff(
-                    PredApp("heater_on", (app("set_target", th, t),)),
-                    PredApp("lt", (app("get_current", th), t)),
+                    pred_app("heater_on", app("set_target", th, t)),
+                    pred_app("lt", app("get_current", th), t),
                 ),
             ),
         ),
@@ -1171,8 +1166,8 @@ def thermostat_spec() -> Spec:
             formula=forall(
                 [th, r],
                 iff(
-                    PredApp("heater_on", (app("read_temp", th, r),)),
-                    PredApp("lt", (r, app("get_target", th))),
+                    pred_app("heater_on", app("read_temp", th, r)),
+                    pred_app("lt", r, app("get_target", th)),
                 ),
             ),
         ),
@@ -1220,20 +1215,20 @@ BANK_ACCOUNT = WorkedExample(
     code='''from alspec import (
     Axiom,
     GeneratedSortInfo,
-    Implication,
-    PredApp,
-    Definedness,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
+    definedness,
     eq,
+    fn,
     forall,
     iff,
+    implication,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -1299,8 +1294,8 @@ def bank_account_spec() -> Spec:
             formula=forall(
                 [a, m],
                 iff(
-                    Definedness(app("withdraw", a, m)),
-                    PredApp("geq", (app("balance", a), m)),
+                    definedness(app("withdraw", a, m)),
+                    pred_app("geq", app("balance", a), m),
                 ),
             ),
         ),
@@ -1309,8 +1304,8 @@ def bank_account_spec() -> Spec:
             label="balance_withdraw",
             formula=forall(
                 [a, m],
-                Implication(
-                    PredApp("geq", (app("balance", a), m)),
+                implication(
+                    pred_app("geq", app("balance", a), m),
                     eq(
                         app("balance", app("withdraw", a, m)),
                         app("sub", app("balance", a), m),
@@ -1378,21 +1373,20 @@ DOOR_LOCK = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Conjunction,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
     eq,
+    fn,
     forall,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -1441,16 +1435,16 @@ def door_lock_spec() -> Spec:
         # eq_code x BASIS: BASIS - Code equality is reflexive
         Axiom(
             label="eq_code_refl",
-            formula=forall([c1], PredApp("eq_code", (c1, c1))),
+            formula=forall([c1], pred_app("eq_code", c1, c1)),
         ),
         # eq_code x BASIS: BASIS - Code equality is symmetric
         Axiom(
             label="eq_code_sym",
             formula=forall(
                 [c1, c2],
-                Implication(
-                    PredApp("eq_code", (c1, c2)),
-                    PredApp("eq_code", (c2, c1)),
+                implication(
+                    pred_app("eq_code", c1, c2),
+                    pred_app("eq_code", c2, c1),
                 ),
             ),
         ),
@@ -1459,14 +1453,10 @@ def door_lock_spec() -> Spec:
             label="eq_code_trans",
             formula=forall(
                 [c1, c2, c3],
-                Implication(
-                    Conjunction(
-                        (
-                            PredApp("eq_code", (c1, c2)),
-                            PredApp("eq_code", (c2, c3)),
-                        )
-                    ),
-                    PredApp("eq_code", (c1, c3)),
+                implication(
+                    conjunction(pred_app("eq_code", c1, c2),
+                            pred_app("eq_code", c2, c3)),
+                    pred_app("eq_code", c1, c3),
                 ),
             ),
         ),
@@ -1516,13 +1506,9 @@ def door_lock_spec() -> Spec:
             label="get_state_lock_hit",
             formula=forall(
                 [l, c],
-                Implication(
-                    Conjunction(
-                        (
-                            PredApp("eq_code", (c, app("get_code", l))),
-                            eq(app("get_state", l), const("unlocked")),
-                        )
-                    ),
+                implication(
+                    conjunction(pred_app("eq_code", c, app("get_code", l)),
+                            eq(app("get_state", l), const("unlocked"))),
                     eq(app("get_state", app("lock", l, c)), const("locked")),
                 ),
             ),
@@ -1532,14 +1518,10 @@ def door_lock_spec() -> Spec:
             label="get_state_lock_miss",
             formula=forall(
                 [l, c],
-                Implication(
-                    Negation(
-                        Conjunction(
-                            (
-                                PredApp("eq_code", (c, app("get_code", l))),
-                                eq(app("get_state", l), const("unlocked")),
-                            )
-                        )
+                implication(
+                    negation(
+                        conjunction(pred_app("eq_code", c, app("get_code", l)),
+                                eq(app("get_state", l), const("unlocked")))
                     ),
                     eq(app("get_state", app("lock", l, c)), app("get_state", l)),
                 ),
@@ -1551,13 +1533,9 @@ def door_lock_spec() -> Spec:
             label="get_state_unlock_hit",
             formula=forall(
                 [l, c],
-                Implication(
-                    Conjunction(
-                        (
-                            PredApp("eq_code", (c, app("get_code", l))),
-                            eq(app("get_state", l), const("locked")),
-                        )
-                    ),
+                implication(
+                    conjunction(pred_app("eq_code", c, app("get_code", l)),
+                            eq(app("get_state", l), const("locked"))),
                     eq(app("get_state", app("unlock", l, c)), const("unlocked")),
                 ),
             ),
@@ -1567,14 +1545,10 @@ def door_lock_spec() -> Spec:
             label="get_state_unlock_miss",
             formula=forall(
                 [l, c],
-                Implication(
-                    Negation(
-                        Conjunction(
-                            (
-                                PredApp("eq_code", (c, app("get_code", l))),
-                                eq(app("get_state", l), const("locked")),
-                            )
-                        )
+                implication(
+                    negation(
+                        conjunction(pred_app("eq_code", c, app("get_code", l)),
+                                eq(app("get_state", l), const("locked")))
                     ),
                     eq(app("get_state", app("unlock", l, c)), app("get_state", l)),
                 ),
@@ -1586,7 +1560,7 @@ def door_lock_spec() -> Spec:
             label="get_state_open_door_hit",
             formula=forall(
                 [l],
-                Implication(
+                implication(
                     eq(app("get_state", l), const("unlocked")),
                     eq(app("get_state", app("open_door", l)), const("open_state")),
                 ),
@@ -1597,8 +1571,8 @@ def door_lock_spec() -> Spec:
             label="get_state_open_door_miss",
             formula=forall(
                 [l],
-                Implication(
-                    Negation(eq(app("get_state", l), const("unlocked"))),
+                implication(
+                    negation(eq(app("get_state", l), const("unlocked"))),
                     eq(app("get_state", app("open_door", l)), app("get_state", l)),
                 ),
             ),
@@ -1608,7 +1582,7 @@ def door_lock_spec() -> Spec:
             label="get_state_close_door_hit",
             formula=forall(
                 [l],
-                Implication(
+                implication(
                     eq(app("get_state", l), const("open_state")),
                     eq(app("get_state", app("close_door", l)), const("unlocked")),
                 ),
@@ -1619,8 +1593,8 @@ def door_lock_spec() -> Spec:
             label="get_state_close_door_miss",
             formula=forall(
                 [l],
-                Implication(
-                    Negation(eq(app("get_state", l), const("open_state"))),
+                implication(
+                    negation(eq(app("get_state", l), const("open_state"))),
                     eq(app("get_state", app("close_door", l)), app("get_state", l)),
                 ),
             ),
@@ -1689,23 +1663,22 @@ TODO_LIST = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Conjunction,
-    Definedness,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
+    definedness,
     eq,
+    fn,
     forall,
     iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -1768,15 +1741,15 @@ def todo_list_spec() -> Spec:
     axioms = (
         # == eq_id structural axioms ==
         Axiom(
-            "eq_id_refl", forall([k], PredApp("eq_id", (k, k)))
+            "eq_id_refl", forall([k], pred_app("eq_id", k, k))
         ),  # eq_id x none: BASIS — reflexive
         Axiom(
             "eq_id_sym",  # eq_id x none: BASIS — symmetric
             forall(
                 [k, k2],
-                Implication(
-                    PredApp("eq_id", (k, k2)),
-                    PredApp("eq_id", (k2, k)),
+                implication(
+                    pred_app("eq_id", k, k2),
+                    pred_app("eq_id", k2, k),
                 ),
             ),
         ),
@@ -1784,14 +1757,10 @@ def todo_list_spec() -> Spec:
             "eq_id_trans",  # eq_id x none: BASIS — transitive
             forall(
                 [k, k2, k3],
-                Implication(
-                    Conjunction(
-                        (
-                            PredApp("eq_id", (k, k2)),
-                            PredApp("eq_id", (k2, k3)),
-                        )
-                    ),
-                    PredApp("eq_id", (k, k3)),
+                implication(
+                    conjunction(pred_app("eq_id", k, k2),
+                            pred_app("eq_id", k2, k3)),
+                    pred_app("eq_id", k, k3),
                 ),
             ),
         ),
@@ -1800,8 +1769,8 @@ def todo_list_spec() -> Spec:
             "has_item_empty",  # has_item x empty: BASIS — empty list contains no items
             forall(
                 [k],
-                Negation(
-                    PredApp("has_item", (const("empty"), k)),
+                negation(
+                    pred_app("has_item", const("empty"), k),
                 ),
             ),
         ),
@@ -1809,9 +1778,9 @@ def todo_list_spec() -> Spec:
             "has_item_add_hit",  # has_item x add_item: KEY_HIT — key match means item exists
             forall(
                 [l, k, k2, t],
-                Implication(
-                    PredApp("eq_id", (k, k2)),
-                    PredApp("has_item", (app("add_item", l, k, t), k2)),
+                implication(
+                    pred_app("eq_id", k, k2),
+                    pred_app("has_item", app("add_item", l, k, t), k2),
                 ),
             ),
         ),
@@ -1819,11 +1788,11 @@ def todo_list_spec() -> Spec:
             "has_item_add_miss",  # has_item x add_item: KEY_MISS — delegate to underlying list
             forall(
                 [l, k, k2, t],
-                Implication(
-                    Negation(PredApp("eq_id", (k, k2))),
+                implication(
+                    negation(pred_app("eq_id", k, k2)),
                     iff(
-                        PredApp("has_item", (app("add_item", l, k, t), k2)),
-                        PredApp("has_item", (l, k2)),
+                        pred_app("has_item", app("add_item", l, k, t), k2),
+                        pred_app("has_item", l, k2),
                     ),
                 ),
             ),
@@ -1833,8 +1802,8 @@ def todo_list_spec() -> Spec:
             forall(
                 [l, k, k2],
                 iff(
-                    PredApp("has_item", (app("complete_item", l, k), k2)),
-                    PredApp("has_item", (l, k2)),
+                    pred_app("has_item", app("complete_item", l, k), k2),
+                    pred_app("has_item", l, k2),
                 ),
             ),
         ),
@@ -1842,9 +1811,9 @@ def todo_list_spec() -> Spec:
             "has_item_remove_hit",  # has_item x remove_item: KEY_HIT — removed item doesn't exist
             forall(
                 [l, k, k2],
-                Implication(
-                    PredApp("eq_id", (k, k2)),
-                    Negation(PredApp("has_item", (app("remove_item", l, k), k2))),
+                implication(
+                    pred_app("eq_id", k, k2),
+                    negation(pred_app("has_item", app("remove_item", l, k), k2)),
                 ),
             ),
         ),
@@ -1852,11 +1821,11 @@ def todo_list_spec() -> Spec:
             "has_item_remove_miss",  # has_item x remove_item: KEY_MISS — delegate to underlying list
             forall(
                 [l, k, k2],
-                Implication(
-                    Negation(PredApp("eq_id", (k, k2))),
+                implication(
+                    negation(pred_app("eq_id", k, k2)),
                     iff(
-                        PredApp("has_item", (app("remove_item", l, k), k2)),
-                        PredApp("has_item", (l, k2)),
+                        pred_app("has_item", app("remove_item", l, k), k2),
+                        pred_app("has_item", l, k2),
                     ),
                 ),
             ),
@@ -1864,14 +1833,14 @@ def todo_list_spec() -> Spec:
         # == get_title axioms ==
         Axiom(
             "get_title_empty_undef",  # get_title x empty: UNDEF — explicitly undefined for empty list
-            forall([k], Negation(Definedness(app("get_title", const("empty"), k)))),
+            forall([k], negation(definedness(app("get_title", const("empty"), k)))),
         ),
         Axiom(
             "get_title_add_hit",  # get_title x add_item: KEY_HIT — return added title
             forall(
                 [l, k, k2, t],
-                Implication(
-                    PredApp("eq_id", (k, k2)),
+                implication(
+                    pred_app("eq_id", k, k2),
                     eq(app("get_title", app("add_item", l, k, t), k2), t),
                 ),
             ),
@@ -1880,8 +1849,8 @@ def todo_list_spec() -> Spec:
             "get_title_add_miss",  # get_title x add_item: KEY_MISS — delegate to underlying list
             forall(
                 [l, k, k2, t],
-                Implication(
-                    Negation(PredApp("eq_id", (k, k2))),
+                implication(
+                    negation(pred_app("eq_id", k, k2)),
                     eq(
                         app("get_title", app("add_item", l, k, t), k2),
                         app("get_title", l, k2),
@@ -1903,10 +1872,10 @@ def todo_list_spec() -> Spec:
             "get_title_remove_hit",  # get_title x remove_item: KEY_HIT — explicitly undefined for removed item
             forall(
                 [l, k, k2],
-                Implication(
-                    PredApp("eq_id", (k, k2)),
-                    Negation(
-                        Definedness(app("get_title", app("remove_item", l, k), k2))
+                implication(
+                    pred_app("eq_id", k, k2),
+                    negation(
+                        definedness(app("get_title", app("remove_item", l, k), k2))
                     ),
                 ),
             ),
@@ -1915,8 +1884,8 @@ def todo_list_spec() -> Spec:
             "get_title_remove_miss",  # get_title x remove_item: KEY_MISS — delegate to underlying list
             forall(
                 [l, k, k2],
-                Implication(
-                    Negation(PredApp("eq_id", (k, k2))),
+                implication(
+                    negation(pred_app("eq_id", k, k2)),
                     eq(
                         app("get_title", app("remove_item", l, k), k2),
                         app("get_title", l, k2),
@@ -1927,14 +1896,14 @@ def todo_list_spec() -> Spec:
         # == get_status axioms ==
         Axiom(
             "get_status_empty_undef",  # get_status x empty: UNDEF — explicitly undefined for empty list
-            forall([k], Negation(Definedness(app("get_status", const("empty"), k)))),
+            forall([k], negation(definedness(app("get_status", const("empty"), k)))),
         ),
         Axiom(
             "get_status_add_hit",  # get_status x add_item: KEY_HIT — new items start pending
             forall(
                 [l, k, k2, t],
-                Implication(
-                    PredApp("eq_id", (k, k2)),
+                implication(
+                    pred_app("eq_id", k, k2),
                     eq(
                         app("get_status", app("add_item", l, k, t), k2),
                         const("pending"),
@@ -1946,8 +1915,8 @@ def todo_list_spec() -> Spec:
             "get_status_add_miss",  # get_status x add_item: KEY_MISS — delegate to underlying list
             forall(
                 [l, k, k2, t],
-                Implication(
-                    Negation(PredApp("eq_id", (k, k2))),
+                implication(
+                    negation(pred_app("eq_id", k, k2)),
                     eq(
                         app("get_status", app("add_item", l, k, t), k2),
                         app("get_status", l, k2),
@@ -1959,10 +1928,10 @@ def todo_list_spec() -> Spec:
             "get_status_complete_hit",  # get_status x complete_item: GUARDED — mark as done if exists
             forall(
                 [l, k, k2],
-                Implication(
-                    PredApp("eq_id", (k, k2)),
-                    Implication(
-                        PredApp("has_item", (l, k)),
+                implication(
+                    pred_app("eq_id", k, k2),
+                    implication(
+                        pred_app("has_item", l, k),
                         eq(
                             app("get_status", app("complete_item", l, k), k2),
                             const("done"),
@@ -1975,10 +1944,10 @@ def todo_list_spec() -> Spec:
             "get_status_complete_hit_noitem",  # get_status x complete_item: KEY_HIT — no-op if missing
             forall(
                 [l, k, k2],
-                Implication(
-                    PredApp("eq_id", (k, k2)),
-                    Implication(
-                        Negation(PredApp("has_item", (l, k))),
+                implication(
+                    pred_app("eq_id", k, k2),
+                    implication(
+                        negation(pred_app("has_item", l, k)),
                         eq(
                             app("get_status", app("complete_item", l, k), k2),
                             app("get_status", l, k2),
@@ -1991,8 +1960,8 @@ def todo_list_spec() -> Spec:
             "get_status_complete_miss",  # get_status x complete_item: KEY_MISS — delegate to underlying list
             forall(
                 [l, k, k2],
-                Implication(
-                    Negation(PredApp("eq_id", (k, k2))),
+                implication(
+                    negation(pred_app("eq_id", k, k2)),
                     eq(
                         app("get_status", app("complete_item", l, k), k2),
                         app("get_status", l, k2),
@@ -2004,10 +1973,10 @@ def todo_list_spec() -> Spec:
             "get_status_remove_hit",  # get_status x remove_item: KEY_HIT — explicitly undefined for removed item
             forall(
                 [l, k, k2],
-                Implication(
-                    PredApp("eq_id", (k, k2)),
-                    Negation(
-                        Definedness(app("get_status", app("remove_item", l, k), k2))
+                implication(
+                    pred_app("eq_id", k, k2),
+                    negation(
+                        definedness(app("get_status", app("remove_item", l, k), k2))
                     ),
                 ),
             ),
@@ -2016,8 +1985,8 @@ def todo_list_spec() -> Spec:
             "get_status_remove_miss",  # get_status x remove_item: KEY_MISS — delegate to underlying list
             forall(
                 [l, k, k2],
-                Implication(
-                    Negation(PredApp("eq_id", (k, k2))),
+                implication(
+                    negation(pred_app("eq_id", k, k2)),
                     eq(
                         app("get_status", app("remove_item", l, k), k2),
                         app("get_status", l, k2),
@@ -2074,23 +2043,22 @@ INVENTORY_TRACKER = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Conjunction,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
+    definedness,
     eq,
+    fn,
     forall,
     iff,
-    Definedness,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -2147,16 +2115,16 @@ def inventory_spec() -> Spec:
         # Reflexivity: every key equals itself
         Axiom(
             label="eq_id_refl",
-            formula=forall([k], PredApp("eq_id", (k, k))),
+            formula=forall([k], pred_app("eq_id", k, k)),
         ),
         # Symmetry: if k1 equals k2, then k2 equals k1
         Axiom(
             label="eq_id_sym",
             formula=forall(
                 [k, k2],
-                Implication(
-                    PredApp("eq_id", (k, k2)),
-                    PredApp("eq_id", (k2, k)),
+                implication(
+                    pred_app("eq_id", k, k2),
+                    pred_app("eq_id", k2, k),
                 ),
             ),
         ),
@@ -2165,14 +2133,10 @@ def inventory_spec() -> Spec:
             label="eq_id_trans",
             formula=forall(
                 [k, k2, k3],
-                Implication(
-                    Conjunction(
-                        (
-                            PredApp("eq_id", (k, k2)),
-                            PredApp("eq_id", (k2, k3)),
-                        )
-                    ),
-                    PredApp("eq_id", (k, k3)),
+                implication(
+                    conjunction(pred_app("eq_id", k, k2),
+                            pred_app("eq_id", k2, k3)),
+                    pred_app("eq_id", k, k3),
                 ),
             ),
         ),
@@ -2183,8 +2147,8 @@ def inventory_spec() -> Spec:
             formula=forall(
                 [i, k, q],
                 iff(
-                    Definedness(app("remove_stock", i, k, q)),
-                    PredApp("leq", (q, app("get_qty", i, k))),
+                    definedness(app("remove_stock", i, k, q)),
+                    pred_app("leq", q, app("get_qty", i, k)),
                 ),
             ),
         ),
@@ -2205,8 +2169,8 @@ def inventory_spec() -> Spec:
             label="get_qty_add_hit",
             formula=forall(
                 [i, k, k2, q],
-                Implication(
-                    PredApp("eq_id", (k, k2)),
+                implication(
+                    pred_app("eq_id", k, k2),
                     eq(
                         app("get_qty", app("add_stock", i, k, q), k2),
                         app("add", app("get_qty", i, k2), q),
@@ -2219,8 +2183,8 @@ def inventory_spec() -> Spec:
             label="get_qty_add_miss",
             formula=forall(
                 [i, k, k2, q],
-                Implication(
-                    Negation(PredApp("eq_id", (k, k2))),
+                implication(
+                    negation(pred_app("eq_id", k, k2)),
                     eq(
                         app("get_qty", app("add_stock", i, k, q), k2),
                         app("get_qty", i, k2),
@@ -2233,10 +2197,10 @@ def inventory_spec() -> Spec:
             label="get_qty_remove_hit",
             formula=forall(
                 [i, k, k2, q],
-                Implication(
-                    PredApp("eq_id", (k, k2)),
-                    Implication(
-                        PredApp("leq", (q, app("get_qty", i, k))),
+                implication(
+                    pred_app("eq_id", k, k2),
+                    implication(
+                        pred_app("leq", q, app("get_qty", i, k)),
                         eq(
                             app("get_qty", app("remove_stock", i, k, q), k2),
                             app("sub", app("get_qty", i, k2), q),
@@ -2250,10 +2214,10 @@ def inventory_spec() -> Spec:
             label="get_qty_remove_miss",
             formula=forall(
                 [i, k, k2, q],
-                Implication(
-                    Negation(PredApp("eq_id", (k, k2))),
-                    Implication(
-                        PredApp("leq", (q, app("get_qty", i, k))),
+                implication(
+                    negation(pred_app("eq_id", k, k2)),
+                    implication(
+                        pred_app("leq", q, app("get_qty", i, k)),
                         eq(
                             app("get_qty", app("remove_stock", i, k, q), k2),
                             app("get_qty", i, k2),
@@ -2319,23 +2283,22 @@ SHOPPING_CART = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Conjunction,
-    Definedness,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
+    definedness,
     eq,
+    fn,
     forall,
     iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -2393,16 +2356,16 @@ def shopping_cart_spec() -> Spec:
         # eq_id x basis: BASIS — reflexivity property
         Axiom(
             label="eq_id_refl",
-            formula=forall([i], PredApp("eq_id", (i, i))),
+            formula=forall([i], pred_app("eq_id", i, i)),
         ),
         # eq_id x basis: BASIS — symmetry property
         Axiom(
             label="eq_id_sym",
             formula=forall(
                 [i, j],
-                Implication(
-                    PredApp("eq_id", (i, j)),
-                    PredApp("eq_id", (j, i)),
+                implication(
+                    pred_app("eq_id", i, j),
+                    pred_app("eq_id", j, i),
                 ),
             ),
         ),
@@ -2411,14 +2374,10 @@ def shopping_cart_spec() -> Spec:
             label="eq_id_trans",
             formula=forall(
                 [i, j, k],
-                Implication(
-                    Conjunction(
-                        (
-                            PredApp("eq_id", (i, j)),
-                            PredApp("eq_id", (j, k)),
-                        )
-                    ),
-                    PredApp("eq_id", (i, k)),
+                implication(
+                    conjunction(pred_app("eq_id", i, j),
+                            pred_app("eq_id", j, k)),
+                    pred_app("eq_id", i, k),
                 ),
             ),
         ),
@@ -2428,8 +2387,8 @@ def shopping_cart_spec() -> Spec:
             label="has_item_empty",
             formula=forall(
                 [j],
-                Negation(
-                    PredApp("has_item", (const("empty"), j)),
+                negation(
+                    pred_app("has_item", const("empty"), j),
                 ),
             ),
         ),
@@ -2438,9 +2397,9 @@ def shopping_cart_spec() -> Spec:
             label="has_item_add_hit",
             formula=forall(
                 [c, i, j],
-                Implication(
-                    PredApp("eq_id", (i, j)),
-                    PredApp("has_item", (app("add_item", c, i), j)),
+                implication(
+                    pred_app("eq_id", i, j),
+                    pred_app("has_item", app("add_item", c, i), j),
                 ),
             ),
         ),
@@ -2449,11 +2408,11 @@ def shopping_cart_spec() -> Spec:
             label="has_item_add_miss",
             formula=forall(
                 [c, i, j],
-                Implication(
-                    Negation(PredApp("eq_id", (i, j))),
+                implication(
+                    negation(pred_app("eq_id", i, j)),
                     iff(
-                        PredApp("has_item", (app("add_item", c, i), j)),
-                        PredApp("has_item", (c, j)),
+                        pred_app("has_item", app("add_item", c, i), j),
+                        pred_app("has_item", c, j),
                     ),
                 ),
             ),
@@ -2464,8 +2423,8 @@ def shopping_cart_spec() -> Spec:
             formula=forall(
                 [c, d, j],
                 iff(
-                    PredApp("has_item", (app("apply_discount", c, d), j)),
-                    PredApp("has_item", (c, j)),
+                    pred_app("has_item", app("apply_discount", c, d), j),
+                    pred_app("has_item", c, j),
                 ),
             ),
         ),
@@ -2474,7 +2433,7 @@ def shopping_cart_spec() -> Spec:
         Axiom(
             label="remove_item_empty_undef",
             formula=forall(
-                [j], Negation(Definedness(app("remove_item", const("empty"), j)))
+                [j], negation(definedness(app("remove_item", const("empty"), j)))
             ),
         ),
         # remove_item x add_item: KEY_HIT — return cart when item matches
@@ -2482,8 +2441,8 @@ def shopping_cart_spec() -> Spec:
             label="remove_item_add_hit",
             formula=forall(
                 [c, i, j],
-                Implication(
-                    PredApp("eq_id", (i, j)),
+                implication(
+                    pred_app("eq_id", i, j),
                     eq(app("remove_item", app("add_item", c, i), j), c),
                 ),
             ),
@@ -2493,8 +2452,8 @@ def shopping_cart_spec() -> Spec:
             label="remove_item_add_miss",
             formula=forall(
                 [c, i, j],
-                Implication(
-                    Negation(PredApp("eq_id", (i, j))),
+                implication(
+                    negation(pred_app("eq_id", i, j)),
                     eq(
                         app("remove_item", app("add_item", c, i), j),
                         app("add_item", app("remove_item", c, j), i),
@@ -2602,23 +2561,21 @@ ACCESS_CONTROL = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Conjunction,
-    Disjunction,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
     eq,
+    fn,
     forall,
     iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -2689,14 +2646,14 @@ def access_control_spec() -> Spec:
     axioms = (
         # == Equality Basis ==
         # eq_user x basis: Equivalence relation properties
-        Axiom("eq_user_refl", forall([u], PredApp("eq_user", (u, u)))),
+        Axiom("eq_user_refl", forall([u], pred_app("eq_user", u, u))),
         Axiom(
             "eq_user_sym",
             forall(
                 [u1, u2],
-                Implication(
-                    PredApp("eq_user", (u1, u2)),
-                    PredApp("eq_user", (u2, u1)),
+                implication(
+                    pred_app("eq_user", u1, u2),
+                    pred_app("eq_user", u2, u1),
                 ),
             ),
         ),
@@ -2704,23 +2661,21 @@ def access_control_spec() -> Spec:
             "eq_user_trans",
             forall(
                 [u1, u2, u3],
-                Implication(
-                    Conjunction(
-                        (PredApp("eq_user", (u1, u2)), PredApp("eq_user", (u2, u3)))
-                    ),
-                    PredApp("eq_user", (u1, u3)),
+                implication(
+                    conjunction(pred_app("eq_user", u1, u2), pred_app("eq_user", u2, u3)),
+                    pred_app("eq_user", u1, u3),
                 ),
             ),
         ),
         # eq_res x basis: Equivalence relation properties
-        Axiom("eq_res_refl", forall([r], PredApp("eq_res", (r, r)))),
+        Axiom("eq_res_refl", forall([r], pred_app("eq_res", r, r))),
         Axiom(
             "eq_res_sym",
             forall(
                 [r1, r2],
-                Implication(
-                    PredApp("eq_res", (r1, r2)),
-                    PredApp("eq_res", (r2, r1)),
+                implication(
+                    pred_app("eq_res", r1, r2),
+                    pred_app("eq_res", r2, r1),
                 ),
             ),
         ),
@@ -2728,19 +2683,17 @@ def access_control_spec() -> Spec:
             "eq_res_trans",
             forall(
                 [r1, r2, r3],
-                Implication(
-                    Conjunction(
-                        (PredApp("eq_res", (r1, r2)), PredApp("eq_res", (r2, r3)))
-                    ),
-                    PredApp("eq_res", (r1, r3)),
+                implication(
+                    conjunction(pred_app("eq_res", r1, r2), pred_app("eq_res", r2, r3)),
+                    pred_app("eq_res", r1, r3),
                 ),
             ),
         ),
         # == Role Distinctness ==
         # Prevent model collapse where all roles are equal
-        Axiom("role_admin_ne_regular", Negation(eq(const("admin"), const("regular")))),
-        Axiom("role_admin_ne_none", Negation(eq(const("admin"), const("none")))),
-        Axiom("role_regular_ne_none", Negation(eq(const("regular"), const("none")))),
+        Axiom("role_admin_ne_regular", negation(eq(const("admin"), const("regular")))),
+        Axiom("role_admin_ne_none", negation(eq(const("admin"), const("none")))),
+        Axiom("role_regular_ne_none", negation(eq(const("regular"), const("none")))),
         # == Role Management ==
         # get_role x init: Default role is none
         Axiom(
@@ -2758,8 +2711,8 @@ def access_control_spec() -> Spec:
             "get_role_set_hit",
             forall(
                 [s, u1, u2, role],
-                Implication(
-                    PredApp("eq_user", (u1, u2)),
+                implication(
+                    pred_app("eq_user", u1, u2),
                     eq(app("get_role", app("set_role", s, u1, role), u2), role),
                 ),
             ),
@@ -2769,8 +2722,8 @@ def access_control_spec() -> Spec:
             "get_role_set_miss",
             forall(
                 [s, u1, u2, role],
-                Implication(
-                    Negation(PredApp("eq_user", (u1, u2))),
+                implication(
+                    negation(pred_app("eq_user", u1, u2)),
                     eq(
                         app("get_role", app("set_role", s, u1, role), u2),
                         app("get_role", s, u2),
@@ -2806,8 +2759,8 @@ def access_control_spec() -> Spec:
             "has_perm_init",
             forall(
                 [u, r],
-                Negation(
-                    PredApp("has_permission", (const("init"), u, r)),
+                negation(
+                    pred_app("has_permission", const("init"), u, r),
                 ),
             ),
         ),
@@ -2817,8 +2770,8 @@ def access_control_spec() -> Spec:
             forall(
                 [s, u1, u2, role, r],
                 iff(
-                    PredApp("has_permission", (app("set_role", s, u1, role), u2, r)),
-                    PredApp("has_permission", (s, u2, r)),
+                    pred_app("has_permission", app("set_role", s, u1, role), u2, r),
+                    pred_app("has_permission", s, u2, r),
                 ),
             ),
         ),
@@ -2827,11 +2780,9 @@ def access_control_spec() -> Spec:
             "has_perm_grant_hit",
             forall(
                 [s, u1, u2, r1, r2],
-                Implication(
-                    Conjunction(
-                        (PredApp("eq_user", (u1, u2)), PredApp("eq_res", (r1, r2)))
-                    ),
-                    PredApp("has_permission", (app("grant", s, u1, r1), u2, r2)),
+                implication(
+                    conjunction(pred_app("eq_user", u1, u2), pred_app("eq_res", r1, r2)),
+                    pred_app("has_permission", app("grant", s, u1, r1), u2, r2),
                 ),
             ),
         ),
@@ -2840,15 +2791,13 @@ def access_control_spec() -> Spec:
             "has_perm_grant_miss",
             forall(
                 [s, u1, u2, r1, r2],
-                Implication(
-                    Negation(
-                        Conjunction(
-                            (PredApp("eq_user", (u1, u2)), PredApp("eq_res", (r1, r2)))
-                        )
+                implication(
+                    negation(
+                        conjunction(pred_app("eq_user", u1, u2), pred_app("eq_res", r1, r2))
                     ),
                     iff(
-                        PredApp("has_permission", (app("grant", s, u1, r1), u2, r2)),
-                        PredApp("has_permission", (s, u2, r2)),
+                        pred_app("has_permission", app("grant", s, u1, r1), u2, r2),
+                        pred_app("has_permission", s, u2, r2),
                     ),
                 ),
             ),
@@ -2858,12 +2807,10 @@ def access_control_spec() -> Spec:
             "has_perm_revoke_hit",
             forall(
                 [s, u1, u2, r1, r2],
-                Implication(
-                    Conjunction(
-                        (PredApp("eq_user", (u1, u2)), PredApp("eq_res", (r1, r2)))
-                    ),
-                    Negation(
-                        PredApp("has_permission", (app("revoke", s, u1, r1), u2, r2))
+                implication(
+                    conjunction(pred_app("eq_user", u1, u2), pred_app("eq_res", r1, r2)),
+                    negation(
+                        pred_app("has_permission", app("revoke", s, u1, r1), u2, r2)
                     ),
                 ),
             ),
@@ -2873,15 +2820,13 @@ def access_control_spec() -> Spec:
             "has_perm_revoke_miss",
             forall(
                 [s, u1, u2, r1, r2],
-                Implication(
-                    Negation(
-                        Conjunction(
-                            (PredApp("eq_user", (u1, u2)), PredApp("eq_res", (r1, r2)))
-                        )
+                implication(
+                    negation(
+                        conjunction(pred_app("eq_user", u1, u2), pred_app("eq_res", r1, r2))
                     ),
                     iff(
-                        PredApp("has_permission", (app("revoke", s, u1, r1), u2, r2)),
-                        PredApp("has_permission", (s, u2, r2)),
+                        pred_app("has_permission", app("revoke", s, u1, r1), u2, r2),
+                        pred_app("has_permission", s, u2, r2),
                     ),
                 ),
             ),
@@ -2893,13 +2838,9 @@ def access_control_spec() -> Spec:
             forall(
                 [s, u, r],
                 iff(
-                    PredApp("can_access", (s, u, r)),
-                    Disjunction(
-                        (
-                            eq(app("get_role", s, u), const("admin")),
-                            PredApp("has_permission", (s, u, r)),
-                        )
-                    ),
+                    pred_app("can_access", s, u, r),
+                    disjunction(eq(app("get_role", s, u), const("admin")),
+                            pred_app("has_permission", s, u, r)),
                 ),
             ),
         ),
@@ -2955,23 +2896,22 @@ LIBRARY_LENDING = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Conjunction,
-    Definedness,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
+    definedness,
     eq,
+    fn,
     forall,
     iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -3031,15 +2971,15 @@ def library_lending_spec() -> Spec:
     axioms = (
         # == Equality Basis ==
         Axiom(
-            "eq_id_refl", forall([b], PredApp("eq_id", (b, b)))
+            "eq_id_refl", forall([b], pred_app("eq_id", b, b))
         ),  # eq_id x identity: BASIS — reflexivity
         Axiom(
             "eq_id_sym",
             forall(
                 [b, b2],
-                Implication(  # eq_id x identity: BASIS — symmetry
-                    PredApp("eq_id", (b, b2)),
-                    PredApp("eq_id", (b2, b)),
+                implication(  # eq_id x identity: BASIS — symmetry
+                    pred_app("eq_id", b, b2),
+                    pred_app("eq_id", b2, b),
                 ),
             ),
         ),
@@ -3047,11 +2987,9 @@ def library_lending_spec() -> Spec:
             "eq_id_trans",
             forall(
                 [b, b2, b3],
-                Implication(  # eq_id x identity: BASIS — transitivity
-                    Conjunction(
-                        (PredApp("eq_id", (b, b2)), PredApp("eq_id", (b2, b3)))
-                    ),
-                    PredApp("eq_id", (b, b3)),
+                implication(  # eq_id x identity: BASIS — transitivity
+                    conjunction(pred_app("eq_id", b, b2), pred_app("eq_id", b2, b3)),
+                    pred_app("eq_id", b, b3),
                 ),
             ),
         ),
@@ -3060,8 +2998,8 @@ def library_lending_spec() -> Spec:
             "has_book_empty",
             forall(
                 [b],
-                Negation(  # has_book x empty: BASIS — no books in empty library
-                    PredApp("has_book", (const("empty"), b)),
+                negation(  # has_book x empty: BASIS — no books in empty library
+                    pred_app("has_book", const("empty"), b),
                 ),
             ),
         ),
@@ -3069,9 +3007,9 @@ def library_lending_spec() -> Spec:
             "has_book_register_hit",
             forall(
                 [L, b, b2],
-                Implication(  # has_book x register: KEY_HIT — book becomes registered
-                    PredApp("eq_id", (b, b2)),
-                    PredApp("has_book", (app("register", L, b), b2)),
+                implication(  # has_book x register: KEY_HIT — book becomes registered
+                    pred_app("eq_id", b, b2),
+                    pred_app("has_book", app("register", L, b), b2),
                 ),
             ),
         ),
@@ -3079,11 +3017,11 @@ def library_lending_spec() -> Spec:
             "has_book_register_miss",
             forall(
                 [L, b, b2],
-                Implication(  # has_book x register: KEY_MISS — delegate to previous state
-                    Negation(PredApp("eq_id", (b, b2))),
+                implication(  # has_book x register: KEY_MISS — delegate to previous state
+                    negation(pred_app("eq_id", b, b2)),
                     iff(
-                        PredApp("has_book", (app("register", L, b), b2)),
-                        PredApp("has_book", (L, b2)),
+                        pred_app("has_book", app("register", L, b), b2),
+                        pred_app("has_book", L, b2),
                     ),
                 ),
             ),
@@ -3093,8 +3031,8 @@ def library_lending_spec() -> Spec:
             forall(
                 [L, b, b2, u],
                 iff(  # has_book x borrow: PRESERVATION — borrowing preserves registration
-                    PredApp("has_book", (app("borrow", L, b, u), b2)),
-                    PredApp("has_book", (L, b2)),
+                    pred_app("has_book", app("borrow", L, b, u), b2),
+                    pred_app("has_book", L, b2),
                 ),
             ),
         ),
@@ -3103,8 +3041,8 @@ def library_lending_spec() -> Spec:
             forall(
                 [L, b, b2],
                 iff(  # has_book x return: PRESERVATION — returning preserves registration
-                    PredApp("has_book", (app("return_book", L, b), b2)),
-                    PredApp("has_book", (L, b2)),
+                    pred_app("has_book", app("return_book", L, b), b2),
+                    pred_app("has_book", L, b2),
                 ),
             ),
         ),
@@ -3113,8 +3051,8 @@ def library_lending_spec() -> Spec:
             "get_status_empty_undef",
             forall(
                 [b],
-                Negation(
-                    Definedness(  # get_status x empty: UNDEF — no status in empty library
+                negation(
+                    definedness(  # get_status x empty: UNDEF — no status in empty library
                         app("get_status", const("empty"), b),
                     )
                 ),
@@ -3124,8 +3062,8 @@ def library_lending_spec() -> Spec:
             "get_status_register_hit",
             forall(
                 [L, b, b2],
-                Implication(  # get_status x register: KEY_HIT — new books are available
-                    PredApp("eq_id", (b, b2)),
+                implication(  # get_status x register: KEY_HIT — new books are available
+                    pred_app("eq_id", b, b2),
                     eq(
                         app("get_status", app("register", L, b), b2), const("available")
                     ),
@@ -3136,8 +3074,8 @@ def library_lending_spec() -> Spec:
             "get_status_register_miss",
             forall(
                 [L, b, b2],
-                Implication(  # get_status x register: KEY_MISS — delegate for other books
-                    Negation(PredApp("eq_id", (b, b2))),
+                implication(  # get_status x register: KEY_MISS — delegate for other books
+                    negation(pred_app("eq_id", b, b2)),
                     eq(
                         app("get_status", app("register", L, b), b2),
                         app("get_status", L, b2),
@@ -3149,9 +3087,9 @@ def library_lending_spec() -> Spec:
             "get_status_borrow_hit_succ",
             forall(
                 [L, b, b2, u],
-                Implication(  # get_status x borrow: GUARDED — mark as borrowed if available
-                    PredApp("eq_id", (b, b2)),
-                    Implication(
+                implication(  # get_status x borrow: GUARDED — mark as borrowed if available
+                    pred_app("eq_id", b, b2),
+                    implication(
                         eq(app("get_status", L, b), const("available")),
                         eq(
                             app("get_status", app("borrow", L, b, u), b2),
@@ -3165,10 +3103,10 @@ def library_lending_spec() -> Spec:
             "get_status_borrow_hit_fail",
             forall(
                 [L, b, b2, u],
-                Implication(  # get_status x borrow: PRESERVATION — preserve if not available
-                    PredApp("eq_id", (b, b2)),
-                    Implication(
-                        Negation(eq(app("get_status", L, b), const("available"))),
+                implication(  # get_status x borrow: PRESERVATION — preserve if not available
+                    pred_app("eq_id", b, b2),
+                    implication(
+                        negation(eq(app("get_status", L, b), const("available"))),
                         eq(
                             app("get_status", app("borrow", L, b, u), b2),
                             app("get_status", L, b2),
@@ -3181,8 +3119,8 @@ def library_lending_spec() -> Spec:
             "get_status_borrow_miss",
             forall(
                 [L, b, b2, u],
-                Implication(  # get_status x borrow: KEY_MISS — delegate for other books
-                    Negation(PredApp("eq_id", (b, b2))),
+                implication(  # get_status x borrow: KEY_MISS — delegate for other books
+                    negation(pred_app("eq_id", b, b2)),
                     eq(
                         app("get_status", app("borrow", L, b, u), b2),
                         app("get_status", L, b2),
@@ -3194,9 +3132,9 @@ def library_lending_spec() -> Spec:
             "get_status_return_hit_succ",
             forall(
                 [L, b, b2],
-                Implication(  # get_status x return: GUARDED — mark as available if borrowed
-                    PredApp("eq_id", (b, b2)),
-                    Implication(
+                implication(  # get_status x return: GUARDED — mark as available if borrowed
+                    pred_app("eq_id", b, b2),
+                    implication(
                         eq(app("get_status", L, b), const("borrowed")),
                         eq(
                             app("get_status", app("return_book", L, b), b2),
@@ -3210,10 +3148,10 @@ def library_lending_spec() -> Spec:
             "get_status_return_hit_fail",
             forall(
                 [L, b, b2],
-                Implication(  # get_status x return: PRESERVATION — preserve if not borrowed
-                    PredApp("eq_id", (b, b2)),
-                    Implication(
-                        Negation(eq(app("get_status", L, b), const("borrowed"))),
+                implication(  # get_status x return: PRESERVATION — preserve if not borrowed
+                    pred_app("eq_id", b, b2),
+                    implication(
+                        negation(eq(app("get_status", L, b), const("borrowed"))),
                         eq(
                             app("get_status", app("return_book", L, b), b2),
                             app("get_status", L, b2),
@@ -3226,8 +3164,8 @@ def library_lending_spec() -> Spec:
             "get_status_return_miss",
             forall(
                 [L, b, b2],
-                Implication(  # get_status x return: KEY_MISS — delegate for other books
-                    Negation(PredApp("eq_id", (b, b2))),
+                implication(  # get_status x return: KEY_MISS — delegate for other books
+                    negation(pred_app("eq_id", b, b2)),
                     eq(
                         app("get_status", app("return_book", L, b), b2),
                         app("get_status", L, b2),
@@ -3240,8 +3178,8 @@ def library_lending_spec() -> Spec:
             "get_borrower_empty_undef",
             forall(
                 [b],
-                Negation(
-                    Definedness(  # get_borrower x empty: UNDEF — no borrowers in empty library
+                negation(
+                    definedness(  # get_borrower x empty: UNDEF — no borrowers in empty library
                         app("get_borrower", const("empty"), b),
                     )
                 ),
@@ -3251,10 +3189,10 @@ def library_lending_spec() -> Spec:
             "get_borrower_register_hit",
             forall(
                 [L, b, b2],
-                Implication(  # get_borrower x register: UNDEF — new books have no borrower
-                    PredApp("eq_id", (b, b2)),
-                    Negation(
-                        Definedness(app("get_borrower", app("register", L, b), b2))
+                implication(  # get_borrower x register: UNDEF — new books have no borrower
+                    pred_app("eq_id", b, b2),
+                    negation(
+                        definedness(app("get_borrower", app("register", L, b), b2))
                     ),
                 ),
             ),
@@ -3263,8 +3201,8 @@ def library_lending_spec() -> Spec:
             "get_borrower_register_miss",
             forall(
                 [L, b, b2],
-                Implication(  # get_borrower x register: KEY_MISS — delegate for other books
-                    Negation(PredApp("eq_id", (b, b2))),
+                implication(  # get_borrower x register: KEY_MISS — delegate for other books
+                    negation(pred_app("eq_id", b, b2)),
                     eq(
                         app("get_borrower", app("register", L, b), b2),
                         app("get_borrower", L, b2),
@@ -3276,9 +3214,9 @@ def library_lending_spec() -> Spec:
             "get_borrower_borrow_hit_succ",
             forall(
                 [L, b, b2, u],
-                Implication(  # get_borrower x borrow: GUARDED — set borrower if available
-                    PredApp("eq_id", (b, b2)),
-                    Implication(
+                implication(  # get_borrower x borrow: GUARDED — set borrower if available
+                    pred_app("eq_id", b, b2),
+                    implication(
                         eq(app("get_status", L, b), const("available")),
                         eq(app("get_borrower", app("borrow", L, b, u), b2), u),
                     ),
@@ -3289,10 +3227,10 @@ def library_lending_spec() -> Spec:
             "get_borrower_borrow_hit_fail",
             forall(
                 [L, b, b2, u],
-                Implication(  # get_borrower x borrow: PRESERVATION — preserve if not available
-                    PredApp("eq_id", (b, b2)),
-                    Implication(
-                        Negation(eq(app("get_status", L, b), const("available"))),
+                implication(  # get_borrower x borrow: PRESERVATION — preserve if not available
+                    pred_app("eq_id", b, b2),
+                    implication(
+                        negation(eq(app("get_status", L, b), const("available"))),
                         eq(
                             app("get_borrower", app("borrow", L, b, u), b2),
                             app("get_borrower", L, b2),
@@ -3305,8 +3243,8 @@ def library_lending_spec() -> Spec:
             "get_borrower_borrow_miss",
             forall(
                 [L, b, b2, u],
-                Implication(  # get_borrower x borrow: KEY_MISS — delegate for other books
-                    Negation(PredApp("eq_id", (b, b2))),
+                implication(  # get_borrower x borrow: KEY_MISS — delegate for other books
+                    negation(pred_app("eq_id", b, b2)),
                     eq(
                         app("get_borrower", app("borrow", L, b, u), b2),
                         app("get_borrower", L, b2),
@@ -3318,12 +3256,12 @@ def library_lending_spec() -> Spec:
             "get_borrower_return_hit_succ",
             forall(
                 [L, b, b2],
-                Implication(  # get_borrower x return: UNDEF — clear borrower if borrowed
-                    PredApp("eq_id", (b, b2)),
-                    Implication(
+                implication(  # get_borrower x return: UNDEF — clear borrower if borrowed
+                    pred_app("eq_id", b, b2),
+                    implication(
                         eq(app("get_status", L, b), const("borrowed")),
-                        Negation(
-                            Definedness(
+                        negation(
+                            definedness(
                                 app("get_borrower", app("return_book", L, b), b2)
                             )
                         ),
@@ -3335,10 +3273,10 @@ def library_lending_spec() -> Spec:
             "get_borrower_return_hit_fail",
             forall(
                 [L, b, b2],
-                Implication(  # get_borrower x return: PRESERVATION — preserve if not borrowed
-                    PredApp("eq_id", (b, b2)),
-                    Implication(
-                        Negation(eq(app("get_status", L, b), const("borrowed"))),
+                implication(  # get_borrower x return: PRESERVATION — preserve if not borrowed
+                    pred_app("eq_id", b, b2),
+                    implication(
+                        negation(eq(app("get_status", L, b), const("borrowed"))),
                         eq(
                             app("get_borrower", app("return_book", L, b), b2),
                             app("get_borrower", L, b2),
@@ -3351,8 +3289,8 @@ def library_lending_spec() -> Spec:
             "get_borrower_return_miss",
             forall(
                 [L, b, b2],
-                Implication(  # get_borrower x return: KEY_MISS — delegate for other books
-                    Negation(PredApp("eq_id", (b, b2))),
+                implication(  # get_borrower x return: KEY_MISS — delegate for other books
+                    negation(pred_app("eq_id", b, b2)),
                     eq(
                         app("get_borrower", app("return_book", L, b), b2),
                         app("get_borrower", L, b2),
@@ -3415,23 +3353,21 @@ EMAIL_INBOX = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Conjunction,
-    Disjunction,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
     eq,
+    fn,
     forall,
     iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -3489,13 +3425,13 @@ def email_inbox_spec() -> Spec:
     axioms = (
         # == Basis: eq_id and pred ==
         # eq_id x reflexive: BASIS — Identity equals itself
-        Axiom(label="eq_id_refl", formula=forall([m], PredApp("eq_id", (m, m)))),
+        Axiom(label="eq_id_refl", formula=forall([m], pred_app("eq_id", m, m))),
         # eq_id x symmetric: BASIS — If a=b then b=a
         Axiom(
             label="eq_id_sym",
             formula=forall(
                 [m, m2],
-                Implication(PredApp("eq_id", (m, m2)), PredApp("eq_id", (m2, m))),
+                implication(pred_app("eq_id", m, m2), pred_app("eq_id", m2, m)),
             ),
         ),
         # eq_id x transitive: BASIS — If a=b and b=c then a=c
@@ -3503,11 +3439,9 @@ def email_inbox_spec() -> Spec:
             label="eq_id_trans",
             formula=forall(
                 [m, m2, m3],
-                Implication(
-                    Conjunction(
-                        (PredApp("eq_id", (m, m2)), PredApp("eq_id", (m2, m3)))
-                    ),
-                    PredApp("eq_id", (m, m3)),
+                implication(
+                    conjunction(pred_app("eq_id", m, m2), pred_app("eq_id", m2, m3)),
+                    pred_app("eq_id", m, m3),
                 ),
             ),
         ),
@@ -3519,16 +3453,16 @@ def email_inbox_spec() -> Spec:
         # has_msg x empty: BASIS — Empty inbox has no messages
         Axiom(
             label="has_msg_empty",
-            formula=forall([m], Negation(PredApp("has_msg", (const("empty"), m)))),
+            formula=forall([m], negation(pred_app("has_msg", const("empty"), m))),
         ),
         # has_msg x receive_hit: KEY_HIT — Message exists after receiving it
         Axiom(
             label="has_msg_receive_hit",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    PredApp("eq_id", (m, m2)),
-                    PredApp("has_msg", (app("receive", i, m), m2)),
+                implication(
+                    pred_app("eq_id", m, m2),
+                    pred_app("has_msg", app("receive", i, m), m2),
                 ),
             ),
         ),
@@ -3537,11 +3471,11 @@ def email_inbox_spec() -> Spec:
             label="has_msg_receive_miss",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    Negation(PredApp("eq_id", (m, m2))),
+                implication(
+                    negation(pred_app("eq_id", m, m2)),
                     iff(
-                        PredApp("has_msg", (app("receive", i, m), m2)),
-                        PredApp("has_msg", (i, m2)),
+                        pred_app("has_msg", app("receive", i, m), m2),
+                        pred_app("has_msg", i, m2),
                     ),
                 ),
             ),
@@ -3552,8 +3486,8 @@ def email_inbox_spec() -> Spec:
             formula=forall(
                 [i, m, m2],
                 iff(
-                    PredApp("has_msg", (app("mark_read", i, m), m2)),
-                    PredApp("has_msg", (i, m2)),
+                    pred_app("has_msg", app("mark_read", i, m), m2),
+                    pred_app("has_msg", i, m2),
                 ),
             ),
         ),
@@ -3563,8 +3497,8 @@ def email_inbox_spec() -> Spec:
             formula=forall(
                 [i, m, m2],
                 iff(
-                    PredApp("has_msg", (app("mark_unread", i, m), m2)),
-                    PredApp("has_msg", (i, m2)),
+                    pred_app("has_msg", app("mark_unread", i, m), m2),
+                    pred_app("has_msg", i, m2),
                 ),
             ),
         ),
@@ -3573,9 +3507,9 @@ def email_inbox_spec() -> Spec:
             label="has_msg_delete_hit",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    PredApp("eq_id", (m, m2)),
-                    Negation(PredApp("has_msg", (app("delete", i, m), m2))),
+                implication(
+                    pred_app("eq_id", m, m2),
+                    negation(pred_app("has_msg", app("delete", i, m), m2)),
                 ),
             ),
         ),
@@ -3584,11 +3518,11 @@ def email_inbox_spec() -> Spec:
             label="has_msg_delete_miss",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    Negation(PredApp("eq_id", (m, m2))),
+                implication(
+                    negation(pred_app("eq_id", m, m2)),
                     iff(
-                        PredApp("has_msg", (app("delete", i, m), m2)),
-                        PredApp("has_msg", (i, m2)),
+                        pred_app("has_msg", app("delete", i, m), m2),
+                        pred_app("has_msg", i, m2),
                     ),
                 ),
             ),
@@ -3599,8 +3533,8 @@ def email_inbox_spec() -> Spec:
             formula=forall(
                 [i, m, m2],
                 iff(
-                    PredApp("has_msg", (app("star", i, m), m2)),
-                    PredApp("has_msg", (i, m2)),
+                    pred_app("has_msg", app("star", i, m), m2),
+                    pred_app("has_msg", i, m2),
                 ),
             ),
         ),
@@ -3608,20 +3542,18 @@ def email_inbox_spec() -> Spec:
         # is_read x empty: BASIS — No read messages in empty inbox
         Axiom(
             label="is_read_empty",
-            formula=forall([m], Negation(PredApp("is_read", (const("empty"), m)))),
+            formula=forall([m], negation(pred_app("is_read", const("empty"), m))),
         ),
         # is_read x receive_hit: KEY_HIT — New message inherits read state
         Axiom(
             label="is_read_receive_hit",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    PredApp("eq_id", (m, m2)),
+                implication(
+                    pred_app("eq_id", m, m2),
                     iff(
-                        PredApp("is_read", (app("receive", i, m), m2)),
-                        Conjunction(
-                            (PredApp("has_msg", (i, m2)), PredApp("is_read", (i, m2)))
-                        ),
+                        pred_app("is_read", app("receive", i, m), m2),
+                        conjunction(pred_app("has_msg", i, m2), pred_app("is_read", i, m2)),
                     ),
                 ),
             ),
@@ -3631,11 +3563,11 @@ def email_inbox_spec() -> Spec:
             label="is_read_receive_miss",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    Negation(PredApp("eq_id", (m, m2))),
+                implication(
+                    negation(pred_app("eq_id", m, m2)),
                     iff(
-                        PredApp("is_read", (app("receive", i, m), m2)),
-                        PredApp("is_read", (i, m2)),
+                        pred_app("is_read", app("receive", i, m), m2),
+                        pred_app("is_read", i, m2),
                     ),
                 ),
             ),
@@ -3645,11 +3577,11 @@ def email_inbox_spec() -> Spec:
             label="is_read_mark_read_hit",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    PredApp("eq_id", (m, m2)),
+                implication(
+                    pred_app("eq_id", m, m2),
                     iff(
-                        PredApp("is_read", (app("mark_read", i, m), m2)),
-                        PredApp("has_msg", (i, m2)),
+                        pred_app("is_read", app("mark_read", i, m), m2),
+                        pred_app("has_msg", i, m2),
                     ),
                 ),
             ),
@@ -3659,11 +3591,11 @@ def email_inbox_spec() -> Spec:
             label="is_read_mark_read_miss",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    Negation(PredApp("eq_id", (m, m2))),
+                implication(
+                    negation(pred_app("eq_id", m, m2)),
                     iff(
-                        PredApp("is_read", (app("mark_read", i, m), m2)),
-                        PredApp("is_read", (i, m2)),
+                        pred_app("is_read", app("mark_read", i, m), m2),
+                        pred_app("is_read", i, m2),
                     ),
                 ),
             ),
@@ -3673,9 +3605,9 @@ def email_inbox_spec() -> Spec:
             label="is_read_mark_unread_hit",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    PredApp("eq_id", (m, m2)),
-                    Negation(PredApp("is_read", (app("mark_unread", i, m), m2))),
+                implication(
+                    pred_app("eq_id", m, m2),
+                    negation(pred_app("is_read", app("mark_unread", i, m), m2)),
                 ),
             ),
         ),
@@ -3684,11 +3616,11 @@ def email_inbox_spec() -> Spec:
             label="is_read_mark_unread_miss",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    Negation(PredApp("eq_id", (m, m2))),
+                implication(
+                    negation(pred_app("eq_id", m, m2)),
                     iff(
-                        PredApp("is_read", (app("mark_unread", i, m), m2)),
-                        PredApp("is_read", (i, m2)),
+                        pred_app("is_read", app("mark_unread", i, m), m2),
+                        pred_app("is_read", i, m2),
                     ),
                 ),
             ),
@@ -3698,9 +3630,9 @@ def email_inbox_spec() -> Spec:
             label="is_read_delete_hit",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    PredApp("eq_id", (m, m2)),
-                    Negation(PredApp("is_read", (app("delete", i, m), m2))),
+                implication(
+                    pred_app("eq_id", m, m2),
+                    negation(pred_app("is_read", app("delete", i, m), m2)),
                 ),
             ),
         ),
@@ -3709,11 +3641,11 @@ def email_inbox_spec() -> Spec:
             label="is_read_delete_miss",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    Negation(PredApp("eq_id", (m, m2))),
+                implication(
+                    negation(pred_app("eq_id", m, m2)),
                     iff(
-                        PredApp("is_read", (app("delete", i, m), m2)),
-                        PredApp("is_read", (i, m2)),
+                        pred_app("is_read", app("delete", i, m), m2),
+                        pred_app("is_read", i, m2),
                     ),
                 ),
             ),
@@ -3724,8 +3656,8 @@ def email_inbox_spec() -> Spec:
             formula=forall(
                 [i, m, m2],
                 iff(
-                    PredApp("is_read", (app("star", i, m), m2)),
-                    PredApp("is_read", (i, m2)),
+                    pred_app("is_read", app("star", i, m), m2),
+                    pred_app("is_read", i, m2),
                 ),
             ),
         ),
@@ -3733,23 +3665,19 @@ def email_inbox_spec() -> Spec:
         # is_starred x empty: BASIS — No starred messages in empty inbox
         Axiom(
             label="is_starred_empty",
-            formula=forall([m], Negation(PredApp("is_starred", (const("empty"), m)))),
+            formula=forall([m], negation(pred_app("is_starred", const("empty"), m))),
         ),
         # is_starred x receive_hit: KEY_HIT — New message inherits star state
         Axiom(
             label="is_starred_receive_hit",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    PredApp("eq_id", (m, m2)),
+                implication(
+                    pred_app("eq_id", m, m2),
                     iff(
-                        PredApp("is_starred", (app("receive", i, m), m2)),
-                        Conjunction(
-                            (
-                                PredApp("has_msg", (i, m2)),
-                                PredApp("is_starred", (i, m2)),
-                            )
-                        ),
+                        pred_app("is_starred", app("receive", i, m), m2),
+                        conjunction(pred_app("has_msg", i, m2),
+                                pred_app("is_starred", i, m2)),
                     ),
                 ),
             ),
@@ -3759,11 +3687,11 @@ def email_inbox_spec() -> Spec:
             label="is_starred_receive_miss",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    Negation(PredApp("eq_id", (m, m2))),
+                implication(
+                    negation(pred_app("eq_id", m, m2)),
                     iff(
-                        PredApp("is_starred", (app("receive", i, m), m2)),
-                        PredApp("is_starred", (i, m2)),
+                        pred_app("is_starred", app("receive", i, m), m2),
+                        pred_app("is_starred", i, m2),
                     ),
                 ),
             ),
@@ -3774,8 +3702,8 @@ def email_inbox_spec() -> Spec:
             formula=forall(
                 [i, m, m2],
                 iff(
-                    PredApp("is_starred", (app("mark_read", i, m), m2)),
-                    PredApp("is_starred", (i, m2)),
+                    pred_app("is_starred", app("mark_read", i, m), m2),
+                    pred_app("is_starred", i, m2),
                 ),
             ),
         ),
@@ -3785,8 +3713,8 @@ def email_inbox_spec() -> Spec:
             formula=forall(
                 [i, m, m2],
                 iff(
-                    PredApp("is_starred", (app("mark_unread", i, m), m2)),
-                    PredApp("is_starred", (i, m2)),
+                    pred_app("is_starred", app("mark_unread", i, m), m2),
+                    pred_app("is_starred", i, m2),
                 ),
             ),
         ),
@@ -3795,9 +3723,9 @@ def email_inbox_spec() -> Spec:
             label="is_starred_delete_hit",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    PredApp("eq_id", (m, m2)),
-                    Negation(PredApp("is_starred", (app("delete", i, m), m2))),
+                implication(
+                    pred_app("eq_id", m, m2),
+                    negation(pred_app("is_starred", app("delete", i, m), m2)),
                 ),
             ),
         ),
@@ -3806,11 +3734,11 @@ def email_inbox_spec() -> Spec:
             label="is_starred_delete_miss",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    Negation(PredApp("eq_id", (m, m2))),
+                implication(
+                    negation(pred_app("eq_id", m, m2)),
                     iff(
-                        PredApp("is_starred", (app("delete", i, m), m2)),
-                        PredApp("is_starred", (i, m2)),
+                        pred_app("is_starred", app("delete", i, m), m2),
+                        pred_app("is_starred", i, m2),
                     ),
                 ),
             ),
@@ -3820,11 +3748,11 @@ def email_inbox_spec() -> Spec:
             label="is_starred_star_hit",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    PredApp("eq_id", (m, m2)),
+                implication(
+                    pred_app("eq_id", m, m2),
                     iff(
-                        PredApp("is_starred", (app("star", i, m), m2)),
-                        PredApp("has_msg", (i, m2)),
+                        pred_app("is_starred", app("star", i, m), m2),
+                        pred_app("has_msg", i, m2),
                     ),
                 ),
             ),
@@ -3834,11 +3762,11 @@ def email_inbox_spec() -> Spec:
             label="is_starred_star_miss",
             formula=forall(
                 [i, m, m2],
-                Implication(
-                    Negation(PredApp("eq_id", (m, m2))),
+                implication(
+                    negation(pred_app("eq_id", m, m2)),
                     iff(
-                        PredApp("is_starred", (app("star", i, m), m2)),
-                        PredApp("is_starred", (i, m2)),
+                        pred_app("is_starred", app("star", i, m), m2),
+                        pred_app("is_starred", i, m2),
                     ),
                 ),
             ),
@@ -3854,8 +3782,8 @@ def email_inbox_spec() -> Spec:
             label="unread_count_receive_preserve",
             formula=forall(
                 [i, m],
-                Implication(
-                    PredApp("has_msg", (i, m)),
+                implication(
+                    pred_app("has_msg", i, m),
                     eq(
                         app("unread_count", app("receive", i, m)),
                         app("unread_count", i),
@@ -3867,8 +3795,8 @@ def email_inbox_spec() -> Spec:
             label="unread_count_receive_change",
             formula=forall(
                 [i, m],
-                Implication(
-                    Negation(PredApp("has_msg", (i, m))),
+                implication(
+                    negation(pred_app("has_msg", i, m)),
                     eq(
                         app("unread_count", app("receive", i, m)),
                         app("suc", app("unread_count", i)),
@@ -3881,13 +3809,9 @@ def email_inbox_spec() -> Spec:
             label="unread_count_mark_read_change",
             formula=forall(
                 [i, m],
-                Implication(
-                    Conjunction(
-                        (
-                            PredApp("has_msg", (i, m)),
-                            Negation(PredApp("is_read", (i, m))),
-                        )
-                    ),
+                implication(
+                    conjunction(pred_app("has_msg", i, m),
+                            negation(pred_app("is_read", i, m))),
                     eq(
                         app("unread_count", app("mark_read", i, m)),
                         app("pred", app("unread_count", i)),
@@ -3899,14 +3823,10 @@ def email_inbox_spec() -> Spec:
             label="unread_count_mark_read_preserve",
             formula=forall(
                 [i, m],
-                Implication(
-                    Negation(
-                        Conjunction(
-                            (
-                                PredApp("has_msg", (i, m)),
-                                Negation(PredApp("is_read", (i, m))),
-                            )
-                        )
+                implication(
+                    negation(
+                        conjunction(pred_app("has_msg", i, m),
+                                negation(pred_app("is_read", i, m)))
                     ),
                     eq(
                         app("unread_count", app("mark_read", i, m)),
@@ -3920,10 +3840,8 @@ def email_inbox_spec() -> Spec:
             label="unread_count_mark_unread_change",
             formula=forall(
                 [i, m],
-                Implication(
-                    Conjunction(
-                        (PredApp("has_msg", (i, m)), PredApp("is_read", (i, m)))
-                    ),
+                implication(
+                    conjunction(pred_app("has_msg", i, m), pred_app("is_read", i, m)),
                     eq(
                         app("unread_count", app("mark_unread", i, m)),
                         app("suc", app("unread_count", i)),
@@ -3935,11 +3853,9 @@ def email_inbox_spec() -> Spec:
             label="unread_count_mark_unread_preserve",
             formula=forall(
                 [i, m],
-                Implication(
-                    Negation(
-                        Conjunction(
-                            (PredApp("has_msg", (i, m)), PredApp("is_read", (i, m)))
-                        )
+                implication(
+                    negation(
+                        conjunction(pred_app("has_msg", i, m), pred_app("is_read", i, m))
                     ),
                     eq(
                         app("unread_count", app("mark_unread", i, m)),
@@ -3953,13 +3869,9 @@ def email_inbox_spec() -> Spec:
             label="unread_count_delete_change",
             formula=forall(
                 [i, m],
-                Implication(
-                    Conjunction(
-                        (
-                            PredApp("has_msg", (i, m)),
-                            Negation(PredApp("is_read", (i, m))),
-                        )
-                    ),
+                implication(
+                    conjunction(pred_app("has_msg", i, m),
+                            negation(pred_app("is_read", i, m))),
                     eq(
                         app("unread_count", app("delete", i, m)),
                         app("pred", app("unread_count", i)),
@@ -3971,14 +3883,10 @@ def email_inbox_spec() -> Spec:
             label="unread_count_delete_preserve",
             formula=forall(
                 [i, m],
-                Implication(
-                    Negation(
-                        Conjunction(
-                            (
-                                PredApp("has_msg", (i, m)),
-                                Negation(PredApp("is_read", (i, m))),
-                            )
-                        )
+                implication(
+                    negation(
+                        conjunction(pred_app("has_msg", i, m),
+                                negation(pred_app("is_read", i, m)))
                     ),
                     eq(
                         app("unread_count", app("delete", i, m)), app("unread_count", i)
@@ -4054,23 +3962,22 @@ AUCTION = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Conjunction,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
+    definedness,
     eq,
+    fn,
     forall,
     iff,
-    Definedness,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -4122,15 +4029,15 @@ def auction_spec() -> Spec:
     axioms = (
         # == Helper Predicates ==
         # eq_bidder x refl: BASIS — reflexive property
-        Axiom("eq_bidder_refl", forall([b], PredApp("eq_bidder", (b, b)))),
+        Axiom("eq_bidder_refl", forall([b], pred_app("eq_bidder", b, b))),
         # eq_bidder x sym: BASIS — symmetric property
         Axiom(
             "eq_bidder_sym",
             forall(
                 [b, b2],
-                Implication(
-                    PredApp("eq_bidder", (b, b2)),
-                    PredApp("eq_bidder", (b2, b)),
+                implication(
+                    pred_app("eq_bidder", b, b2),
+                    pred_app("eq_bidder", b2, b),
                 ),
             ),
         ),
@@ -4139,11 +4046,9 @@ def auction_spec() -> Spec:
             "eq_bidder_trans",
             forall(
                 [b, b2, b3],
-                Implication(
-                    Conjunction(
-                        (PredApp("eq_bidder", (b, b2)), PredApp("eq_bidder", (b2, b3)))
-                    ),
-                    PredApp("eq_bidder", (b, b3)),
+                implication(
+                    conjunction(pred_app("eq_bidder", b, b2), pred_app("eq_bidder", b2, b3)),
+                    pred_app("eq_bidder", b, b3),
                 ),
             ),
         ),
@@ -4154,24 +4059,22 @@ def auction_spec() -> Spec:
             forall(
                 [a, b, amt],
                 iff(
-                    Definedness(app("submit", a, b, amt)),
-                    Conjunction(
-                        (PredApp("is_open", (a,)), PredApp("is_registered", (a, b)))
-                    ),
+                    definedness(app("submit", a, b, amt)),
+                    conjunction(pred_app("is_open", a), pred_app("is_registered", a, b)),
                 ),
             ),
         ),
         # == is_open Observer ==
         # is_open x new: BASIS — new auction starts open
-        Axiom("is_open_new", PredApp("is_open", (const("new"),))),
+        Axiom("is_open_new", pred_app("is_open", const("new"))),
         # is_open x register: PRESERVATION — registration preserves open state
         Axiom(
             "is_open_register",
             forall(
                 [a, b],
                 iff(
-                    PredApp("is_open", (app("register", a, b),)),
-                    PredApp("is_open", (a,)),
+                    pred_app("is_open", app("register", a, b)),
+                    pred_app("is_open", a),
                 ),
             ),
         ),
@@ -4180,11 +4083,11 @@ def auction_spec() -> Spec:
             "is_open_submit",
             forall(
                 [a, b, amt],
-                Implication(
-                    Definedness(app("submit", a, b, amt)),
+                implication(
+                    definedness(app("submit", a, b, amt)),
                     iff(
-                        PredApp("is_open", (app("submit", a, b, amt),)),
-                        PredApp("is_open", (a,)),
+                        pred_app("is_open", app("submit", a, b, amt)),
+                        pred_app("is_open", a),
                     ),
                 ),
             ),
@@ -4194,8 +4097,8 @@ def auction_spec() -> Spec:
             "is_open_close",
             forall(
                 [a],
-                Negation(
-                    PredApp("is_open", (app("close", a),)),
+                negation(
+                    pred_app("is_open", app("close", a)),
                 ),
             ),
         ),
@@ -4205,8 +4108,8 @@ def auction_spec() -> Spec:
             "is_registered_new",
             forall(
                 [b],
-                Negation(
-                    PredApp("is_registered", (const("new"), b)),
+                negation(
+                    pred_app("is_registered", const("new"), b),
                 ),
             ),
         ),
@@ -4215,9 +4118,9 @@ def auction_spec() -> Spec:
             "is_registered_register_hit",
             forall(
                 [a, b, b2],
-                Implication(
-                    PredApp("eq_bidder", (b, b2)),
-                    PredApp("is_registered", (app("register", a, b), b2)),
+                implication(
+                    pred_app("eq_bidder", b, b2),
+                    pred_app("is_registered", app("register", a, b), b2),
                 ),
             ),
         ),
@@ -4226,11 +4129,11 @@ def auction_spec() -> Spec:
             "is_registered_register_miss",
             forall(
                 [a, b, b2],
-                Implication(
-                    Negation(PredApp("eq_bidder", (b, b2))),
+                implication(
+                    negation(pred_app("eq_bidder", b, b2)),
                     iff(
-                        PredApp("is_registered", (app("register", a, b), b2)),
-                        PredApp("is_registered", (a, b2)),
+                        pred_app("is_registered", app("register", a, b), b2),
+                        pred_app("is_registered", a, b2),
                     ),
                 ),
             ),
@@ -4240,11 +4143,11 @@ def auction_spec() -> Spec:
             "is_registered_submit",
             forall(
                 [a, b, b2, amt],
-                Implication(
-                    Definedness(app("submit", a, b, amt)),
+                implication(
+                    definedness(app("submit", a, b, amt)),
                     iff(
-                        PredApp("is_registered", (app("submit", a, b, amt), b2)),
-                        PredApp("is_registered", (a, b2)),
+                        pred_app("is_registered", app("submit", a, b, amt), b2),
+                        pred_app("is_registered", a, b2),
                     ),
                 ),
             ),
@@ -4255,8 +4158,8 @@ def auction_spec() -> Spec:
             forall(
                 [a, b],
                 iff(
-                    PredApp("is_registered", (app("close", a), b)),
-                    PredApp("is_registered", (a, b)),
+                    pred_app("is_registered", app("close", a), b),
+                    pred_app("is_registered", a, b),
                 ),
             ),
         ),
@@ -4264,7 +4167,7 @@ def auction_spec() -> Spec:
         # highest_bid x new: UNDEF — new auction has no bids
         Axiom(
             "highest_bid_new_undef",
-            Negation(Definedness(app("highest_bid", const("new")))),
+            negation(definedness(app("highest_bid", const("new")))),
         ),
         # highest_bid x register: PRESERVATION — registration preserves highest bid
         Axiom(
@@ -4282,13 +4185,9 @@ def auction_spec() -> Spec:
             "highest_bid_submit_first",
             forall(
                 [a, b, amt],
-                Implication(
-                    Conjunction(
-                        (
-                            Definedness(app("submit", a, b, amt)),
-                            Negation(Definedness(app("highest_bid", a))),
-                        )
-                    ),
+                implication(
+                    conjunction(definedness(app("submit", a, b, amt)),
+                            negation(definedness(app("highest_bid", a)))),
                     eq(app("highest_bid", app("submit", a, b, amt)), amt),
                 ),
             ),
@@ -4298,14 +4197,10 @@ def auction_spec() -> Spec:
             "highest_bid_submit_update",
             forall(
                 [a, b, amt],
-                Implication(
-                    Conjunction(
-                        (
-                            Definedness(app("submit", a, b, amt)),
-                            Definedness(app("highest_bid", a)),
-                            PredApp("gt", (amt, app("highest_bid", a))),
-                        )
-                    ),
+                implication(
+                    conjunction(definedness(app("submit", a, b, amt)),
+                            definedness(app("highest_bid", a)),
+                            pred_app("gt", amt, app("highest_bid", a))),
                     eq(app("highest_bid", app("submit", a, b, amt)), amt),
                 ),
             ),
@@ -4315,14 +4210,10 @@ def auction_spec() -> Spec:
             "highest_bid_submit_keep",
             forall(
                 [a, b, amt],
-                Implication(
-                    Conjunction(
-                        (
-                            Definedness(app("submit", a, b, amt)),
-                            Definedness(app("highest_bid", a)),
-                            Negation(PredApp("gt", (amt, app("highest_bid", a)))),
-                        )
-                    ),
+                implication(
+                    conjunction(definedness(app("submit", a, b, amt)),
+                            definedness(app("highest_bid", a)),
+                            negation(pred_app("gt", amt, app("highest_bid", a)))),
                     eq(
                         app("highest_bid", app("submit", a, b, amt)),
                         app("highest_bid", a),
@@ -4343,7 +4234,7 @@ def auction_spec() -> Spec:
         ),
         # == winner Observer ==
         # winner x new: UNDEF — new auction has no winner
-        Axiom("winner_new_undef", Negation(Definedness(app("winner", const("new"))))),
+        Axiom("winner_new_undef", negation(definedness(app("winner", const("new"))))),
         # winner x register: PRESERVATION — registration preserves winner
         Axiom(
             "winner_register",
@@ -4360,13 +4251,9 @@ def auction_spec() -> Spec:
             "winner_submit_first",
             forall(
                 [a, b, amt],
-                Implication(
-                    Conjunction(
-                        (
-                            Definedness(app("submit", a, b, amt)),
-                            Negation(Definedness(app("highest_bid", a))),
-                        )
-                    ),
+                implication(
+                    conjunction(definedness(app("submit", a, b, amt)),
+                            negation(definedness(app("highest_bid", a)))),
                     eq(app("winner", app("submit", a, b, amt)), b),
                 ),
             ),
@@ -4376,14 +4263,10 @@ def auction_spec() -> Spec:
             "winner_submit_update",
             forall(
                 [a, b, amt],
-                Implication(
-                    Conjunction(
-                        (
-                            Definedness(app("submit", a, b, amt)),
-                            Definedness(app("highest_bid", a)),
-                            PredApp("gt", (amt, app("highest_bid", a))),
-                        )
-                    ),
+                implication(
+                    conjunction(definedness(app("submit", a, b, amt)),
+                            definedness(app("highest_bid", a)),
+                            pred_app("gt", amt, app("highest_bid", a))),
                     eq(app("winner", app("submit", a, b, amt)), b),
                 ),
             ),
@@ -4393,14 +4276,10 @@ def auction_spec() -> Spec:
             "winner_submit_keep",
             forall(
                 [a, b, amt],
-                Implication(
-                    Conjunction(
-                        (
-                            Definedness(app("submit", a, b, amt)),
-                            Definedness(app("highest_bid", a)),
-                            Negation(PredApp("gt", (amt, app("highest_bid", a)))),
-                        )
-                    ),
+                implication(
+                    conjunction(definedness(app("submit", a, b, amt)),
+                            definedness(app("highest_bid", a)),
+                            negation(pred_app("gt", amt, app("highest_bid", a)))),
                     eq(app("winner", app("submit", a, b, amt)), app("winner", a)),
                 ),
             ),
@@ -4471,24 +4350,22 @@ VERSION_HISTORY = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Conjunction,
-    Definedness,
-    Disjunction,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
-    const,
+    atomic,
+    conjunction,
+    definedness,
     eq,
+    fn,
     forall,
     iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -4551,15 +4428,15 @@ def version_history_spec() -> Spec:
     axioms = (
         # == Version ID Equality ==
         # Basic reflexivity
-        Axiom("eq_id_refl", forall([v], PredApp("eq_id", (v, v)))),
+        Axiom("eq_id_refl", forall([v], pred_app("eq_id", v, v))),
         # Symmetry of equality
         Axiom(
             "eq_id_sym",
             forall(
                 [v1, v2],
-                Implication(
-                    PredApp("eq_id", (v1, v2)),
-                    PredApp("eq_id", (v2, v1)),
+                implication(
+                    pred_app("eq_id", v1, v2),
+                    pred_app("eq_id", v2, v1),
                 ),
             ),
         ),
@@ -4568,11 +4445,9 @@ def version_history_spec() -> Spec:
             "eq_id_trans",
             forall(
                 [v1, v2, v3],
-                Implication(
-                    Conjunction(
-                        (PredApp("eq_id", (v1, v2)), PredApp("eq_id", (v2, v3)))
-                    ),
-                    PredApp("eq_id", (v1, v3)),
+                implication(
+                    conjunction(pred_app("eq_id", v1, v2), pred_app("eq_id", v2, v3)),
+                    pred_app("eq_id", v1, v3),
                 ),
             ),
         ),
@@ -4583,8 +4458,8 @@ def version_history_spec() -> Spec:
             forall(
                 [c, v, v2],
                 iff(
-                    PredApp("has_version", (app("init", c, v), v2)),
-                    PredApp("eq_id", (v, v2)),
+                    pred_app("has_version", app("init", c, v), v2),
+                    pred_app("eq_id", v, v2),
                 ),
             ),
         ),
@@ -4593,9 +4468,9 @@ def version_history_spec() -> Spec:
             "has_version_commit_hit",
             forall(
                 [r, c, v, v2],
-                Implication(
-                    PredApp("eq_id", (v, v2)),
-                    PredApp("has_version", (app("commit", r, c, v), v2)),
+                implication(
+                    pred_app("eq_id", v, v2),
+                    pred_app("has_version", app("commit", r, c, v), v2),
                 ),
             ),
         ),
@@ -4604,11 +4479,11 @@ def version_history_spec() -> Spec:
             "has_version_commit_miss",
             forall(
                 [r, c, v, v2],
-                Implication(
-                    Negation(PredApp("eq_id", (v, v2))),
+                implication(
+                    negation(pred_app("eq_id", v, v2)),
                     iff(
-                        PredApp("has_version", (app("commit", r, c, v), v2)),
-                        PredApp("has_version", (r, v2)),
+                        pred_app("has_version", app("commit", r, c, v), v2),
+                        pred_app("has_version", r, v2),
                     ),
                 ),
             ),
@@ -4619,8 +4494,8 @@ def version_history_spec() -> Spec:
             forall(
                 [r, v, v2],
                 iff(
-                    PredApp("has_version", (app("revert", r, v), v2)),
-                    PredApp("has_version", (r, v2)),
+                    pred_app("has_version", app("revert", r, v), v2),
+                    pred_app("has_version", r, v2),
                 ),
             ),
         ),
@@ -4640,8 +4515,8 @@ def version_history_spec() -> Spec:
             "current_content_revert_hit",
             forall(
                 [r, v],
-                Implication(
-                    PredApp("has_version", (r, v)),
+                implication(
+                    pred_app("has_version", r, v),
                     eq(
                         app("current_content", app("revert", r, v)),
                         app("get_content", r, v),
@@ -4654,8 +4529,8 @@ def version_history_spec() -> Spec:
             "current_content_revert_miss",
             forall(
                 [r, v],
-                Implication(
-                    Negation(PredApp("has_version", (r, v))),
+                implication(
+                    negation(pred_app("has_version", r, v)),
                     eq(
                         app("current_content", app("revert", r, v)),
                         app("current_content", r),
@@ -4679,8 +4554,8 @@ def version_history_spec() -> Spec:
             "current_version_revert_hit",
             forall(
                 [r, v],
-                Implication(
-                    PredApp("has_version", (r, v)),
+                implication(
+                    pred_app("has_version", r, v),
                     eq(app("current_version", app("revert", r, v)), v),
                 ),
             ),
@@ -4690,8 +4565,8 @@ def version_history_spec() -> Spec:
             "current_version_revert_miss",
             forall(
                 [r, v],
-                Implication(
-                    Negation(PredApp("has_version", (r, v))),
+                implication(
+                    negation(pred_app("has_version", r, v)),
                     eq(
                         app("current_version", app("revert", r, v)),
                         app("current_version", r),
@@ -4705,8 +4580,8 @@ def version_history_spec() -> Spec:
             "get_content_init_hit",
             forall(
                 [c, v, v2],
-                Implication(
-                    PredApp("eq_id", (v, v2)),
+                implication(
+                    pred_app("eq_id", v, v2),
                     eq(app("get_content", app("init", c, v), v2), c),
                 ),
             ),
@@ -4716,9 +4591,9 @@ def version_history_spec() -> Spec:
             "get_content_init_miss",
             forall(
                 [c, v, v2],
-                Implication(
-                    Negation(PredApp("eq_id", (v, v2))),
-                    Negation(Definedness(app("get_content", app("init", c, v), v2))),
+                implication(
+                    negation(pred_app("eq_id", v, v2)),
+                    negation(definedness(app("get_content", app("init", c, v), v2))),
                 ),
             ),
         ),
@@ -4727,8 +4602,8 @@ def version_history_spec() -> Spec:
             "get_content_commit_hit",
             forall(
                 [r, c, v, v2],
-                Implication(
-                    PredApp("eq_id", (v, v2)),
+                implication(
+                    pred_app("eq_id", v, v2),
                     eq(app("get_content", app("commit", r, c, v), v2), c),
                 ),
             ),
@@ -4738,8 +4613,8 @@ def version_history_spec() -> Spec:
             "get_content_commit_miss",
             forall(
                 [r, c, v, v2],
-                Implication(
-                    Negation(PredApp("eq_id", (v, v2))),
+                implication(
+                    negation(pred_app("eq_id", v, v2)),
                     eq(
                         app("get_content", app("commit", r, c, v), v2),
                         app("get_content", r, v2),
@@ -4764,8 +4639,8 @@ def version_history_spec() -> Spec:
             "diff_init_hit_hit",
             forall(
                 [c, v, v1, v2],
-                Implication(
-                    Conjunction((PredApp("eq_id", (v, v1)), PredApp("eq_id", (v, v2)))),
+                implication(
+                    conjunction(pred_app("eq_id", v, v1), pred_app("eq_id", v, v2)),
                     eq(
                         app("diff", app("init", c, v), v1, v2),
                         app("compute_diff", c, c),
@@ -4778,11 +4653,9 @@ def version_history_spec() -> Spec:
             "diff_init_hit_miss",
             forall(
                 [c, v, v1, v2],
-                Implication(
-                    Conjunction(
-                        (PredApp("eq_id", (v, v1)), Negation(PredApp("eq_id", (v, v2))))
-                    ),
-                    Negation(Definedness(app("diff", app("init", c, v), v1, v2))),
+                implication(
+                    conjunction(pred_app("eq_id", v, v1), negation(pred_app("eq_id", v, v2))),
+                    negation(definedness(app("diff", app("init", c, v), v1, v2))),
                 ),
             ),
         ),
@@ -4791,11 +4664,9 @@ def version_history_spec() -> Spec:
             "diff_init_miss_hit",
             forall(
                 [c, v, v1, v2],
-                Implication(
-                    Conjunction(
-                        (Negation(PredApp("eq_id", (v, v1))), PredApp("eq_id", (v, v2)))
-                    ),
-                    Negation(Definedness(app("diff", app("init", c, v), v1, v2))),
+                implication(
+                    conjunction(negation(pred_app("eq_id", v, v1)), pred_app("eq_id", v, v2)),
+                    negation(definedness(app("diff", app("init", c, v), v1, v2))),
                 ),
             ),
         ),
@@ -4804,14 +4675,10 @@ def version_history_spec() -> Spec:
             "diff_init_miss_miss",
             forall(
                 [c, v, v1, v2],
-                Implication(
-                    Conjunction(
-                        (
-                            Negation(PredApp("eq_id", (v, v1))),
-                            Negation(PredApp("eq_id", (v, v2))),
-                        )
-                    ),
-                    Negation(Definedness(app("diff", app("init", c, v), v1, v2))),
+                implication(
+                    conjunction(negation(pred_app("eq_id", v, v1)),
+                            negation(pred_app("eq_id", v, v2))),
+                    negation(definedness(app("diff", app("init", c, v), v1, v2))),
                 ),
             ),
         ),
@@ -4820,8 +4687,8 @@ def version_history_spec() -> Spec:
             "diff_commit_hit_hit",
             forall(
                 [r, c, v, v1, v2],
-                Implication(
-                    Conjunction((PredApp("eq_id", (v, v1)), PredApp("eq_id", (v, v2)))),
+                implication(
+                    conjunction(pred_app("eq_id", v, v1), pred_app("eq_id", v, v2)),
                     eq(
                         app("diff", app("commit", r, c, v), v1, v2),
                         app("compute_diff", c, c),
@@ -4834,12 +4701,10 @@ def version_history_spec() -> Spec:
             "diff_commit_hit_miss",
             forall(
                 [r, c, v, v1, v2],
-                Implication(
-                    Conjunction(
-                        (PredApp("eq_id", (v, v1)), Negation(PredApp("eq_id", (v, v2))))
-                    ),
-                    Implication(
-                        PredApp("has_version", (r, v2)),
+                implication(
+                    conjunction(pred_app("eq_id", v, v1), negation(pred_app("eq_id", v, v2))),
+                    implication(
+                        pred_app("has_version", r, v2),
                         eq(
                             app("diff", app("commit", r, c, v), v1, v2),
                             app("compute_diff", c, app("get_content", r, v2)),
@@ -4853,14 +4718,12 @@ def version_history_spec() -> Spec:
             "diff_commit_hit_miss_noversion",
             forall(
                 [r, c, v, v1, v2],
-                Implication(
-                    Conjunction(
-                        (PredApp("eq_id", (v, v1)), Negation(PredApp("eq_id", (v, v2))))
-                    ),
-                    Implication(
-                        Negation(PredApp("has_version", (r, v2))),
-                        Negation(
-                            Definedness(app("diff", app("commit", r, c, v), v1, v2))
+                implication(
+                    conjunction(pred_app("eq_id", v, v1), negation(pred_app("eq_id", v, v2))),
+                    implication(
+                        negation(pred_app("has_version", r, v2)),
+                        negation(
+                            definedness(app("diff", app("commit", r, c, v), v1, v2))
                         ),
                     ),
                 ),
@@ -4871,12 +4734,10 @@ def version_history_spec() -> Spec:
             "diff_commit_miss_hit",
             forall(
                 [r, c, v, v1, v2],
-                Implication(
-                    Conjunction(
-                        (Negation(PredApp("eq_id", (v, v1))), PredApp("eq_id", (v, v2)))
-                    ),
-                    Implication(
-                        PredApp("has_version", (r, v1)),
+                implication(
+                    conjunction(negation(pred_app("eq_id", v, v1)), pred_app("eq_id", v, v2)),
+                    implication(
+                        pred_app("has_version", r, v1),
                         eq(
                             app("diff", app("commit", r, c, v), v1, v2),
                             app("compute_diff", app("get_content", r, v1), c),
@@ -4890,14 +4751,12 @@ def version_history_spec() -> Spec:
             "diff_commit_miss_hit_noversion",
             forall(
                 [r, c, v, v1, v2],
-                Implication(
-                    Conjunction(
-                        (Negation(PredApp("eq_id", (v, v1))), PredApp("eq_id", (v, v2)))
-                    ),
-                    Implication(
-                        Negation(PredApp("has_version", (r, v1))),
-                        Negation(
-                            Definedness(app("diff", app("commit", r, c, v), v1, v2))
+                implication(
+                    conjunction(negation(pred_app("eq_id", v, v1)), pred_app("eq_id", v, v2)),
+                    implication(
+                        negation(pred_app("has_version", r, v1)),
+                        negation(
+                            definedness(app("diff", app("commit", r, c, v), v1, v2))
                         ),
                     ),
                 ),
@@ -4908,13 +4767,9 @@ def version_history_spec() -> Spec:
             "diff_commit_miss_miss",
             forall(
                 [r, c, v, v1, v2],
-                Implication(
-                    Conjunction(
-                        (
-                            Negation(PredApp("eq_id", (v, v1))),
-                            Negation(PredApp("eq_id", (v, v2))),
-                        )
-                    ),
+                implication(
+                    conjunction(negation(pred_app("eq_id", v, v1)),
+                            negation(pred_app("eq_id", v, v2))),
                     eq(
                         app("diff", app("commit", r, c, v), v1, v2),
                         app("diff", r, v1, v2),
@@ -5424,12 +5279,8 @@ def bug_tracker_spec() -> Spec:
             formula=forall(
                 [k, k2, k3],
                 Implication(
-                    Conjunction(
-                        (
-                            PredApp("eq_id", (k, k2)),
-                            PredApp("eq_id", (k2, k3)),
-                        )
-                    ),
+                    conjunction(PredApp("eq_id", (k, k2)),
+                            PredApp("eq_id", (k2, k3))),
                     PredApp("eq_id", (k, k3)),
                 ),
             ),
@@ -5868,23 +5719,23 @@ SESSION_STORE = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Conjunction,
-    Definedness,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
+    conjunction,
     const,
+    definedness,
     eq,
+    fn,
     forall,
     iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -5985,7 +5836,7 @@ def session_store_spec() -> Spec:
             label="last_input_create_undef",
             formula=forall(
                 [t],
-                Negation(Definedness(app("last_input", app("create", t)))),
+                negation(definedness(app("last_input", app("create", t)))),
             ),
         ),
         # ==================================================================
@@ -5995,16 +5846,16 @@ def session_store_spec() -> Spec:
             label="eq_token_refl",
             formula=forall(
                 [t],
-                PredApp("eq_token", (t, t)),
+                pred_app("eq_token", t, t),
             ),
         ),
         Axiom(
             label="eq_token_sym",
             formula=forall(
                 [t, t2],
-                Implication(
-                    PredApp("eq_token", (t, t2)),
-                    PredApp("eq_token", (t2, t)),
+                implication(
+                    pred_app("eq_token", t, t2),
+                    pred_app("eq_token", t2, t),
                 ),
             ),
         ),
@@ -6012,12 +5863,10 @@ def session_store_spec() -> Spec:
             label="eq_token_trans",
             formula=forall(
                 [t, t2, t3],
-                Implication(
-                    Conjunction((
-                        PredApp("eq_token", (t, t2)),
-                        PredApp("eq_token", (t2, t3)),
-                    )),
-                    PredApp("eq_token", (t, t3)),
+                implication(
+                    conjunction(pred_app("eq_token", t, t2),
+                        pred_app("eq_token", t2, t3)),
+                    pred_app("eq_token", t, t3),
                 ),
             ),
         ),
@@ -6029,7 +5878,7 @@ def session_store_spec() -> Spec:
             formula=forall(
                 [s],
                 iff(
-                    Definedness(app("refresh", s)),
+                    definedness(app("refresh", s)),
                     eq(app("get_status", s), const("active")),
                 ),
             ),
@@ -6041,7 +5890,7 @@ def session_store_spec() -> Spec:
         # ==================================================================
         Axiom(
             label="active_expired_distinct",
-            formula=Negation(eq(const("active"), const("expired"))),
+            formula=negation(eq(const("active"), const("expired"))),
         ),
         # ==================================================================
         # DOMAIN CELLS — get_token (preservation)
@@ -6076,8 +5925,8 @@ def session_store_spec() -> Spec:
             label="get_token_refresh",
             formula=forall(
                 [s],
-                Implication(
-                    Definedness(app("refresh", s)),
+                implication(
+                    definedness(app("refresh", s)),
                     eq(
                         app("get_token", app("refresh", s)),
                         app("get_token", s),
@@ -6120,8 +5969,8 @@ def session_store_spec() -> Spec:
             label="get_status_refresh",
             formula=forall(
                 [s],
-                Implication(
-                    Definedness(app("refresh", s)),
+                implication(
+                    definedness(app("refresh", s)),
                     eq(
                         app("get_status", app("refresh", s)),
                         const("active"),
@@ -6149,8 +5998,8 @@ def session_store_spec() -> Spec:
             label="last_input_refresh",
             formula=forall(
                 [s],
-                Implication(
-                    Definedness(app("refresh", s)),
+                implication(
+                    definedness(app("refresh", s)),
                     eq(
                         app("last_input", app("refresh", s)),
                         app("last_input", s),
@@ -6166,7 +6015,7 @@ def session_store_spec() -> Spec:
             label="is_verified_create",
             formula=forall(
                 [t],
-                Negation(PredApp("is_verified", (app("create", t),))),
+                negation(pred_app("is_verified", app("create", t))),
             ),
         ),
         # Cell 14a: is_verified × verify — POSITIVE guard polarity.
@@ -6180,12 +6029,10 @@ def session_store_spec() -> Spec:
             label="is_verified_verify_pos",
             formula=forall(
                 [s, t],
-                Implication(
-                    Conjunction((
-                        PredApp("eq_token", (t, app("get_token", s))),
-                        eq(app("get_status", s), const("active")),
-                    )),
-                    PredApp("is_verified", (app("verify", s, t),)),
+                implication(
+                    conjunction(pred_app("eq_token", t, app("get_token", s)),
+                        eq(app("get_status", s), const("active"))),
+                    pred_app("is_verified", app("verify", s, t)),
                 ),
             ),
         ),
@@ -6198,16 +6045,14 @@ def session_store_spec() -> Spec:
             label="is_verified_verify_neg",
             formula=forall(
                 [s, t],
-                Implication(
-                    Negation(
-                        Conjunction((
-                            PredApp("eq_token", (t, app("get_token", s))),
-                            eq(app("get_status", s), const("active")),
-                        )),
+                implication(
+                    negation(
+                        conjunction(pred_app("eq_token", t, app("get_token", s)),
+                            eq(app("get_status", s), const("active"))),
                     ),
                     iff(
-                        PredApp("is_verified", (app("verify", s, t),)),
-                        PredApp("is_verified", (s,)),
+                        pred_app("is_verified", app("verify", s, t)),
+                        pred_app("is_verified", s),
                     ),
                 ),
             ),
@@ -6217,7 +6062,7 @@ def session_store_spec() -> Spec:
             label="is_verified_expire",
             formula=forall(
                 [s],
-                Negation(PredApp("is_verified", (app("expire", s),))),
+                negation(pred_app("is_verified", app("expire", s))),
             ),
         ),
         # Cell 16: is_verified × refresh — definedness-guarded
@@ -6225,10 +6070,10 @@ def session_store_spec() -> Spec:
             label="is_verified_refresh",
             formula=forall(
                 [s],
-                Implication(
-                    Definedness(app("refresh", s)),
-                    Negation(
-                        PredApp("is_verified", (app("refresh", s),)),
+                implication(
+                    definedness(app("refresh", s)),
+                    negation(
+                        pred_app("is_verified", app("refresh", s)),
                     ),
                 ),
             ),
@@ -6245,7 +6090,7 @@ def session_store_spec() -> Spec:
             label="needs_auth_create",
             formula=forall(
                 [t],
-                PredApp("needs_auth", (app("create", t),)),
+                pred_app("needs_auth", app("create", t)),
             ),
         ),
         # Cell 18a: needs_auth × verify — POSITIVE guard → ¬needs_auth
@@ -6253,12 +6098,10 @@ def session_store_spec() -> Spec:
             label="needs_auth_verify_pos",
             formula=forall(
                 [s, t],
-                Implication(
-                    Conjunction((
-                        PredApp("eq_token", (t, app("get_token", s))),
-                        eq(app("get_status", s), const("active")),
-                    )),
-                    Negation(PredApp("needs_auth", (app("verify", s, t),))),
+                implication(
+                    conjunction(pred_app("eq_token", t, app("get_token", s)),
+                        eq(app("get_status", s), const("active"))),
+                    negation(pred_app("needs_auth", app("verify", s, t))),
                 ),
             ),
         ),
@@ -6267,16 +6110,14 @@ def session_store_spec() -> Spec:
             label="needs_auth_verify_neg",
             formula=forall(
                 [s, t],
-                Implication(
-                    Negation(
-                        Conjunction((
-                            PredApp("eq_token", (t, app("get_token", s))),
-                            eq(app("get_status", s), const("active")),
-                        )),
+                implication(
+                    negation(
+                        conjunction(pred_app("eq_token", t, app("get_token", s)),
+                            eq(app("get_status", s), const("active"))),
                     ),
                     iff(
-                        PredApp("needs_auth", (app("verify", s, t),)),
-                        PredApp("needs_auth", (s,)),
+                        pred_app("needs_auth", app("verify", s, t)),
+                        pred_app("needs_auth", s),
                     ),
                 ),
             ),
@@ -6286,7 +6127,7 @@ def session_store_spec() -> Spec:
             label="needs_auth_expire",
             formula=forall(
                 [s],
-                Negation(PredApp("needs_auth", (app("expire", s),))),
+                negation(pred_app("needs_auth", app("expire", s))),
             ),
         ),
         # Cell 20: needs_auth × refresh — definedness-guarded
@@ -6294,9 +6135,9 @@ def session_store_spec() -> Spec:
             label="needs_auth_refresh",
             formula=forall(
                 [s],
-                Implication(
-                    Definedness(app("refresh", s)),
-                    PredApp("needs_auth", (app("refresh", s),)),
+                implication(
+                    definedness(app("refresh", s)),
+                    pred_app("needs_auth", app("refresh", s)),
                 ),
             ),
         ),
@@ -6312,11 +6153,9 @@ def session_store_spec() -> Spec:
             formula=forall(
                 [s],
                 iff(
-                    PredApp("needs_auth", (s,)),
-                    Conjunction((
-                        eq(app("get_status", s), const("active")),
-                        Negation(PredApp("is_verified", (s,))),
-                    )),
+                    pred_app("needs_auth", s),
+                    conjunction(eq(app("get_status", s), const("active")),
+                        negation(pred_app("is_verified", s))),
                 ),
             ),
         ),
@@ -6380,21 +6219,20 @@ RATE_LIMITER = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Definedness,
     GeneratedSortInfo,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
     eq,
+    fn,
     forall,
     iff,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -6556,8 +6394,8 @@ def rate_limiter_spec() -> Spec:
             formula=forall(
                 [m],
                 iff(
-                    PredApp("over_limit", (app("create", m),)),
-                    PredApp("geq", (const("zero"), m)),
+                    pred_app("over_limit", app("create", m)),
+                    pred_app("geq", const("zero"), m),
                 ),
             ),
         ),
@@ -6567,11 +6405,9 @@ def rate_limiter_spec() -> Spec:
             formula=forall(
                 [l],
                 iff(
-                    PredApp("over_limit", (app("record", l),)),
-                    PredApp("geq", (
-                        app("succ", app("get_count", l)),
-                        app("get_max", l),
-                    )),
+                    pred_app("over_limit", app("record", l)),
+                    pred_app("geq", app("succ", app("get_count", l)),
+                        app("get_max", l)),
                 ),
             ),
         ),
@@ -6581,8 +6417,8 @@ def rate_limiter_spec() -> Spec:
             formula=forall(
                 [l],
                 iff(
-                    PredApp("over_limit", (app("reset", l),)),
-                    PredApp("geq", (const("zero"), app("get_max", l))),
+                    pred_app("over_limit", app("reset", l)),
+                    pred_app("geq", const("zero"), app("get_max", l)),
                 ),
             ),
         ),
@@ -6592,8 +6428,8 @@ def rate_limiter_spec() -> Spec:
             formula=forall(
                 [l, n],
                 iff(
-                    PredApp("over_limit", (app("set_max", l, n),)),
-                    PredApp("geq", (app("get_count", l), n)),
+                    pred_app("over_limit", app("set_max", l, n)),
+                    pred_app("geq", app("get_count", l), n),
                 ),
             ),
         ),
@@ -6609,11 +6445,9 @@ def rate_limiter_spec() -> Spec:
             formula=forall(
                 [l],
                 iff(
-                    PredApp("over_limit", (l,)),
-                    PredApp("geq", (
-                        app("get_count", l),
-                        app("get_max", l),
-                    )),
+                    pred_app("over_limit", l),
+                    pred_app("geq", app("get_count", l),
+                        app("get_max", l)),
                 ),
             ),
         ),
@@ -6629,7 +6463,7 @@ def rate_limiter_spec() -> Spec:
             label="geq_zero_base",
             formula=forall(
                 [m],
-                PredApp("geq", (m, const("zero"))),
+                pred_app("geq", m, const("zero")),
             ),
         ),
         # Zero is not ≥ any successor
@@ -6637,7 +6471,7 @@ def rate_limiter_spec() -> Spec:
             label="geq_zero_succ",
             formula=forall(
                 [m],
-                Negation(PredApp("geq", (const("zero"), app("succ", m)))),
+                negation(pred_app("geq", const("zero"), app("succ", m))),
             ),
         ),
         # Inductive step: succ(a) ≥ succ(b) ⟺ a ≥ b
@@ -6646,8 +6480,8 @@ def rate_limiter_spec() -> Spec:
             formula=forall(
                 [m, n],
                 iff(
-                    PredApp("geq", (app("succ", m), app("succ", n))),
-                    PredApp("geq", (m, n)),
+                    pred_app("geq", app("succ", m), app("succ", n)),
+                    pred_app("geq", m, n),
                 ),
             ),
         ),
@@ -6728,23 +6562,23 @@ DNS_ZONE = WorkedExample(
     ),
     code='''from alspec import (
     Axiom,
-    Conjunction,
-    Definedness,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
+    conjunction,
     const,
+    definedness,
     eq,
+    fn,
     forall,
     iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -6851,16 +6685,16 @@ def dns_zone_spec() -> Spec:
             label="eq_name_refl",
             formula=forall(
                 [n],
-                PredApp("eq_name", (n, n)),
+                pred_app("eq_name", n, n),
             ),
         ),
         Axiom(
             label="eq_name_sym",
             formula=forall(
                 [n, n2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    PredApp("eq_name", (n2, n)),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    pred_app("eq_name", n2, n),
                 ),
             ),
         ),
@@ -6868,12 +6702,10 @@ def dns_zone_spec() -> Spec:
             label="eq_name_trans",
             formula=forall(
                 [n, n2, n3],
-                Implication(
-                    Conjunction((
-                        PredApp("eq_name", (n, n2)),
-                        PredApp("eq_name", (n2, n3)),
-                    )),
-                    PredApp("eq_name", (n, n3)),
+                implication(
+                    conjunction(pred_app("eq_name", n, n2),
+                        pred_app("eq_name", n2, n3)),
+                    pred_app("eq_name", n, n3),
                 ),
             ),
         ),
@@ -6884,16 +6716,16 @@ def dns_zone_spec() -> Spec:
             label="eq_type_refl",
             formula=forall(
                 [t],
-                PredApp("eq_type", (t, t)),
+                pred_app("eq_type", t, t),
             ),
         ),
         Axiom(
             label="eq_type_sym",
             formula=forall(
                 [t, t2],
-                Implication(
-                    PredApp("eq_type", (t, t2)),
-                    PredApp("eq_type", (t2, t)),
+                implication(
+                    pred_app("eq_type", t, t2),
+                    pred_app("eq_type", t2, t),
                 ),
             ),
         ),
@@ -6901,12 +6733,10 @@ def dns_zone_spec() -> Spec:
             label="eq_type_trans",
             formula=forall(
                 [t, t2, t3],
-                Implication(
-                    Conjunction((
-                        PredApp("eq_type", (t, t2)),
-                        PredApp("eq_type", (t2, t3)),
-                    )),
-                    PredApp("eq_type", (t, t3)),
+                implication(
+                    conjunction(pred_app("eq_type", t, t2),
+                        pred_app("eq_type", t2, t3)),
+                    pred_app("eq_type", t, t3),
                 ),
             ),
         ),
@@ -6918,8 +6748,8 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_empty",
             formula=forall(
                 [n, t],
-                Negation(
-                    Definedness(app("get_rdata", const("empty"), n, t))
+                negation(
+                    definedness(app("get_rdata", const("empty"), n, t))
                 ),
             ),
         ),
@@ -6928,8 +6758,8 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_empty",
             formula=forall(
                 [n, t],
-                Negation(
-                    Definedness(app("get_ttl", const("empty"), n, t))
+                negation(
+                    definedness(app("get_ttl", const("empty"), n, t))
                 ),
             ),
         ),
@@ -6938,8 +6768,8 @@ def dns_zone_spec() -> Spec:
             label="has_record_empty",
             formula=forall(
                 [n, t],
-                Negation(
-                    PredApp("has_record", (const("empty"), n, t))
+                negation(
+                    pred_app("has_record", const("empty"), n, t)
                 ),
             ),
         ),
@@ -6955,10 +6785,10 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_add_hit_type_hit",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        PredApp("eq_type", (t, t2)),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        pred_app("eq_type", t, t2),
                         eq(
                             app("get_rdata", app("add_record", z, n, t, d, ttl), n2, t2),
                             d,
@@ -6972,10 +6802,10 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_add_hit_type_miss",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        Negation(PredApp("eq_type", (t, t2))),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        negation(pred_app("eq_type", t, t2)),
                         eq(
                             app("get_rdata", app("add_record", z, n, t, d, ttl), n2, t2),
                             app("get_rdata", z, n2, t2),
@@ -6989,8 +6819,8 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_add_miss",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     eq(
                         app("get_rdata", app("add_record", z, n, t, d, ttl), n2, t2),
                         app("get_rdata", z, n2, t2),
@@ -7006,12 +6836,12 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_remove_hit_type_hit",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        PredApp("eq_type", (t, t2)),
-                        Negation(
-                            Definedness(
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        pred_app("eq_type", t, t2),
+                        negation(
+                            definedness(
                                 app("get_rdata", app("remove_record", z, n, t), n2, t2)
                             )
                         ),
@@ -7024,10 +6854,10 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_remove_hit_type_miss",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        Negation(PredApp("eq_type", (t, t2))),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        negation(pred_app("eq_type", t, t2)),
                         eq(
                             app("get_rdata", app("remove_record", z, n, t), n2, t2),
                             app("get_rdata", z, n2, t2),
@@ -7041,8 +6871,8 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_remove_miss",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     eq(
                         app("get_rdata", app("remove_record", z, n, t), n2, t2),
                         app("get_rdata", z, n2, t2),
@@ -7058,10 +6888,10 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_add_hit_type_hit",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        PredApp("eq_type", (t, t2)),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        pred_app("eq_type", t, t2),
                         eq(
                             app("get_ttl", app("add_record", z, n, t, d, ttl), n2, t2),
                             ttl,
@@ -7075,10 +6905,10 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_add_hit_type_miss",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        Negation(PredApp("eq_type", (t, t2))),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        negation(pred_app("eq_type", t, t2)),
                         eq(
                             app("get_ttl", app("add_record", z, n, t, d, ttl), n2, t2),
                             app("get_ttl", z, n2, t2),
@@ -7092,8 +6922,8 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_add_miss",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     eq(
                         app("get_ttl", app("add_record", z, n, t, d, ttl), n2, t2),
                         app("get_ttl", z, n2, t2),
@@ -7109,12 +6939,12 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_remove_hit_type_hit",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        PredApp("eq_type", (t, t2)),
-                        Negation(
-                            Definedness(
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        pred_app("eq_type", t, t2),
+                        negation(
+                            definedness(
                                 app("get_ttl", app("remove_record", z, n, t), n2, t2)
                             )
                         ),
@@ -7127,10 +6957,10 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_remove_hit_type_miss",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        Negation(PredApp("eq_type", (t, t2))),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        negation(pred_app("eq_type", t, t2)),
                         eq(
                             app("get_ttl", app("remove_record", z, n, t), n2, t2),
                             app("get_ttl", z, n2, t2),
@@ -7144,8 +6974,8 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_remove_miss",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     eq(
                         app("get_ttl", app("remove_record", z, n, t), n2, t2),
                         app("get_ttl", z, n2, t2),
@@ -7161,14 +6991,11 @@ def dns_zone_spec() -> Spec:
             label="has_record_add_hit_type_hit",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        PredApp("eq_type", (t, t2)),
-                        PredApp(
-                            "has_record",
-                            (app("add_record", z, n, t, d, ttl), n2, t2),
-                        ),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        pred_app("eq_type", t, t2),
+                        pred_app("has_record", app("add_record", z, n, t, d, ttl), n2, t2),
                     ),
                 ),
             ),
@@ -7178,16 +7005,13 @@ def dns_zone_spec() -> Spec:
             label="has_record_add_hit_type_miss",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        Negation(PredApp("eq_type", (t, t2))),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        negation(pred_app("eq_type", t, t2)),
                         iff(
-                            PredApp(
-                                "has_record",
-                                (app("add_record", z, n, t, d, ttl), n2, t2),
-                            ),
-                            PredApp("has_record", (z, n2, t2)),
+                            pred_app("has_record", app("add_record", z, n, t, d, ttl), n2, t2),
+                            pred_app("has_record", z, n2, t2),
                         ),
                     ),
                 ),
@@ -7198,14 +7022,11 @@ def dns_zone_spec() -> Spec:
             label="has_record_add_miss",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     iff(
-                        PredApp(
-                            "has_record",
-                            (app("add_record", z, n, t, d, ttl), n2, t2),
-                        ),
-                        PredApp("has_record", (z, n2, t2)),
+                        pred_app("has_record", app("add_record", z, n, t, d, ttl), n2, t2),
+                        pred_app("has_record", z, n2, t2),
                     ),
                 ),
             ),
@@ -7218,15 +7039,12 @@ def dns_zone_spec() -> Spec:
             label="has_record_remove_hit_type_hit",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        PredApp("eq_type", (t, t2)),
-                        Negation(
-                            PredApp(
-                                "has_record",
-                                (app("remove_record", z, n, t), n2, t2),
-                            )
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        pred_app("eq_type", t, t2),
+                        negation(
+                            pred_app("has_record", app("remove_record", z, n, t), n2, t2)
                         ),
                     ),
                 ),
@@ -7237,16 +7055,13 @@ def dns_zone_spec() -> Spec:
             label="has_record_remove_hit_type_miss",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        Negation(PredApp("eq_type", (t, t2))),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        negation(pred_app("eq_type", t, t2)),
                         iff(
-                            PredApp(
-                                "has_record",
-                                (app("remove_record", z, n, t), n2, t2),
-                            ),
-                            PredApp("has_record", (z, n2, t2)),
+                            pred_app("has_record", app("remove_record", z, n, t), n2, t2),
+                            pred_app("has_record", z, n2, t2),
                         ),
                     ),
                 ),
@@ -7257,14 +7072,11 @@ def dns_zone_spec() -> Spec:
             label="has_record_remove_miss",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     iff(
-                        PredApp(
-                            "has_record",
-                            (app("remove_record", z, n, t), n2, t2),
-                        ),
-                        PredApp("has_record", (z, n2, t2)),
+                        pred_app("has_record", app("remove_record", z, n, t), n2, t2),
+                        pred_app("has_record", z, n2, t2),
                     ),
                 ),
             ),
@@ -7282,8 +7094,8 @@ def dns_zone_spec() -> Spec:
             formula=forall(
                 [z, n, t],
                 iff(
-                    PredApp("has_record", (z, n, t)),
-                    Definedness(app("get_rdata", z, n, t)),
+                    pred_app("has_record", z, n, t),
+                    definedness(app("get_rdata", z, n, t)),
                 ),
             ),
         ),

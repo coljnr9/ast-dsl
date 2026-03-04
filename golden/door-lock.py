@@ -61,21 +61,21 @@ r"""
 
 from alspec import (
     Axiom,
-    Conjunction,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
+    conjunction,
     const,
     eq,
+    fn,
     forall,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -123,15 +123,15 @@ def door_lock_spec() -> Spec:
         # ━━ eq_code basis ━━
         Axiom(
             label="eq_code_refl",
-            formula=forall([c1], PredApp("eq_code", (c1, c1))),
+            formula=forall([c1], pred_app("eq_code", c1, c1)),
         ),
         Axiom(
             label="eq_code_sym",
             formula=forall(
                 [c1, c2],
-                Implication(
-                    PredApp("eq_code", (c1, c2)),
-                    PredApp("eq_code", (c2, c1)),
+                implication(
+                    pred_app("eq_code", c1, c2),
+                    pred_app("eq_code", c2, c1),
                 ),
             ),
         ),
@@ -139,14 +139,12 @@ def door_lock_spec() -> Spec:
             label="eq_code_trans",
             formula=forall(
                 [c1, c2, c3],
-                Implication(
-                    Conjunction(
-                        (
-                            PredApp("eq_code", (c1, c2)),
-                            PredApp("eq_code", (c2, c3)),
-                        )
+                implication(
+                    conjunction(
+                        pred_app("eq_code", c1, c2),
+                        pred_app("eq_code", c2, c3),
                     ),
-                    PredApp("eq_code", (c1, c3)),
+                    pred_app("eq_code", c1, c3),
                 ),
             ),
         ),
@@ -189,12 +187,10 @@ def door_lock_spec() -> Spec:
             label="get_state_lock_hit",
             formula=forall(
                 [l, c],
-                Implication(
-                    Conjunction(
-                        (
-                            PredApp("eq_code", (c, app("get_code", l))),
-                            eq(app("get_state", l), const("unlocked")),
-                        )
+                implication(
+                    conjunction(
+                        pred_app("eq_code", c, app("get_code", l)),
+                        eq(app("get_state", l), const("unlocked")),
                     ),
                     eq(app("get_state", app("lock", l, c)), const("locked")),
                 ),
@@ -204,13 +200,11 @@ def door_lock_spec() -> Spec:
             label="get_state_lock_miss",
             formula=forall(
                 [l, c],
-                Implication(
-                    Negation(
-                        Conjunction(
-                            (
-                                PredApp("eq_code", (c, app("get_code", l))),
-                                eq(app("get_state", l), const("unlocked")),
-                            )
+                implication(
+                    negation(
+                        conjunction(
+                            pred_app("eq_code", c, app("get_code", l)),
+                            eq(app("get_state", l), const("unlocked")),
                         )
                     ),
                     eq(app("get_state", app("lock", l, c)), app("get_state", l)),
@@ -222,12 +216,10 @@ def door_lock_spec() -> Spec:
             label="get_state_unlock_hit",
             formula=forall(
                 [l, c],
-                Implication(
-                    Conjunction(
-                        (
-                            PredApp("eq_code", (c, app("get_code", l))),
-                            eq(app("get_state", l), const("locked")),
-                        )
+                implication(
+                    conjunction(
+                        pred_app("eq_code", c, app("get_code", l)),
+                        eq(app("get_state", l), const("locked")),
                     ),
                     eq(app("get_state", app("unlock", l, c)), const("unlocked")),
                 ),
@@ -237,13 +229,11 @@ def door_lock_spec() -> Spec:
             label="get_state_unlock_miss",
             formula=forall(
                 [l, c],
-                Implication(
-                    Negation(
-                        Conjunction(
-                            (
-                                PredApp("eq_code", (c, app("get_code", l))),
-                                eq(app("get_state", l), const("locked")),
-                            )
+                implication(
+                    negation(
+                        conjunction(
+                            pred_app("eq_code", c, app("get_code", l)),
+                            eq(app("get_state", l), const("locked")),
                         )
                     ),
                     eq(app("get_state", app("unlock", l, c)), app("get_state", l)),
@@ -255,7 +245,7 @@ def door_lock_spec() -> Spec:
             label="get_state_open_door_hit",
             formula=forall(
                 [l],
-                Implication(
+                implication(
                     eq(app("get_state", l), const("unlocked")),
                     eq(app("get_state", app("open_door", l)), const("open_state")),
                 ),
@@ -265,8 +255,8 @@ def door_lock_spec() -> Spec:
             label="get_state_open_door_miss",
             formula=forall(
                 [l],
-                Implication(
-                    Negation(eq(app("get_state", l), const("unlocked"))),
+                implication(
+                    negation(eq(app("get_state", l), const("unlocked"))),
                     eq(app("get_state", app("open_door", l)), app("get_state", l)),
                 ),
             ),
@@ -276,7 +266,7 @@ def door_lock_spec() -> Spec:
             label="get_state_close_door_hit",
             formula=forall(
                 [l],
-                Implication(
+                implication(
                     eq(app("get_state", l), const("open_state")),
                     eq(app("get_state", app("close_door", l)), const("unlocked")),
                 ),
@@ -286,8 +276,8 @@ def door_lock_spec() -> Spec:
             label="get_state_close_door_miss",
             formula=forall(
                 [l],
-                Implication(
-                    Negation(eq(app("get_state", l), const("open_state"))),
+                implication(
+                    negation(eq(app("get_state", l), const("open_state"))),
                     eq(app("get_state", app("close_door", l)), app("get_state", l)),
                 ),
             ),

@@ -51,7 +51,7 @@
 | `winner` | `close` | — | `winner_close` | Universal preservation |
 
 ### 4. Tricky Cases & Design Decisions
-- **Guarding Partial Constructors:** `submit` is a partial constructor natively enforcing the "deadline" property via `is_open` verification. In standard total logic, an undefined partial operation conceptually produces an entirely malformed undefined term. Thus, ANY equation relying on the output of `submit` MUST be guarded by the constructor `Definedness(submit(...))` to remain rigorous and sound.
+- **Guarding Partial Constructors:** `submit` is a partial constructor natively enforcing the "deadline" property via `is_open` verification. In standard total logic, an undefined partial operation conceptually produces an entirely malformed undefined term. Thus, ANY equation relying on the output of `submit` MUST be guarded by the constructor `definedness(submit(...))` to remain rigorous and sound.
 - **Handling Ties:** The specification for `submit` explicitly branches on the strict `gt` evaluation. If `gt(new_amt, current_amount)` evaluates to `false` (meaning the new bid is less than **or equal to** the current highest), the `submit_keep` axiom fires, preserving the current state. This naturally gives preference to the earliest highest bid, satisfying standard real-world auction mechanisms without requiring timestamps.
 - **Sealed Bid Property:** While `winner` and `highest_bid` update dynamically via `submit`, there are computationally transparent. In the domain spec, hiding observer invocation isn't relevant constraints. We evaluate `submit` dynamically to compute state recursively, so exposing observers directly meets "revealing rules" and strict logic definitions.
 
@@ -65,9 +65,24 @@
 """
 
 from alspec import (
-    Axiom, Conjunction, GeneratedSortInfo, Implication, Negation, PredApp,
-    Signature, Spec,
-    atomic, fn, pred, var, app, const, eq, forall, iff, Definedness
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    conjunction,
+    const,
+    definedness,
+    eq,
+    fn,
+    forall,
+    iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 def auction_spec() -> Spec:
@@ -114,74 +129,74 @@ def auction_spec() -> Spec:
 
     axioms = (
         # --- eq_bidder helper ---
-        Axiom("eq_bidder_refl", forall([b], PredApp("eq_bidder", (b, b)))),
-        Axiom("eq_bidder_sym", forall([b, b2], Implication(
-            PredApp("eq_bidder", (b, b2)), 
-            PredApp("eq_bidder", (b2, b))
+        Axiom("eq_bidder_refl", forall([b], pred_app("eq_bidder", b, b))),
+        Axiom("eq_bidder_sym", forall([b, b2], implication(
+            pred_app("eq_bidder", b, b2), 
+            pred_app("eq_bidder", b2, b)
         ))),
-        Axiom("eq_bidder_trans", forall([b, b2, b3], Implication(
-            Conjunction((PredApp("eq_bidder", (b, b2)), PredApp("eq_bidder", (b2, b3)))), 
-            PredApp("eq_bidder", (b, b3))
+        Axiom("eq_bidder_trans", forall([b, b2, b3], implication(
+            conjunction(pred_app("eq_bidder", b, b2), pred_app("eq_bidder", b2, b3)), 
+            pred_app("eq_bidder", b, b3)
         ))),
 
         # --- submit definedness mapping --- 
         Axiom("submit_definedness", forall([a, b, amt], iff(
-            Definedness(app("submit", a, b, amt)), 
-            Conjunction((PredApp("is_open", (a,)), PredApp("is_registered", (a, b))))
+            definedness(app("submit", a, b, amt)), 
+            conjunction(pred_app("is_open", a), pred_app("is_registered", a, b))
         ))),
 
         # --- is_open (Predicate Observer) ---
-        Axiom("is_open_new", PredApp("is_open", (const("new"),))),
+        Axiom("is_open_new", pred_app("is_open", const("new"))),
         Axiom("is_open_register", forall([a, b], iff(
-            PredApp("is_open", (app("register", a, b),)), 
-            PredApp("is_open", (a,))
+            pred_app("is_open", app("register", a, b)), 
+            pred_app("is_open", a)
         ))),
-        Axiom("is_open_submit", forall([a, b, amt], Implication(
-            Definedness(app("submit", a, b, amt)), 
-            iff(PredApp("is_open", (app("submit", a, b, amt),)), PredApp("is_open", (a,)))
+        Axiom("is_open_submit", forall([a, b, amt], implication(
+            definedness(app("submit", a, b, amt)), 
+            iff(pred_app("is_open", app("submit", a, b, amt)), pred_app("is_open", a))
         ))),
-        Axiom("is_open_close", forall([a], Negation(
-            PredApp("is_open", (app("close", a),))
+        Axiom("is_open_close", forall([a], negation(
+            pred_app("is_open", app("close", a))
         ))),
 
         # --- is_registered (Predicate Observer) ---
-        Axiom("is_registered_new", forall([b], Negation(
-            PredApp("is_registered", (const("new"), b))
+        Axiom("is_registered_new", forall([b], negation(
+            pred_app("is_registered", const("new"), b)
         ))),
-        Axiom("is_registered_register_hit", forall([a, b, b2], Implication(
-            PredApp("eq_bidder", (b, b2)), 
-            PredApp("is_registered", (app("register", a, b), b2))
+        Axiom("is_registered_register_hit", forall([a, b, b2], implication(
+            pred_app("eq_bidder", b, b2), 
+            pred_app("is_registered", app("register", a, b), b2)
         ))),
-        Axiom("is_registered_register_miss", forall([a, b, b2], Implication(
-            Negation(PredApp("eq_bidder", (b, b2))), 
-            iff(PredApp("is_registered", (app("register", a, b), b2)), PredApp("is_registered", (a, b2)))
+        Axiom("is_registered_register_miss", forall([a, b, b2], implication(
+            negation(pred_app("eq_bidder", b, b2)), 
+            iff(pred_app("is_registered", app("register", a, b), b2), pred_app("is_registered", a, b2))
         ))),
-        Axiom("is_registered_submit", forall([a, b, b2, amt], Implication(
-            Definedness(app("submit", a, b, amt)), 
-            iff(PredApp("is_registered", (app("submit", a, b, amt), b2)), PredApp("is_registered", (a, b2)))
+        Axiom("is_registered_submit", forall([a, b, b2, amt], implication(
+            definedness(app("submit", a, b, amt)), 
+            iff(pred_app("is_registered", app("submit", a, b, amt), b2), pred_app("is_registered", a, b2))
         ))),
         Axiom("is_registered_close", forall([a, b], iff(
-            PredApp("is_registered", (app("close", a), b)), 
-            PredApp("is_registered", (a, b))
+            pred_app("is_registered", app("close", a), b), 
+            pred_app("is_registered", a, b)
         ))),
 
         # --- highest_bid (Partial Observer) ---
         # highest_bid × new: partial observer on base constructor — explicit undefinedness required
-        Axiom("highest_bid_new_undef", Negation(Definedness(app("highest_bid", const("new"))))),
+        Axiom("highest_bid_new_undef", negation(definedness(app("highest_bid", const("new"))))),
         Axiom("highest_bid_register", forall([a, b], eq(
             app("highest_bid", app("register", a, b)), 
             app("highest_bid", a)
         ))),
-        Axiom("highest_bid_submit_first", forall([a, b, amt], Implication(
-            Conjunction((Definedness(app("submit", a, b, amt)), Negation(Definedness(app("highest_bid", a))))), 
+        Axiom("highest_bid_submit_first", forall([a, b, amt], implication(
+            conjunction(definedness(app("submit", a, b, amt)), negation(definedness(app("highest_bid", a)))), 
             eq(app("highest_bid", app("submit", a, b, amt)), amt)
         ))),
-        Axiom("highest_bid_submit_update", forall([a, b, amt], Implication(
-            Conjunction((Definedness(app("submit", a, b, amt)), Definedness(app("highest_bid", a)), PredApp("gt", (amt, app("highest_bid", a))))), 
+        Axiom("highest_bid_submit_update", forall([a, b, amt], implication(
+            conjunction(definedness(app("submit", a, b, amt)), definedness(app("highest_bid", a)), pred_app("gt", amt, app("highest_bid", a))), 
             eq(app("highest_bid", app("submit", a, b, amt)), amt)
         ))),
-        Axiom("highest_bid_submit_keep", forall([a, b, amt], Implication(
-            Conjunction((Definedness(app("submit", a, b, amt)), Definedness(app("highest_bid", a)), Negation(PredApp("gt", (amt, app("highest_bid", a)))))), 
+        Axiom("highest_bid_submit_keep", forall([a, b, amt], implication(
+            conjunction(definedness(app("submit", a, b, amt)), definedness(app("highest_bid", a)), negation(pred_app("gt", amt, app("highest_bid", a)))), 
             eq(app("highest_bid", app("submit", a, b, amt)), app("highest_bid", a))
         ))),
         Axiom("highest_bid_close", forall([a], eq(
@@ -191,21 +206,21 @@ def auction_spec() -> Spec:
 
         # --- winner (Partial Observer) ---
         # winner × new: partial observer on base constructor — explicit undefinedness required
-        Axiom("winner_new_undef", Negation(Definedness(app("winner", const("new"))))),
+        Axiom("winner_new_undef", negation(definedness(app("winner", const("new"))))),
         Axiom("winner_register", forall([a, b], eq(
             app("winner", app("register", a, b)), 
             app("winner", a)
         ))),
-        Axiom("winner_submit_first", forall([a, b, amt], Implication(
-            Conjunction((Definedness(app("submit", a, b, amt)), Negation(Definedness(app("highest_bid", a))))), 
+        Axiom("winner_submit_first", forall([a, b, amt], implication(
+            conjunction(definedness(app("submit", a, b, amt)), negation(definedness(app("highest_bid", a)))), 
             eq(app("winner", app("submit", a, b, amt)), b)
         ))),
-        Axiom("winner_submit_update", forall([a, b, amt], Implication(
-            Conjunction((Definedness(app("submit", a, b, amt)), Definedness(app("highest_bid", a)), PredApp("gt", (amt, app("highest_bid", a))))), 
+        Axiom("winner_submit_update", forall([a, b, amt], implication(
+            conjunction(definedness(app("submit", a, b, amt)), definedness(app("highest_bid", a)), pred_app("gt", amt, app("highest_bid", a))), 
             eq(app("winner", app("submit", a, b, amt)), b)
         ))),
-        Axiom("winner_submit_keep", forall([a, b, amt], Implication(
-            Conjunction((Definedness(app("submit", a, b, amt)), Definedness(app("highest_bid", a)), Negation(PredApp("gt", (amt, app("highest_bid", a)))))), 
+        Axiom("winner_submit_keep", forall([a, b, amt], implication(
+            conjunction(definedness(app("submit", a, b, amt)), definedness(app("highest_bid", a)), negation(pred_app("gt", amt, app("highest_bid", a)))), 
             eq(app("winner", app("submit", a, b, amt)), app("winner", a))
         ))),
         Axiom("winner_close", forall([a], eq(

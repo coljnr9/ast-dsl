@@ -40,7 +40,7 @@ Total expected axioms: 6.
 
 ### Step 4 & 5: Design Decisions
 - This perfectly matches the `Stack` standard pattern in the basis library.
-- We declare `empty` as a predicate, so we use `PredApp` internally (and `Negation(PredApp(...))` for the push case).
+- We declare `empty` as a predicate, so we use `PredApp` internally (and `negation(PredApp(...))` for the push case).
 - `pop` and `top` are declared with `total=False` and registered as selectors in `generated_sorts`.
 - `new` is a constant (nullary function), so we evaluate it with `const("new")`.
 - `empty_new` does not require any variables, so its formula uses `PredApp` without a top-level `UniversalQuant` wrapper.
@@ -49,20 +49,20 @@ Total expected axioms: 6.
 
 from alspec import (
     Axiom,
-    Definedness,
     GeneratedSortInfo,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
+    definedness,
     eq,
+    fn,
     forall,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 def stack_spec() -> Spec:
@@ -95,7 +95,7 @@ def stack_spec() -> Spec:
         # pop × new: SELECTOR_FOREIGN — explicit undefinedness required
         Axiom(
             label="pop_new_undef",
-            formula=Negation(Definedness(app("pop", const("new"))))
+            formula=negation(definedness(app("pop", const("new"))))
         ),
         # pop × push: SELECTOR_EXTRACT — mechanically derivable
         Axiom(
@@ -108,7 +108,7 @@ def stack_spec() -> Spec:
         # top × new: SELECTOR_FOREIGN — explicit undefinedness required
         Axiom(
             label="top_new_undef",
-            formula=Negation(Definedness(app("top", const("new"))))
+            formula=negation(definedness(app("top", const("new"))))
         ),
         # top × push: SELECTOR_EXTRACT — mechanically derivable
         Axiom(
@@ -121,13 +121,13 @@ def stack_spec() -> Spec:
         # empty × new: DOMAIN — base case for predicate
         Axiom(
             label="empty_new",
-            formula=PredApp("empty", (const("new"),))
+            formula=pred_app("empty", const("new"))
         ),
         # empty × push: DOMAIN — recursive case
         Axiom(
             label="not_empty_push",
-            formula=forall([s, e], Negation(
-                PredApp("empty", (app("push", s, e),))
+            formula=forall([s, e], negation(
+                pred_app("empty", app("push", s, e))
             ))
         ),
     )

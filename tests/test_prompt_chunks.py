@@ -126,7 +126,7 @@ class TestDefaultConfigs:
     
     def test_axioms_default_has_axiom_patterns(self):
         prompt = build_default_prompt(Stage.AXIOMS)
-        assert "Negation(Definedness" in prompt
+        assert "negation(definedness" in prompt
 
 
 class TestChunkContent:
@@ -256,7 +256,7 @@ class TestPipelineIntegration:
         prompt = build_default_prompt(Stage.AXIOMS)
         
         # Must have: axiom patterns, partial function handling
-        assert "Negation(Definedness" in prompt
+        assert "negation(definedness" in prompt
         # Must have: all three new examples
         assert "Session Store" in prompt
         assert "Rate Limiter" in prompt

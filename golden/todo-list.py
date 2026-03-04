@@ -59,14 +59,29 @@ We owe axioms for every (Observer × Constructor) pair. For constructors that ta
 
 ## 4. Tricky Cases & Design Decisions
 1. **Universal Preservation Optimization:** For instances where a constructor fundamentally doesn't interact with an observer regardless of key, we collapse hit/miss cases. `complete_item` doesn't change `has_item` or `get_title`, netting single universal axioms for both.
-2. **Guarded Updates:** `get_status_complete_hit` must only return `done` if the item actually existed prior, so `Implication(PredApp("has_item", (l, k)), ...)` wraps the assignment. Otherwise, completing a nonexistent task would magically vivify its status.
-3. **Explicit Undefinedness on Removal:** When processing a `remove_item` hit against partial observers (`get_title`, `get_status`), undefinedness is asserted explicitly via `Negation(Definedness(...))`. Under loose semantics, omitting an axiom leaves the interpretation unconstrained rather than forcing undefinedness.
+2. **Guarded Updates:** `get_status_complete_hit` must only return `done` if the item actually existed prior, so `implication(pred_app("has_item", l, k), ...)` wraps the assignment. Otherwise, completing a nonexistent task would magically vivify its status.
+3. **Explicit Undefinedness on Removal:** When processing a `remove_item` hit against partial observers (`get_title`, `get_status`), undefinedness is asserted explicitly via `negation(definedness(...))`. Under loose semantics, omitting an axiom leaves the interpretation unconstrained rather than forcing undefinedness.
 """
 
 from alspec import (
-    Axiom, Conjunction, Definedness, GeneratedSortInfo, Implication, Negation, PredApp,
-    Signature, Spec,
-    atomic, fn, pred, var, app, const, eq, forall, iff,
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    conjunction,
+    const,
+    definedness,
+    eq,
+    fn,
+    forall,
+    iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 def todo_list_spec() -> Spec:
@@ -115,47 +130,45 @@ def todo_list_spec() -> Spec:
         # ━━ eq_id basis (3) ━━
         Axiom(
             label="eq_id_refl",
-            formula=forall([k], PredApp("eq_id", (k, k)))
+            formula=forall([k], pred_app("eq_id", k, k))
         ),
         Axiom(
             label="eq_id_sym",
-            formula=forall([k, k2], Implication(
-                PredApp("eq_id", (k, k2)),
-                PredApp("eq_id", (k2, k)),
+            formula=forall([k, k2], implication(
+                pred_app("eq_id", k, k2),
+                pred_app("eq_id", k2, k),
             ))
         ),
         Axiom(
             label="eq_id_trans",
-            formula=forall([k, k2, k3], Implication(
-                Conjunction((
-                    PredApp("eq_id", (k, k2)),
-                    PredApp("eq_id", (k2, k3)),
-                )),
-                PredApp("eq_id", (k, k3)),
+            formula=forall([k, k2, k3], implication(
+                conjunction(pred_app("eq_id", k, k2),
+                    pred_app("eq_id", k2, k3)),
+                pred_app("eq_id", k, k3),
             ))
         ),
 
         # ━━ has_item (total predicate) (6) ━━
         Axiom(
             label="has_item_empty",
-            formula=forall([k], Negation(
-                PredApp("has_item", (const("empty"), k))
+            formula=forall([k], negation(
+                pred_app("has_item", const("empty"), k)
             ))
         ),
         Axiom(
             label="has_item_add_hit",
-            formula=forall([l, k, k2, t], Implication(
-                PredApp("eq_id", (k, k2)),
-                PredApp("has_item", (app("add_item", l, k, t), k2)),
+            formula=forall([l, k, k2, t], implication(
+                pred_app("eq_id", k, k2),
+                pred_app("has_item", app("add_item", l, k, t), k2),
             ))
         ),
         Axiom(
             label="has_item_add_miss",
-            formula=forall([l, k, k2, t], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([l, k, k2, t], implication(
+                negation(pred_app("eq_id", k, k2)),
                 iff(
-                    PredApp("has_item", (app("add_item", l, k, t), k2)),
-                    PredApp("has_item", (l, k2)),
+                    pred_app("has_item", app("add_item", l, k, t), k2),
+                    pred_app("has_item", l, k2),
                 ),
             ))
         ),
@@ -163,24 +176,24 @@ def todo_list_spec() -> Spec:
         Axiom(
             label="has_item_complete",
             formula=forall([l, k, k2], iff(
-                PredApp("has_item", (app("complete_item", l, k), k2)),
-                PredApp("has_item", (l, k2)),
+                pred_app("has_item", app("complete_item", l, k), k2),
+                pred_app("has_item", l, k2),
             ))
         ),
         Axiom(
             label="has_item_remove_hit",
-            formula=forall([l, k, k2], Implication(
-                PredApp("eq_id", (k, k2)),
-                Negation(PredApp("has_item", (app("remove_item", l, k), k2))),
+            formula=forall([l, k, k2], implication(
+                pred_app("eq_id", k, k2),
+                negation(pred_app("has_item", app("remove_item", l, k), k2)),
             ))
         ),
         Axiom(
             label="has_item_remove_miss",
-            formula=forall([l, k, k2], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([l, k, k2], implication(
+                negation(pred_app("eq_id", k, k2)),
                 iff(
-                    PredApp("has_item", (app("remove_item", l, k), k2)),
-                    PredApp("has_item", (l, k2)),
+                    pred_app("has_item", app("remove_item", l, k), k2),
+                    pred_app("has_item", l, k2),
                 ),
             ))
         ),
@@ -189,19 +202,19 @@ def todo_list_spec() -> Spec:
         # get_title × empty: partial observer on base constructor — explicit undefinedness required
         Axiom(
             label="get_title_empty_undef",
-            formula=forall([k], Negation(Definedness(app("get_title", const("empty"), k))))
+            formula=forall([k], negation(definedness(app("get_title", const("empty"), k))))
         ),
         Axiom(
             label="get_title_add_hit",
-            formula=forall([l, k, k2, t], Implication(
-                PredApp("eq_id", (k, k2)),
+            formula=forall([l, k, k2, t], implication(
+                pred_app("eq_id", k, k2),
                 eq(app("get_title", app("add_item", l, k, t), k2), t),
             ))
         ),
         Axiom(
             label="get_title_add_miss",
-            formula=forall([l, k, k2, t], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([l, k, k2, t], implication(
+                negation(pred_app("eq_id", k, k2)),
                 eq(
                     app("get_title", app("add_item", l, k, t), k2),
                     app("get_title", l, k2),
@@ -219,15 +232,15 @@ def todo_list_spec() -> Spec:
         # Removing an item makes its title explicitly undefined
         Axiom(
             label="get_title_remove_hit",
-            formula=forall([l, k, k2], Implication(
-                PredApp("eq_id", (k, k2)),
-                Negation(Definedness(app("get_title", app("remove_item", l, k), k2)))
+            formula=forall([l, k, k2], implication(
+                pred_app("eq_id", k, k2),
+                negation(definedness(app("get_title", app("remove_item", l, k), k2)))
             ))
         ),
         Axiom(
             label="get_title_remove_miss",
-            formula=forall([l, k, k2], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([l, k, k2], implication(
+                negation(pred_app("eq_id", k, k2)),
                 eq(
                     app("get_title", app("remove_item", l, k), k2),
                     app("get_title", l, k2),
@@ -239,19 +252,19 @@ def todo_list_spec() -> Spec:
         # get_status × empty: partial observer on base constructor — explicit undefinedness required
         Axiom(
             label="get_status_empty_undef",
-            formula=forall([k], Negation(Definedness(app("get_status", const("empty"), k))))
+            formula=forall([k], negation(definedness(app("get_status", const("empty"), k))))
         ),
         Axiom(
             label="get_status_add_hit",
-            formula=forall([l, k, k2, t], Implication(
-                PredApp("eq_id", (k, k2)),
+            formula=forall([l, k, k2, t], implication(
+                pred_app("eq_id", k, k2),
                 eq(app("get_status", app("add_item", l, k, t), k2), const("pending")),
             ))
         ),
         Axiom(
             label="get_status_add_miss",
-            formula=forall([l, k, k2, t], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([l, k, k2, t], implication(
+                negation(pred_app("eq_id", k, k2)),
                 eq(
                     app("get_status", app("add_item", l, k, t), k2),
                     app("get_status", l, k2),
@@ -261,10 +274,10 @@ def todo_list_spec() -> Spec:
         # Guarded completion: Ensure status only becomes "done" if the task already exists
         Axiom(
             label="get_status_complete_hit",
-            formula=forall([l, k, k2], Implication(
-                PredApp("eq_id", (k, k2)),
-                Implication(
-                    PredApp("has_item", (l, k)),
+            formula=forall([l, k, k2], implication(
+                pred_app("eq_id", k, k2),
+                implication(
+                    pred_app("has_item", l, k),
                     eq(app("get_status", app("complete_item", l, k), k2), const("done")),
                 )
             ))
@@ -272,18 +285,18 @@ def todo_list_spec() -> Spec:
         # Completing a non-existent item is a no-op: status delegates (both sides undefined)
         Axiom(
             label="get_status_complete_hit_noitem",
-            formula=forall([l, k, k2], Implication(
-                PredApp("eq_id", (k, k2)),
-                Implication(
-                    Negation(PredApp("has_item", (l, k))),
+            formula=forall([l, k, k2], implication(
+                pred_app("eq_id", k, k2),
+                implication(
+                    negation(pred_app("has_item", l, k)),
                     eq(app("get_status", app("complete_item", l, k), k2), app("get_status", l, k2))
                 )
             ))
         ),
         Axiom(
             label="get_status_complete_miss",
-            formula=forall([l, k, k2], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([l, k, k2], implication(
+                negation(pred_app("eq_id", k, k2)),
                 eq(
                     app("get_status", app("complete_item", l, k), k2),
                     app("get_status", l, k2),
@@ -293,15 +306,15 @@ def todo_list_spec() -> Spec:
         # Removing an item makes its status explicitly undefined
         Axiom(
             label="get_status_remove_hit",
-            formula=forall([l, k, k2], Implication(
-                PredApp("eq_id", (k, k2)),
-                Negation(Definedness(app("get_status", app("remove_item", l, k), k2)))
+            formula=forall([l, k, k2], implication(
+                pred_app("eq_id", k, k2),
+                negation(definedness(app("get_status", app("remove_item", l, k), k2)))
             ))
         ),
         Axiom(
             label="get_status_remove_miss",
-            formula=forall([l, k, k2], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([l, k, k2], implication(
+                negation(pred_app("eq_id", k, k2)),
                 eq(
                     app("get_status", app("remove_item", l, k), k2),
                     app("get_status", l, k2),

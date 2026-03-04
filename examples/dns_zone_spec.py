@@ -1,22 +1,22 @@
 from alspec import (
     Axiom,
-    Conjunction,
-    Definedness,
     GeneratedSortInfo,
-    Implication,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
+    conjunction,
     const,
+    definedness,
     eq,
+    fn,
     forall,
     iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -123,16 +123,16 @@ def dns_zone_spec() -> Spec:
             label="eq_name_refl",
             formula=forall(
                 [n],
-                PredApp("eq_name", (n, n)),
+                pred_app("eq_name", n, n),
             ),
         ),
         Axiom(
             label="eq_name_sym",
             formula=forall(
                 [n, n2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    PredApp("eq_name", (n2, n)),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    pred_app("eq_name", n2, n),
                 ),
             ),
         ),
@@ -140,12 +140,10 @@ def dns_zone_spec() -> Spec:
             label="eq_name_trans",
             formula=forall(
                 [n, n2, n3],
-                Implication(
-                    Conjunction((
-                        PredApp("eq_name", (n, n2)),
-                        PredApp("eq_name", (n2, n3)),
-                    )),
-                    PredApp("eq_name", (n, n3)),
+                implication(
+                    conjunction(pred_app("eq_name", n, n2),
+                        pred_app("eq_name", n2, n3)),
+                    pred_app("eq_name", n, n3),
                 ),
             ),
         ),
@@ -156,16 +154,16 @@ def dns_zone_spec() -> Spec:
             label="eq_type_refl",
             formula=forall(
                 [t],
-                PredApp("eq_type", (t, t)),
+                pred_app("eq_type", t, t),
             ),
         ),
         Axiom(
             label="eq_type_sym",
             formula=forall(
                 [t, t2],
-                Implication(
-                    PredApp("eq_type", (t, t2)),
-                    PredApp("eq_type", (t2, t)),
+                implication(
+                    pred_app("eq_type", t, t2),
+                    pred_app("eq_type", t2, t),
                 ),
             ),
         ),
@@ -173,12 +171,10 @@ def dns_zone_spec() -> Spec:
             label="eq_type_trans",
             formula=forall(
                 [t, t2, t3],
-                Implication(
-                    Conjunction((
-                        PredApp("eq_type", (t, t2)),
-                        PredApp("eq_type", (t2, t3)),
-                    )),
-                    PredApp("eq_type", (t, t3)),
+                implication(
+                    conjunction(pred_app("eq_type", t, t2),
+                        pred_app("eq_type", t2, t3)),
+                    pred_app("eq_type", t, t3),
                 ),
             ),
         ),
@@ -190,8 +186,8 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_empty",
             formula=forall(
                 [n, t],
-                Negation(
-                    Definedness(app("get_rdata", const("empty"), n, t))
+                negation(
+                    definedness(app("get_rdata", const("empty"), n, t))
                 ),
             ),
         ),
@@ -200,8 +196,8 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_empty",
             formula=forall(
                 [n, t],
-                Negation(
-                    Definedness(app("get_ttl", const("empty"), n, t))
+                negation(
+                    definedness(app("get_ttl", const("empty"), n, t))
                 ),
             ),
         ),
@@ -210,8 +206,8 @@ def dns_zone_spec() -> Spec:
             label="has_record_empty",
             formula=forall(
                 [n, t],
-                Negation(
-                    PredApp("has_record", (const("empty"), n, t))
+                negation(
+                    pred_app("has_record", const("empty"), n, t)
                 ),
             ),
         ),
@@ -227,10 +223,10 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_add_hit_type_hit",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        PredApp("eq_type", (t, t2)),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        pred_app("eq_type", t, t2),
                         eq(
                             app("get_rdata", app("add_record", z, n, t, d, ttl), n2, t2),
                             d,
@@ -244,10 +240,10 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_add_hit_type_miss",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        Negation(PredApp("eq_type", (t, t2))),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        negation(pred_app("eq_type", t, t2)),
                         eq(
                             app("get_rdata", app("add_record", z, n, t, d, ttl), n2, t2),
                             app("get_rdata", z, n2, t2),
@@ -261,8 +257,8 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_add_miss",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     eq(
                         app("get_rdata", app("add_record", z, n, t, d, ttl), n2, t2),
                         app("get_rdata", z, n2, t2),
@@ -278,12 +274,12 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_remove_hit_type_hit",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        PredApp("eq_type", (t, t2)),
-                        Negation(
-                            Definedness(
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        pred_app("eq_type", t, t2),
+                        negation(
+                            definedness(
                                 app("get_rdata", app("remove_record", z, n, t), n2, t2)
                             )
                         ),
@@ -296,10 +292,10 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_remove_hit_type_miss",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        Negation(PredApp("eq_type", (t, t2))),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        negation(pred_app("eq_type", t, t2)),
                         eq(
                             app("get_rdata", app("remove_record", z, n, t), n2, t2),
                             app("get_rdata", z, n2, t2),
@@ -313,8 +309,8 @@ def dns_zone_spec() -> Spec:
             label="get_rdata_remove_miss",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     eq(
                         app("get_rdata", app("remove_record", z, n, t), n2, t2),
                         app("get_rdata", z, n2, t2),
@@ -330,10 +326,10 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_add_hit_type_hit",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        PredApp("eq_type", (t, t2)),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        pred_app("eq_type", t, t2),
                         eq(
                             app("get_ttl", app("add_record", z, n, t, d, ttl), n2, t2),
                             ttl,
@@ -347,10 +343,10 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_add_hit_type_miss",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        Negation(PredApp("eq_type", (t, t2))),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        negation(pred_app("eq_type", t, t2)),
                         eq(
                             app("get_ttl", app("add_record", z, n, t, d, ttl), n2, t2),
                             app("get_ttl", z, n2, t2),
@@ -364,8 +360,8 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_add_miss",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     eq(
                         app("get_ttl", app("add_record", z, n, t, d, ttl), n2, t2),
                         app("get_ttl", z, n2, t2),
@@ -381,12 +377,12 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_remove_hit_type_hit",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        PredApp("eq_type", (t, t2)),
-                        Negation(
-                            Definedness(
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        pred_app("eq_type", t, t2),
+                        negation(
+                            definedness(
                                 app("get_ttl", app("remove_record", z, n, t), n2, t2)
                             )
                         ),
@@ -399,10 +395,10 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_remove_hit_type_miss",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        Negation(PredApp("eq_type", (t, t2))),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        negation(pred_app("eq_type", t, t2)),
                         eq(
                             app("get_ttl", app("remove_record", z, n, t), n2, t2),
                             app("get_ttl", z, n2, t2),
@@ -416,8 +412,8 @@ def dns_zone_spec() -> Spec:
             label="get_ttl_remove_miss",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     eq(
                         app("get_ttl", app("remove_record", z, n, t), n2, t2),
                         app("get_ttl", z, n2, t2),
@@ -433,14 +429,11 @@ def dns_zone_spec() -> Spec:
             label="has_record_add_hit_type_hit",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        PredApp("eq_type", (t, t2)),
-                        PredApp(
-                            "has_record",
-                            (app("add_record", z, n, t, d, ttl), n2, t2),
-                        ),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        pred_app("eq_type", t, t2),
+                        pred_app("has_record", app("add_record", z, n, t, d, ttl), n2, t2),
                     ),
                 ),
             ),
@@ -450,16 +443,13 @@ def dns_zone_spec() -> Spec:
             label="has_record_add_hit_type_miss",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        Negation(PredApp("eq_type", (t, t2))),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        negation(pred_app("eq_type", t, t2)),
                         iff(
-                            PredApp(
-                                "has_record",
-                                (app("add_record", z, n, t, d, ttl), n2, t2),
-                            ),
-                            PredApp("has_record", (z, n2, t2)),
+                            pred_app("has_record", app("add_record", z, n, t, d, ttl), n2, t2),
+                            pred_app("has_record", z, n2, t2),
                         ),
                     ),
                 ),
@@ -470,14 +460,11 @@ def dns_zone_spec() -> Spec:
             label="has_record_add_miss",
             formula=forall(
                 [z, n, n2, t, t2, d, ttl],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     iff(
-                        PredApp(
-                            "has_record",
-                            (app("add_record", z, n, t, d, ttl), n2, t2),
-                        ),
-                        PredApp("has_record", (z, n2, t2)),
+                        pred_app("has_record", app("add_record", z, n, t, d, ttl), n2, t2),
+                        pred_app("has_record", z, n2, t2),
                     ),
                 ),
             ),
@@ -490,15 +477,12 @@ def dns_zone_spec() -> Spec:
             label="has_record_remove_hit_type_hit",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        PredApp("eq_type", (t, t2)),
-                        Negation(
-                            PredApp(
-                                "has_record",
-                                (app("remove_record", z, n, t), n2, t2),
-                            )
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        pred_app("eq_type", t, t2),
+                        negation(
+                            pred_app("has_record", app("remove_record", z, n, t), n2, t2)
                         ),
                     ),
                 ),
@@ -509,16 +493,13 @@ def dns_zone_spec() -> Spec:
             label="has_record_remove_hit_type_miss",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    PredApp("eq_name", (n, n2)),
-                    Implication(
-                        Negation(PredApp("eq_type", (t, t2))),
+                implication(
+                    pred_app("eq_name", n, n2),
+                    implication(
+                        negation(pred_app("eq_type", t, t2)),
                         iff(
-                            PredApp(
-                                "has_record",
-                                (app("remove_record", z, n, t), n2, t2),
-                            ),
-                            PredApp("has_record", (z, n2, t2)),
+                            pred_app("has_record", app("remove_record", z, n, t), n2, t2),
+                            pred_app("has_record", z, n2, t2),
                         ),
                     ),
                 ),
@@ -529,14 +510,11 @@ def dns_zone_spec() -> Spec:
             label="has_record_remove_miss",
             formula=forall(
                 [z, n, n2, t, t2],
-                Implication(
-                    Negation(PredApp("eq_name", (n, n2))),
+                implication(
+                    negation(pred_app("eq_name", n, n2)),
                     iff(
-                        PredApp(
-                            "has_record",
-                            (app("remove_record", z, n, t), n2, t2),
-                        ),
-                        PredApp("has_record", (z, n2, t2)),
+                        pred_app("has_record", app("remove_record", z, n, t), n2, t2),
+                        pred_app("has_record", z, n2, t2),
                     ),
                 ),
             ),
@@ -554,8 +532,8 @@ def dns_zone_spec() -> Spec:
             formula=forall(
                 [z, n, t],
                 iff(
-                    PredApp("has_record", (z, n, t)),
-                    Definedness(app("get_rdata", z, n, t)),
+                    pred_app("has_record", z, n, t),
+                    definedness(app("get_rdata", z, n, t)),
                 ),
             ),
         ),

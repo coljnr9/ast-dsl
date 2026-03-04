@@ -1,20 +1,19 @@
 from alspec import (
     Axiom,
-    Definedness,
     GeneratedSortInfo,
-    Negation,
-    PredApp,
     Signature,
     Spec,
-    atomic,
-    fn,
-    pred,
-    var,
     app,
+    atomic,
     const,
     eq,
+    fn,
     forall,
     iff,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 
@@ -176,8 +175,8 @@ def rate_limiter_spec() -> Spec:
             formula=forall(
                 [m],
                 iff(
-                    PredApp("over_limit", (app("create", m),)),
-                    PredApp("geq", (const("zero"), m)),
+                    pred_app("over_limit", app("create", m)),
+                    pred_app("geq", const("zero"), m),
                 ),
             ),
         ),
@@ -187,11 +186,9 @@ def rate_limiter_spec() -> Spec:
             formula=forall(
                 [l],
                 iff(
-                    PredApp("over_limit", (app("record", l),)),
-                    PredApp("geq", (
-                        app("succ", app("get_count", l)),
-                        app("get_max", l),
-                    )),
+                    pred_app("over_limit", app("record", l)),
+                    pred_app("geq", app("succ", app("get_count", l)),
+                        app("get_max", l)),
                 ),
             ),
         ),
@@ -201,8 +198,8 @@ def rate_limiter_spec() -> Spec:
             formula=forall(
                 [l],
                 iff(
-                    PredApp("over_limit", (app("reset", l),)),
-                    PredApp("geq", (const("zero"), app("get_max", l))),
+                    pred_app("over_limit", app("reset", l)),
+                    pred_app("geq", const("zero"), app("get_max", l)),
                 ),
             ),
         ),
@@ -212,8 +209,8 @@ def rate_limiter_spec() -> Spec:
             formula=forall(
                 [l, n],
                 iff(
-                    PredApp("over_limit", (app("set_max", l, n),)),
-                    PredApp("geq", (app("get_count", l), n)),
+                    pred_app("over_limit", app("set_max", l, n)),
+                    pred_app("geq", app("get_count", l), n),
                 ),
             ),
         ),
@@ -229,11 +226,9 @@ def rate_limiter_spec() -> Spec:
             formula=forall(
                 [l],
                 iff(
-                    PredApp("over_limit", (l,)),
-                    PredApp("geq", (
-                        app("get_count", l),
-                        app("get_max", l),
-                    )),
+                    pred_app("over_limit", l),
+                    pred_app("geq", app("get_count", l),
+                        app("get_max", l)),
                 ),
             ),
         ),
@@ -249,7 +244,7 @@ def rate_limiter_spec() -> Spec:
             label="geq_zero_base",
             formula=forall(
                 [m],
-                PredApp("geq", (m, const("zero"))),
+                pred_app("geq", m, const("zero")),
             ),
         ),
         # Zero is not ≥ any successor
@@ -257,7 +252,7 @@ def rate_limiter_spec() -> Spec:
             label="geq_zero_succ",
             formula=forall(
                 [m],
-                Negation(PredApp("geq", (const("zero"), app("succ", m)))),
+                negation(pred_app("geq", const("zero"), app("succ", m))),
             ),
         ),
         # Inductive step: succ(a) ≥ succ(b) ⟺ a ≥ b
@@ -266,8 +261,8 @@ def rate_limiter_spec() -> Spec:
             formula=forall(
                 [m, n],
                 iff(
-                    PredApp("geq", (app("succ", m), app("succ", n))),
-                    PredApp("geq", (m, n)),
+                    pred_app("geq", app("succ", m), app("succ", n)),
+                    pred_app("geq", m, n),
                 ),
             ),
         ),

@@ -27,7 +27,19 @@ from alspec.basis import (
     partial_order_spec,
     stack_spec,
 )
-from alspec.helpers import app, const, eq, forall, iff, var
+from alspec.helpers import (
+    app,
+    conjunction,
+    const,
+    definedness,
+    eq,
+    forall,
+    iff,
+    implication,
+    negation,
+    pred_app,
+    var,
+)
 from alspec.spec import Axiom
 from alspec.terms import (
     Biconditional,
@@ -91,7 +103,7 @@ class TestStackSpec:
 
     def test_pop_new_undef(self) -> None:
         rec = _record_by_label(self.index, "pop_new_undef")
-        # Bare Negation(Definedness(app(pop, const(new)))) — no quantifier
+        # Bare negation(definedness(app(pop, const(new)))) — no quantifier
         assert rec.variables == ()
         assert rec.guards == ()
         assert rec.constrained == ConstrainedSymbol("pop", "function")
@@ -161,7 +173,7 @@ class TestStackSpec:
 
         assert len(rec.variables) == 2
         assert rec.guards == ()
-        # Negation(PredApp("empty", ...)) → constrained = empty predicate
+        # negation(pred_app("empty", ...)) → constrained = empty predicate
         assert rec.constrained == ConstrainedSymbol("empty", "predicate")
         assert rec.equation_rhs is None
 
@@ -273,7 +285,7 @@ class TestFiniteMapSpec:
         assert g.pred_name == "eq_key"
         assert g.polarity == "+"
 
-        # body: PredApp("eq_key", (k2, k1))
+        # body: pred_app("eq_key", k2, k1)
         assert isinstance(rec.body, PredApp)
         assert rec.body.pred_name == "eq_key"
 
@@ -286,7 +298,7 @@ class TestFiniteMapSpec:
     def test_by_constrained_lookup(self) -> None:
         labels = {r.label for r in self.index.by_constrained["lookup"]}
         # lookup_empty_undef is now correctly identified as constraining lookup
-        # (Negation(Definedness(FnApp("lookup",...)))) is a valid constraint.
+        # (negation(definedness(FnApp("lookup",...)))) is a valid constraint.
         assert labels == {"lookup_update_hit", "lookup_update_miss", "lookup_empty_undef"}
 
     def test_by_constrained_eq_key(self) -> None:
@@ -327,7 +339,7 @@ class TestPartialOrderSpec:
         # No guards: Conjunction is not a simple PredApp
         assert rec.guards == ()
 
-        # Body is the full Implication (Conjunction(...) ⇒ Equation(...))
+        # Body is the full Implication (conjunction(...) ⇒ Equation(...))
         assert isinstance(rec.body, Implication)
 
         # constrained: None — Implication body falls through to catch-all
@@ -386,7 +398,7 @@ class TestNatSpecLeqSucSuc:
         assert isinstance(g.args[0], FnApp) and g.args[0].fn_name == "suc"
         assert isinstance(g.args[1], FnApp) and g.args[1].fn_name == "suc"
 
-        # body: PredApp("leq", (x, y)) — the consequent after guard extraction
+        # body: pred_app("leq", x, y) — the consequent after guard extraction
         assert isinstance(rec.body, PredApp)
         assert rec.body.pred_name == "leq"
 
@@ -412,7 +424,7 @@ class TestNatSpecLeqSucSuc:
         assert rec.constrained == ConstrainedSymbol("leq", "predicate")
 
     def test_lt_zero_negation(self) -> None:
-        """lt_zero: Negation(PredApp) — constrained = lt predicate."""
+        """lt_zero: negation(PredApp) — constrained = lt predicate."""
         rec = _record_by_label(self.index, "lt_zero")
         assert rec.guards == ()
         assert rec.constrained == ConstrainedSymbol("lt", "predicate")
@@ -516,7 +528,7 @@ class TestBugTrackerSpec:
         assert rec.guards[0].pred_name == "eq_id"
         assert rec.guards[0].polarity == "+"
 
-        # body: Biconditional(PredApp("is_critical", ...), Equation(...))
+        # body: Biconditional(pred_app("is_critical", ...), Equation(...))
         assert isinstance(rec.body, Biconditional)
         assert rec.constrained == ConstrainedSymbol("is_critical", "predicate")
         assert rec.equation_rhs is None
@@ -531,7 +543,7 @@ class TestBugTrackerSpec:
         assert rec.equation_rhs is None
 
     def test_has_ticket_empty_negation(self) -> None:
-        """has_ticket_empty: Negation(PredApp) → constrained = has_ticket predicate."""
+        """has_ticket_empty: negation(PredApp) → constrained = has_ticket predicate."""
         rec = _record_by_label(self.index, "has_ticket_empty")
         assert rec.guards == ()
         assert rec.constrained == ConstrainedSymbol("has_ticket", "predicate")
@@ -622,7 +634,7 @@ class TestDecomposeAxiomStandalone:
         k = var("k", "Key")
         axiom = Axiom(
             label="test_pred",
-            formula=PredApp("some_pred", (k,)),
+            formula=pred_app("some_pred", k),
         )
         rec = decompose_axiom(axiom)
         assert rec.label == "test_pred"
@@ -642,8 +654,8 @@ class TestDecomposeAxiomStandalone:
         v = var("v", "Val")
         axiom = Axiom(
             label="guard_test",
-            formula=Implication(
-                PredApp("my_guard", (k1, k2)),
+            formula=implication(
+                pred_app("my_guard", k1, k2),
                 Equation(
                     FnApp("my_fn", (k1,)),
                     v,
@@ -658,14 +670,14 @@ class TestDecomposeAxiomStandalone:
         assert "my_fn" in rec.referenced_fns
 
     def test_definedness_body_identifies_fn(self) -> None:
-        """Definedness(FnApp(...)) body → constrained = that function."""
+        """definedness(FnApp(...)) body → constrained = that function."""
         from alspec.spec import Axiom
         from alspec.terms import Definedness
 
         x = var("x", "Nat")
         axiom = Axiom(
             label="def_pre",
-            formula=Definedness(term=FnApp("pre", (x,))),
+            formula=definedness(term=FnApp("pre", (x,))),
         )
         rec = decompose_axiom(axiom)
         assert rec.constrained == ConstrainedSymbol("pre", "function")
@@ -773,7 +785,7 @@ class TestAuditSpecUnconstrainedPredicate:
             name="TestUnconstrainedPred",
             signature=sig,
             axioms=(
-                Axiom("use_pred", forall([x], PredApp("used_pred", (x,)))),
+                Axiom("use_pred", forall([x], pred_app("used_pred", x))),
             ),
         )
         diagnostics = audit_spec(spec)
@@ -1064,8 +1076,8 @@ class TestWitnessedByDefinedness:
                     forall(
                         [x],
                         iff(
-                            Definedness(app("f", x)),
-                            PredApp("p", (x,)),
+                            definedness(app("f", x)),
+                            pred_app("p", x),
                         ),
                     ),
                 ),
@@ -1098,7 +1110,7 @@ class TestWitnessedByDefinedness:
                 # ¬def(f(c)) — the finite_map pattern: explicitly undefined on empty
                 Axiom(
                     "f_undef_c",
-                    Negation(Definedness(app("f", const("c")))),
+                    negation(definedness(app("f", const("c")))),
                 ),
             ),
         )
@@ -1178,8 +1190,8 @@ class TestPartialRHSDoesNotWitness:
                     "lookup_miss_only",
                     forall(
                         [M, k1, k2, v],
-                        Implication(
-                            Negation(PredApp("eq_key", (k1, k2))),
+                        implication(
+                            negation(pred_app("eq_key", k1, k2)),
                             eq(
                                 app("lookup", app("update", M, k1, v), k2),
                                 app("lookup", M, k2),
@@ -1236,11 +1248,9 @@ class TestWitnessedByConjunctionGuardedEquation:
                     "diff_mk_hit_hit",
                     forall(
                         [cc, k, k1, k2],
-                        Implication(
-                            Conjunction((
-                                PredApp("eq_k", (k, k1)),
-                                PredApp("eq_k", (k, k2)),
-                            )),
+                        implication(
+                            conjunction(pred_app("eq_k", k, k1),
+                                pred_app("eq_k", k, k2)),
                             eq(
                                 app("diff", app("mk", cc, k), k1, k2),
                                 app("compute", cc, cc),
@@ -1287,11 +1297,9 @@ class TestWitnessedByConjunctionGuardedEquation:
                     "diff_mk_partial_rhs",
                     forall(
                         [cc, k, k1, k2],
-                        Implication(
-                            Conjunction((
-                                PredApp("eq_k", (k, k1)),
-                                PredApp("eq_k", (k, k2)),
-                            )),
+                        implication(
+                            conjunction(pred_app("eq_k", k, k1),
+                                pred_app("eq_k", k, k2)),
                             eq(
                                 app("diff", app("mk", cc, k), k1, k2),
                                 app("other_partial", cc),
@@ -1346,8 +1354,8 @@ class TestCompleteCaseSplitClean:
                     "get_put_hit",
                     forall(
                         [m, k, k2, v],
-                        Implication(
-                            PredApp("eq_id", (k, k2)),
+                        implication(
+                            pred_app("eq_id", k, k2),
                             eq(app("get", app("put", m, k, v), k2), v),
                         ),
                     ),
@@ -1356,8 +1364,8 @@ class TestCompleteCaseSplitClean:
                     "get_put_miss",
                     forall(
                         [m, k, k2, v],
-                        Implication(
-                            Negation(PredApp("eq_id", (k, k2))),
+                        implication(
+                            negation(pred_app("eq_id", k, k2)),
                             eq(
                                 app("get", app("put", m, k, v), k2),
                                 app("get", m, k2),
@@ -1405,8 +1413,8 @@ class TestMissingMissBranch:
                     "get_put_hit",
                     forall(
                         [m, k, k2, v],
-                        Implication(
-                            PredApp("eq_id", (k, k2)),
+                        implication(
+                            pred_app("eq_id", k, k2),
                             eq(app("get", app("put", m, k, v), k2), v),
                         ),
                     ),
@@ -1454,8 +1462,8 @@ class TestMissingHitBranch:
                     "get_put_miss",
                     forall(
                         [m, k, k2, v],
-                        Implication(
-                            Negation(PredApp("eq_id", (k, k2))),
+                        implication(
+                            negation(pred_app("eq_id", k, k2)),
                             eq(
                                 app("get", app("put", m, k, v), k2),
                                 app("get", m, k2),
@@ -1554,8 +1562,8 @@ class TestMixedGuardedUnguardedWarns:
                     "get_put_hit",
                     forall(
                         [m, k, k2, v],
-                        Implication(
-                            PredApp("eq_id", (k, k2)),
+                        implication(
+                            pred_app("eq_id", k, k2),
                             eq(app("get", app("put", m, k, v), k2), v),
                         ),
                     ),
@@ -1658,7 +1666,7 @@ class TestCaseSplitInfoNotCountedAsWarning:
 
 
 class TestNestedEquationGuardPeels:
-    """Implication(PredApp, Implication(Equation, Equation)) should extract
+    """implication(PredApp, implication(Equation, Equation)) should extract
     the outer PredApp as a guard and the inner Equation as the constrained body."""
 
     def test_nested_equation_guard_peels(self) -> None:
@@ -1688,9 +1696,9 @@ class TestNestedEquationGuardPeels:
                     "get_update_hit_succ",
                     forall(
                         [s, k, k2, v],
-                        Implication(
-                            PredApp("eq_id", (k, k2)),
-                            Implication(
+                        implication(
+                            pred_app("eq_id", k, k2),
+                            implication(
                                 eq(app("status", s, k), const("active")),
                                 eq(app("get", app("update", s, k, v), k2), v),
                             ),
@@ -1708,8 +1716,8 @@ class TestNestedEquationGuardPeels:
         assert rec.guards[0].polarity == "+"
 
     def test_negation_equation_guard_peels(self) -> None:
-        """Implication(PredApp, Implication(Negation(Equation), Equation)):
-        outer PredApp guard, Negation(Equation) antecedent skipped, inner Eq is body."""
+        """implication(PredApp, implication(negation(Equation), Equation)):
+        outer PredApp guard, negation(Equation) antecedent skipped, inner Eq is body."""
         from alspec.helpers import atomic, fn, pred
         from alspec.signature import Signature
         from alspec.spec import Spec
@@ -1733,10 +1741,10 @@ class TestNestedEquationGuardPeels:
                     "get_update_hit_fail",
                     forall(
                         [s, k, k2, v],
-                        Implication(
-                            PredApp("eq_id", (k, k2)),
-                            Implication(
-                                Negation(eq(app("status", s, k), const("active"))),
+                        implication(
+                            pred_app("eq_id", k, k2),
+                            implication(
+                                negation(eq(app("status", s, k), const("active"))),
                                 eq(app("get", app("update", s, k, v), k2), v),
                             ),
                         ),
@@ -1753,10 +1761,10 @@ class TestNestedEquationGuardPeels:
 
 
 class TestNegationDefinednessConstrained:
-    """Negation(Definedness(FnApp(...))) should extract constrained function."""
+    """negation(definedness(FnApp(...))) should extract constrained function."""
 
     def test_negation_definedness_constrained(self) -> None:
-        """PredApp ⇒ Negation(Definedness(FnApp(...))): outer guard + constrained fn."""
+        """PredApp ⇒ negation(definedness(FnApp(...))): outer guard + constrained fn."""
         from alspec.helpers import atomic, fn, pred
         from alspec.signature import Signature
         from alspec.spec import Spec
@@ -1780,9 +1788,9 @@ class TestNegationDefinednessConstrained:
                     "get_add_hit_undef",
                     forall(
                         [s, k, k2],
-                        Implication(
-                            PredApp("eq_id", (k, k2)),
-                            Negation(Definedness(app("get", app("add", s, k), k2))),
+                        implication(
+                            pred_app("eq_id", k, k2),
+                            negation(definedness(app("get", app("add", s, k), k2))),
                         ),
                     ),
                 ),
@@ -1797,7 +1805,7 @@ class TestNegationDefinednessConstrained:
         assert rec.guards[0].pred_name == "eq_id"
 
     def test_bare_negation_definedness_constrained(self) -> None:
-        """Bare Negation(Definedness(FnApp(...))) with no guard."""
+        """Bare negation(definedness(FnApp(...))) with no guard."""
         from alspec.helpers import atomic, fn
         from alspec.signature import Signature
         from alspec.spec import Spec
@@ -1818,7 +1826,7 @@ class TestNegationDefinednessConstrained:
             axioms=(
                 Axiom(
                     "get_empty_undef",
-                    forall([k], Negation(Definedness(app("get", const("empty"), k)))),
+                    forall([k], negation(definedness(app("get", const("empty"), k)))),
                 ),
             ),
         )
@@ -1830,7 +1838,7 @@ class TestNegationDefinednessConstrained:
         assert rec.guards == ()
 
     def test_bare_definedness_constrained(self) -> None:
-        """Definedness(FnApp(...)) as body should extract constrained function."""
+        """definedness(FnApp(...)) as body should extract constrained function."""
         from alspec.helpers import atomic, fn, pred
         from alspec.signature import Signature
         from alspec.spec import Spec
@@ -1854,9 +1862,9 @@ class TestNegationDefinednessConstrained:
                     "get_add_hit_def",
                     forall(
                         [s, k, k2],
-                        Implication(
-                            PredApp("eq_id", (k, k2)),
-                            Definedness(app("get", app("add", s, k), k2)),
+                        implication(
+                            pred_app("eq_id", k, k2),
+                            definedness(app("get", app("add", s, k), k2)),
                         ),
                     ),
                 ),
@@ -1901,12 +1909,12 @@ class TestTripleNestedImplication:
                     "deep",
                     forall(
                         [s, k, k2, v],
-                        Implication(
-                            PredApp("eq_id", (k, k2)),
-                            Implication(
+                        implication(
+                            pred_app("eq_id", k, k2),
+                            implication(
                                 eq(app("status", s, k), const("ok")),
-                                Implication(
-                                    PredApp("active", (s, k)),
+                                implication(
+                                    pred_app("active", s, k),
                                     eq(app("get", app("update", s, k, v), k2), v),
                                 ),
                             ),
@@ -1948,11 +1956,9 @@ class TestConjunctionAntecedentStillOpaqueBody:
                     "antisymmetry",
                     forall(
                         [x, y],
-                        Implication(
-                            Conjunction((
-                                PredApp("leq", (x, y)),
-                                PredApp("leq", (y, x)),
-                            )),
+                        implication(
+                            conjunction(pred_app("leq", x, y),
+                                pred_app("leq", y, x)),
                             eq(x, y),
                         ),
                     ),
@@ -2027,7 +2033,7 @@ class TestLibraryLendingDecomposition:
         assert rec.constrained.name == "get_status"
 
     def test_get_borrower_register_hit_negdef_constrained(self) -> None:
-        """get_borrower_register_hit uses Negation(Definedness(...)) as body."""
+        """get_borrower_register_hit uses negation(definedness(...)) as body."""
         rec = _record_by_label(self.index, "get_borrower_register_hit")
         assert rec.constrained is not None
         assert rec.constrained.name == "get_borrower"
@@ -2046,7 +2052,7 @@ class TestLibraryLendingDecomposition:
         assert rec.constrained.name == "get_borrower"
 
     def test_get_borrower_return_hit_succ_negdef_constrained(self) -> None:
-        """get_borrower_return_hit_succ: PredApp ⇒ (Equation ⇒ Negation(Definedness))."""
+        """get_borrower_return_hit_succ: PredApp ⇒ (Equation ⇒ negation(Definedness))."""
         rec = _record_by_label(self.index, "get_borrower_return_hit_succ")
         assert rec.constrained is not None
         assert rec.constrained.name == "get_borrower"
@@ -2108,10 +2114,10 @@ class TestPartialConstructorSuppressesWarning:
                     "get_remove_hit",
                     forall(
                         [s, k, k2],
-                        Implication(
-                            PredApp("eq_id", (k, k2)),
-                            Implication(
-                                PredApp("has", (s, k)),
+                        implication(
+                            pred_app("eq_id", k, k2),
+                            implication(
+                                pred_app("has", s, k),
                                 eq(app("get", app("remove", s, k), k2), app("get", s, k2)),
                             ),
                         ),
@@ -2155,10 +2161,10 @@ class TestTotalConstructorStillWarns:
                     "get_resolve_hit",
                     forall(
                         [s, k, k2],
-                        Implication(
-                            PredApp("eq_id", (k, k2)),
-                            Implication(
-                                PredApp("has", (s, k)),
+                        implication(
+                            pred_app("eq_id", k, k2),
+                            implication(
+                                pred_app("has", s, k),
                                 eq(app("get", app("resolve", s, k), k2), const("done")),
                             ),
                         ),
@@ -2217,7 +2223,7 @@ class TestAuditSurvivesMalformedSpec:
         )
         x = var("x", "S")
         # Deliberately malformed: FnApp where Formula expected
-        bad_axiom = Axiom("bad", Implication(
+        bad_axiom = Axiom("bad", implication(
             FnApp("f", (x,)),  # Term, not Formula — malformed!
             eq(app("f", x), const("c"))
         ))

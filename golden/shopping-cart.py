@@ -59,9 +59,24 @@ Expected: 3 (eq_id basis) + 4 (has_item) + 3 (remove_item) + 3 (compute_total) =
 """
 
 from alspec import (
-    Axiom, Conjunction, Definedness, GeneratedSortInfo, Implication, Negation, PredApp,
-    Signature, Spec,
-    atomic, fn, pred, var, app, const, eq, forall, iff,
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    conjunction,
+    const,
+    definedness,
+    eq,
+    fn,
+    forall,
+    iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 def shopping_cart_spec() -> Spec:
@@ -113,55 +128,53 @@ def shopping_cart_spec() -> Spec:
         # ━━ eq_id basis ━━
         Axiom(
             label="eq_id_refl",
-            formula=forall([i], PredApp("eq_id", (i, i)))
+            formula=forall([i], pred_app("eq_id", i, i))
         ),
         Axiom(
             label="eq_id_sym",
-            formula=forall([i, j], Implication(
-                PredApp("eq_id", (i, j)),
-                PredApp("eq_id", (j, i))
+            formula=forall([i, j], implication(
+                pred_app("eq_id", i, j),
+                pred_app("eq_id", j, i)
             ))
         ),
         Axiom(
             label="eq_id_trans",
-            formula=forall([i, j, k], Implication(
-                Conjunction((
-                    PredApp("eq_id", (i, j)),
-                    PredApp("eq_id", (j, k))
-                )),
-                PredApp("eq_id", (i, k))
+            formula=forall([i, j, k], implication(
+                conjunction(pred_app("eq_id", i, j),
+                    pred_app("eq_id", j, k)),
+                pred_app("eq_id", i, k)
             ))
         ),
 
         # ━━ has_item predicate ━━
         Axiom(
             label="has_item_empty",
-            formula=forall([j], Negation(
-                PredApp("has_item", (const("empty"), j))
+            formula=forall([j], negation(
+                pred_app("has_item", const("empty"), j)
             ))
         ),
         Axiom(
             label="has_item_add_hit",
-            formula=forall([c, i, j], Implication(
-                PredApp("eq_id", (i, j)),
-                PredApp("has_item", (app("add_item", c, i), j))
+            formula=forall([c, i, j], implication(
+                pred_app("eq_id", i, j),
+                pred_app("has_item", app("add_item", c, i), j)
             ))
         ),
         Axiom(
             label="has_item_add_miss",
-            formula=forall([c, i, j], Implication(
-                Negation(PredApp("eq_id", (i, j))),
+            formula=forall([c, i, j], implication(
+                negation(pred_app("eq_id", i, j)),
                 iff(
-                    PredApp("has_item", (app("add_item", c, i), j)),
-                    PredApp("has_item", (c, j))
+                    pred_app("has_item", app("add_item", c, i), j),
+                    pred_app("has_item", c, j)
                 )
             ))
         ),
         Axiom(
             label="has_item_discount",
             formula=forall([c, d, j], iff(
-                PredApp("has_item", (app("apply_discount", c, d), j)),
-                PredApp("has_item", (c, j))
+                pred_app("has_item", app("apply_discount", c, d), j),
+                pred_app("has_item", c, j)
             ))
         ),
 
@@ -170,14 +183,14 @@ def shopping_cart_spec() -> Spec:
         # Under loose semantics, omitting this was a bug: it leaves the value unconstrained.
         Axiom(
             label="remove_item_empty_undef",
-            formula=forall([j], Negation(Definedness(app("remove_item", const("empty"), j))))
+            formula=forall([j], negation(definedness(app("remove_item", const("empty"), j))))
         ),
         
         # Multiset matching semantic: removes a single instance corresponding to match
         Axiom(
             label="remove_item_add_hit",
-            formula=forall([c, i, j], Implication(
-                PredApp("eq_id", (i, j)),
+            formula=forall([c, i, j], implication(
+                pred_app("eq_id", i, j),
                 eq(
                     app("remove_item", app("add_item", c, i), j),
                     c
@@ -186,8 +199,8 @@ def shopping_cart_spec() -> Spec:
         ),
         Axiom(
             label="remove_item_add_miss",
-            formula=forall([c, i, j], Implication(
-                Negation(PredApp("eq_id", (i, j))),
+            formula=forall([c, i, j], implication(
+                negation(pred_app("eq_id", i, j)),
                 eq(
                     app("remove_item", app("add_item", c, i), j),
                     app("add_item", app("remove_item", c, j), i)

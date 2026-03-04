@@ -52,7 +52,7 @@ Every observer owes axioms against every constructor of its primary sort.
 
 ### Predicates
 - `eq_id : TicketId × TicketId` — Key equality for dispatch. A PREDICATE, not a
-  function returning Bool — use `PredApp("eq_id", ...)` everywhere.
+  function returning Bool — use `pred_app("eq_id", ...)` everywhere.
 - `has_ticket : Store × TicketId` — True iff ticket exists. Total over store.
 - `is_critical : Store × TicketId` — True iff ticket exists and severity is high.
 
@@ -88,7 +88,7 @@ differ) via `eq_id`.
 
 **`get_assignee` — doubly partial (7 axioms):**
 - × `empty`: `¬def(get_assignee(empty, k))` — partial on empty store.
-- × `create_ticket` hit: **explicit undefinedness** via `Negation(Definedness(...))`.
+- × `create_ticket` hit: **explicit undefinedness** via `negation(definedness(...))`.
   New tickets have no assignee. Under loose semantics, omitting this would NOT make
   `get_assignee` undefined — it would leave it unconstrained (any user is valid in
   some model). The `¬def(...)` axiom is required.
@@ -106,24 +106,39 @@ differ) via `eq_id`.
 
 ## Key Patterns Demonstrated
 
-- **Hit/miss key dispatch**: `Implication(PredApp("eq_id", ...), ...)` vs
-  `Implication(Negation(PredApp("eq_id", ...)), ...)`
+- **Hit/miss key dispatch**: `implication(pred_app("eq_id", ...), ...)` vs
+  `implication(negation(pred_app("eq_id", ...)), ...)`
 - **Universal preservation**: When a constructor doesn't affect an observer at ANY
   key, collapse hit/miss into one unguarded equation.
-- **Explicit undefinedness**: `Negation(Definedness(...))` — required under loose
+- **Explicit undefinedness**: `negation(definedness(...))` — required under loose
   semantics. Omission leaves values unconstrained, not undefined.
 - **Both guard polarities**: When guarded by `has_ticket`, write axioms for both
   positive and negative cases.
 - **Nested Implication**: Key dispatch guard wrapping a `has_ticket` guard.
-- **Conjunction in antecedent**: `eq_id_trans` uses `Conjunction((PredApp, PredApp))`.
+- **Conjunction in antecedent**: `eq_id_trans` uses `conjunction(PredApp, PredApp)`.
 - **iff(PredApp, Equation)**: `is_critical_create_hit` — critical iff severity = high.
 - **Uninterpreted function**: `classify` appears in axioms but not defined by them.
 """
 
 from alspec import (
-    Axiom, Conjunction, Definedness, GeneratedSortInfo, Implication, Negation, PredApp,
-    Signature, Spec,
-    atomic, fn, pred, var, app, const, eq, forall, iff,
+    Axiom,
+    GeneratedSortInfo,
+    Signature,
+    Spec,
+    app,
+    atomic,
+    conjunction,
+    const,
+    definedness,
+    eq,
+    fn,
+    forall,
+    iff,
+    implication,
+    negation,
+    pred,
+    pred_app,
+    var,
 )
 
 def bug_tracker_spec() -> Spec:
@@ -178,116 +193,114 @@ def bug_tracker_spec() -> Spec:
         # eq_id basis
         Axiom(
             label="eq_id_refl",
-            formula=forall([k], PredApp("eq_id", (k, k)))
+            formula=forall([k], pred_app("eq_id", k, k))
         ),
         Axiom(
             label="eq_id_sym",
-            formula=forall([k, k2], Implication(
-                PredApp("eq_id", (k, k2)),
-                PredApp("eq_id", (k2, k))
+            formula=forall([k, k2], implication(
+                pred_app("eq_id", k, k2),
+                pred_app("eq_id", k2, k)
             ))
         ),
         Axiom(
             label="eq_id_trans",
-            formula=forall([k, k2, k3], Implication(
-                Conjunction((
-                    PredApp("eq_id", (k, k2)),
-                    PredApp("eq_id", (k2, k3)),
-                )),
-                PredApp("eq_id", (k, k3))
+            formula=forall([k, k2, k3], implication(
+                conjunction(pred_app("eq_id", k, k2),
+                    pred_app("eq_id", k2, k3)),
+                pred_app("eq_id", k, k3)
             ))
         ),
 
         # has_ticket
         Axiom(
             label="has_ticket_empty",
-            formula=forall([k], Negation(PredApp("has_ticket", (const("empty"), k))))
+            formula=forall([k], negation(pred_app("has_ticket", const("empty"), k)))
         ),
         Axiom(
             label="has_ticket_create_hit",
-            formula=forall([s, k, k2, t, b], Implication(
-                PredApp("eq_id", (k, k2)),
-                PredApp("has_ticket", (app("create_ticket", s, k, t, b), k2))
+            formula=forall([s, k, k2, t, b], implication(
+                pred_app("eq_id", k, k2),
+                pred_app("has_ticket", app("create_ticket", s, k, t, b), k2)
             ))
         ),
         Axiom(
             label="has_ticket_create_miss",
-            formula=forall([s, k, k2, t, b], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([s, k, k2, t, b], implication(
+                negation(pred_app("eq_id", k, k2)),
                 iff(
-                    PredApp("has_ticket", (app("create_ticket", s, k, t, b), k2)),
-                    PredApp("has_ticket", (s, k2))
+                    pred_app("has_ticket", app("create_ticket", s, k, t, b), k2),
+                    pred_app("has_ticket", s, k2)
                 )
             ))
         ),
         Axiom(
             label="has_ticket_resolve",
             formula=forall([s, k, k2], iff(
-                PredApp("has_ticket", (app("resolve_ticket", s, k), k2)),
-                PredApp("has_ticket", (s, k2))
+                pred_app("has_ticket", app("resolve_ticket", s, k), k2),
+                pred_app("has_ticket", s, k2)
             ))
         ),
         Axiom(
             label="has_ticket_assign",
             formula=forall([s, k, k2, u], iff(
-                PredApp("has_ticket", (app("assign_ticket", s, k, u), k2)),
-                PredApp("has_ticket", (s, k2))
+                pred_app("has_ticket", app("assign_ticket", s, k, u), k2),
+                pred_app("has_ticket", s, k2)
             ))
         ),
 
         # get_status × empty (partial observer on nullary constructor — plain ¬def, no key dispatch)
         Axiom(
             label="get_status_empty_undef",
-            formula=forall([k], Negation(Definedness(app("get_status", const("empty"), k))))
+            formula=forall([k], negation(definedness(app("get_status", const("empty"), k))))
         ),
         Axiom(
             label="get_severity_empty_undef",
-            formula=forall([k], Negation(Definedness(app("get_severity", const("empty"), k))))
+            formula=forall([k], negation(definedness(app("get_severity", const("empty"), k))))
         ),
         Axiom(
             label="get_assignee_empty_undef",
-            formula=forall([k], Negation(Definedness(app("get_assignee", const("empty"), k))))
+            formula=forall([k], negation(definedness(app("get_assignee", const("empty"), k))))
         ),
 
         # get_status
         Axiom(
             label="get_status_create_hit",
-            formula=forall([s, k, k2, t, b], Implication(
-                PredApp("eq_id", (k, k2)),
+            formula=forall([s, k, k2, t, b], implication(
+                pred_app("eq_id", k, k2),
                 eq(app("get_status", app("create_ticket", s, k, t, b), k2), const("open"))
             ))
         ),
         Axiom(
             label="get_status_create_miss",
-            formula=forall([s, k, k2, t, b], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([s, k, k2, t, b], implication(
+                negation(pred_app("eq_id", k, k2)),
                 eq(app("get_status", app("create_ticket", s, k, t, b), k2), app("get_status", s, k2))
             ))
         ),
         Axiom(
             label="get_status_resolve_hit",
-            formula=forall([s, k, k2], Implication(
-                PredApp("eq_id", (k, k2)),
-                Implication(
-                    PredApp("has_ticket", (s, k)),
+            formula=forall([s, k, k2], implication(
+                pred_app("eq_id", k, k2),
+                implication(
+                    pred_app("has_ticket", s, k),
                     eq(app("get_status", app("resolve_ticket", s, k), k2), const("resolved"))
                 )
             ))
         ),
         Axiom(
             label="get_status_resolve_hit_noticket",
-            formula=forall([s, k, k2], Implication(
-                PredApp("eq_id", (k, k2)),
-                Implication(
-                    Negation(PredApp("has_ticket", (s, k))),
+            formula=forall([s, k, k2], implication(
+                pred_app("eq_id", k, k2),
+                implication(
+                    negation(pred_app("has_ticket", s, k)),
                     eq(app("get_status", app("resolve_ticket", s, k), k2), app("get_status", s, k2))
                 )
             ))
         ),
         Axiom(
             label="get_status_resolve_miss",
-            formula=forall([s, k, k2], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([s, k, k2], implication(
+                negation(pred_app("eq_id", k, k2)),
                 eq(app("get_status", app("resolve_ticket", s, k), k2), app("get_status", s, k2))
             ))
         ),
@@ -302,15 +315,15 @@ def bug_tracker_spec() -> Spec:
         # get_severity
         Axiom(
             label="get_severity_create_hit",
-            formula=forall([s, k, k2, t, b], Implication(
-                PredApp("eq_id", (k, k2)),
+            formula=forall([s, k, k2, t, b], implication(
+                pred_app("eq_id", k, k2),
                 eq(app("get_severity", app("create_ticket", s, k, t, b), k2), app("classify", t, b))
             ))
         ),
         Axiom(
             label="get_severity_create_miss",
-            formula=forall([s, k, k2, t, b], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([s, k, k2, t, b], implication(
+                negation(pred_app("eq_id", k, k2)),
                 eq(app("get_severity", app("create_ticket", s, k, t, b), k2), app("get_severity", s, k2))
             ))
         ),
@@ -332,42 +345,42 @@ def bug_tracker_spec() -> Spec:
         # get_assignee
         Axiom(
             label="get_assignee_create_hit",
-            formula=forall([s, k, k2, t, b], Implication(
-                PredApp("eq_id", (k, k2)),
-                Negation(Definedness(app("get_assignee", app("create_ticket", s, k, t, b), k2)))
+            formula=forall([s, k, k2, t, b], implication(
+                pred_app("eq_id", k, k2),
+                negation(definedness(app("get_assignee", app("create_ticket", s, k, t, b), k2)))
             ))
         ),
         Axiom(
             label="get_assignee_create_miss",
-            formula=forall([s, k, k2, t, b], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([s, k, k2, t, b], implication(
+                negation(pred_app("eq_id", k, k2)),
                 eq(app("get_assignee", app("create_ticket", s, k, t, b), k2), app("get_assignee", s, k2))
             ))
         ),
         Axiom(
             label="get_assignee_assign_hit",
-            formula=forall([s, k, k2, u], Implication(
-                PredApp("eq_id", (k, k2)),
-                Implication(
-                    PredApp("has_ticket", (s, k)),
+            formula=forall([s, k, k2, u], implication(
+                pred_app("eq_id", k, k2),
+                implication(
+                    pred_app("has_ticket", s, k),
                     eq(app("get_assignee", app("assign_ticket", s, k, u), k2), u)
                 )
             ))
         ),
         Axiom(
             label="get_assignee_assign_hit_noticket",
-            formula=forall([s, k, k2, u], Implication(
-                PredApp("eq_id", (k, k2)),
-                Implication(
-                    Negation(PredApp("has_ticket", (s, k))),
+            formula=forall([s, k, k2, u], implication(
+                pred_app("eq_id", k, k2),
+                implication(
+                    negation(pred_app("has_ticket", s, k)),
                     eq(app("get_assignee", app("assign_ticket", s, k, u), k2), app("get_assignee", s, k2))
                 )
             ))
         ),
         Axiom(
             label="get_assignee_assign_miss",
-            formula=forall([s, k, k2, u], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([s, k, k2, u], implication(
+                negation(pred_app("eq_id", k, k2)),
                 eq(app("get_assignee", app("assign_ticket", s, k, u), k2), app("get_assignee", s, k2))
             ))
         ),
@@ -382,40 +395,40 @@ def bug_tracker_spec() -> Spec:
         # is_critical
         Axiom(
             label="is_critical_empty",
-            formula=forall([k], Negation(PredApp("is_critical", (const("empty"), k))))
+            formula=forall([k], negation(pred_app("is_critical", const("empty"), k)))
         ),
         Axiom(
             label="is_critical_create_hit",
-            formula=forall([s, k, k2, t, b], Implication(
-                PredApp("eq_id", (k, k2)),
+            formula=forall([s, k, k2, t, b], implication(
+                pred_app("eq_id", k, k2),
                 iff(
-                    PredApp("is_critical", (app("create_ticket", s, k, t, b), k2)),
+                    pred_app("is_critical", app("create_ticket", s, k, t, b), k2),
                     eq(app("classify", t, b), const("high"))
                 )
             ))
         ),
         Axiom(
             label="is_critical_create_miss",
-            formula=forall([s, k, k2, t, b], Implication(
-                Negation(PredApp("eq_id", (k, k2))),
+            formula=forall([s, k, k2, t, b], implication(
+                negation(pred_app("eq_id", k, k2)),
                 iff(
-                    PredApp("is_critical", (app("create_ticket", s, k, t, b), k2)),
-                    PredApp("is_critical", (s, k2))
+                    pred_app("is_critical", app("create_ticket", s, k, t, b), k2),
+                    pred_app("is_critical", s, k2)
                 )
             ))
         ),
         Axiom(
             label="is_critical_resolve",
             formula=forall([s, k, k2], iff(
-                PredApp("is_critical", (app("resolve_ticket", s, k), k2)),
-                PredApp("is_critical", (s, k2))
+                pred_app("is_critical", app("resolve_ticket", s, k), k2),
+                pred_app("is_critical", s, k2)
             ))
         ),
         Axiom(
             label="is_critical_assign",
             formula=forall([s, k, k2, u], iff(
-                PredApp("is_critical", (app("assign_ticket", s, k, u), k2)),
-                PredApp("is_critical", (s, k2))
+                pred_app("is_critical", app("assign_ticket", s, k, u), k2),
+                pred_app("is_critical", s, k2)
             ))
         ),
     )

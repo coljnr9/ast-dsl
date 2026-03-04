@@ -1,7 +1,7 @@
 """Round-trip tests for serialization, including Biconditional."""
 
 from alspec import Axiom, PredApp, Signature, Spec, dumps, loads
-from alspec.helpers import atomic, forall, iff, pred, var
+from alspec.helpers import atomic, forall, iff, pred, pred_app, var
 from alspec.terms import Term
 
 
@@ -9,7 +9,7 @@ def test_biconditional_round_trip() -> None:
     x = var("x", "Elem")
     y = var("y", "Elem")
     def p(a: Term) -> PredApp:
-        return PredApp("p", (a,))
+        return pred_app("p", a)
 
     sig = Signature(
         sorts={"Elem": atomic("Elem")},
