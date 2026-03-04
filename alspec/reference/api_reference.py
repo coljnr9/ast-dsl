@@ -31,7 +31,7 @@ def render() -> str:
         |------|---------|-------|
         | `app(fn_name, *args)` | `FnApp` (Term) | Apply function symbol to Term arguments |
         | `const(name)` | `FnApp` (Term) | Nullary function application (0-ary constant) |
-        | `FieldAccess(term, field_name)` | `FieldAccess` (Term) | Access named field on product-sorted term |
+        | `field_access(term, field_name)` | `FieldAccess` (Term) | Access named field on product-sorted term |
 
         ### Formula Constructors
 
@@ -41,12 +41,12 @@ def render() -> str:
         | `forall(vars, body)` | `UniversalQuant` (Formula) | `vars`: list of Var, `body`: Formula |
         | `exists(vars, body)` | `ExistentialQuant` (Formula) | `vars`: list of Var, `body`: Formula |
         | `iff(lhs, rhs)` | `Biconditional` (Formula) | Both args must be Formulas |
-        | `PredApp(pred_name, args)` | `PredApp` (Formula) | `args`: tuple of Terms |
-        | `Negation(formula)` | `Negation` (Formula) | Inner must be a Formula |
-        | `Conjunction((f1, f2, ...))` | `Conjunction` (Formula) | All elements must be Formulas |
-        | `Disjunction((f1, f2, ...))` | `Disjunction` (Formula) | All elements must be Formulas |
-        | `Implication(antecedent, consequent)` | `Implication` (Formula) | Both must be Formulas |
-        | `Definedness(term)` | `Definedness` (Formula) | Inner must be a Term |
+        | `pred_app(pred_name, *args)` | `PredApp` (Formula) | `args`: Terms (varargs, NOT a tuple) |
+        | `negation(formula)` | `Negation` (Formula) | Inner must be a Formula |
+        | `conjunction(f1, f2, ...)` | `Conjunction` (Formula) | All args must be Formulas (varargs) |
+        | `disjunction(f1, f2, ...)` | `Disjunction` (Formula) | All args must be Formulas (varargs) |
+        | `implication(antecedent, consequent)` | `Implication` (Formula) | Both must be Formulas |
+        | `definedness(term)` | `Definedness` (Formula) | Inner must be a Term |
 
         ### Assembly
 

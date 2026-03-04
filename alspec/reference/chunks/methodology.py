@@ -36,7 +36,7 @@ This is the obligation table — a completeness checklist, not a guideline.
 1. List the constructors of the observer's primary argument sort.
 2. For each constructor, write an axiom specifying the observer applied to that constructor.
 3. For partial observers, every constructor still needs an axiom — equations where defined,
-   `Negation(Definedness(...))` where undefined. No exceptions.
+   `negation(definedness(...))` where undefined. No exceptions.
 
 **Completeness check:** If a sort has `k` constructors and `n` observers,
 the obligation table has `n × k` cells (before key dispatch splits).
@@ -58,7 +58,7 @@ the axioms. There is no distinguished "intended" model.
 `f(c(...))`, every model is free to interpret that case however it wants. Omitting
 an axiom does NOT encode undefinedness — it leaves the value *unconstrained*.
 
-To force undefinedness, write an explicit `Negation(Definedness(...))` axiom.
+To force undefinedness, write an explicit `negation(definedness(...))` axiom.
 The `total=False` declaration merely *permits* undefinedness; it does not *cause* it.
 
 A complete spec has no silent gaps in the obligation table."""
@@ -75,38 +75,34 @@ def _partial_fn_patterns():
 **Pattern 1 — Partial constructor with definedness biconditional:**
 ```python
 Axiom("refresh_def", forall([s], iff(
-    Definedness(app("refresh", s)),
+    definedness(app("refresh", s)),
     eq(app("get_status", s), const("active"))
 )))
 ```
 
 **Pattern 2 — Partial observer, explicit undefinedness:**
 ```python
-Axiom("pop_new_undef", Negation(Definedness(app("pop", const("new")))))
+Axiom("pop_new_undef", negation(definedness(app("pop", const("new")))))
 Axiom("last_input_create_undef", forall([t],
-    Negation(Definedness(app("last_input", app("create", t))))
+    negation(definedness(app("last_input", app("create", t))))
 ))
 ```
 
 **Pattern 3 — Total constructor with domain guard (both polarities):**
 ```python
 # is_verified × verify — POSITIVE guard: correct token on active session
-Axiom("is_verified_verify_pos", forall([s, t], Implication(
-    Conjunction((
-        PredApp("eq_token", (t, app("get_token", s))),
-        eq(app("get_status", s), const("active")),
-    )),
-    PredApp("is_verified", (app("verify", s, t),))
+Axiom("is_verified_verify_pos", forall([s, t], implication(
+    conjunction(pred_app("eq_token", t, app("get_token", s)),
+        eq(app("get_status", s), const("active"))),
+    pred_app("is_verified", app("verify", s, t))
 )))
 # is_verified × verify — NEGATIVE guard: wrong token or expired session
-Axiom("is_verified_verify_neg", forall([s, t], Implication(
-    Negation(Conjunction((
-        PredApp("eq_token", (t, app("get_token", s))),
-        eq(app("get_status", s), const("active")),
-    ))),
+Axiom("is_verified_verify_neg", forall([s, t], implication(
+    negation(conjunction(pred_app("eq_token", t, app("get_token", s)),
+        eq(app("get_status", s), const("active")))),
     iff(
-        PredApp("is_verified", (app("verify", s, t),)),
-        PredApp("is_verified", (s,)),
+        pred_app("is_verified", app("verify", s, t)),
+        pred_app("is_verified", s),
     )
 )))
 ```"""

@@ -88,10 +88,10 @@ Cell coverage rules:
 - **MISS cells:** write delegation/preservation axioms
 - **HIT cells:** write the domain-specific equation or predicate assertion
 - **Equality predicates:** if the signature includes `eq_*` predicates, use them for key dispatch
-  guards: `Implication(PredApp("eq_id", (k, k2)), ...)` for HIT cells and
-  `Implication(Negation(PredApp("eq_id", (k, k2))), ...)` for MISS cells.
+  guards: `implication(pred_app("eq_id", k, k2), ...)` for HIT cells and
+  `implication(negation(pred_app("eq_id", k, k2)), ...)` for MISS cells.
   Do NOT use term equality `eq(k, k2)` as a dispatch guard — always use the declared
-  equality predicate via `PredApp`.
+  equality predicate via `pred_app`.
 - Follow the loose semantics rules from the reference: use explicit `¬def(...)` for undefinedness
 
 ### Output Format

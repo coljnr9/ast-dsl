@@ -12,16 +12,16 @@ def render() -> str:
                  | FieldAccess(Term, field_name)        ← inner is a Term
                  | Literal(value, sort)
 
-        Formula  = Equation(Term, Term)                 ← both sides are Terms
-                 | PredApp(pred_name, tuple[Term, ...]) ← args are Terms
-                 | Negation(Formula)                    ← inner is a Formula, NEVER a Term
-                 | Conjunction(tuple[Formula, ...])     ← all elements are Formulas
-                 | Disjunction(tuple[Formula, ...])     ← all elements are Formulas
-                 | Implication(Formula, Formula)        ← both are Formulas
-                 | Biconditional(Formula, Formula)      ← both are Formulas
-                 | UniversalQuant(tuple[Var, ...], Formula)
-                 | ExistentialQuant(tuple[Var, ...], Formula)
-                 | Definedness(Term)                    ← inner is a Term
+        Formula  = eq(Term, Term)                          ← Equation
+                 | pred_app(pred_name, Term, ...)           ← PredApp (varargs)
+                 | negation(Formula)                        ← inner is a Formula, NEVER a Term
+                 | conjunction(Formula, ...)                ← all args are Formulas (varargs)
+                 | disjunction(Formula, ...)                ← all args are Formulas (varargs)
+                 | implication(Formula, Formula)            ← both are Formulas
+                 | iff(Formula, Formula)                    ← both are Formulas (Biconditional)
+                 | forall(list[Var], Formula)
+                 | exists(list[Var], Formula)
+                 | definedness(Term)                        ← inner is a Term
         ```
 
         ### Valid Compositions
@@ -30,12 +30,12 @@ def render() -> str:
         |-----------|------------------|
         | `eq(app(...), app(...))` | Both are Terms ✓ |
         | `eq(app(...), var(...))` | Both are Terms ✓ |
-        | `Negation(eq(...))` | eq returns a Formula ✓ |
-        | `Negation(PredApp(...))` | PredApp is a Formula ✓ |
-        | `Implication(PredApp(...), eq(...))` | Both are Formulas ✓ |
-        | `iff(PredApp(...), PredApp(...))` | Formula ⇔ Formula ✓ |
-        | `iff(PredApp(...), eq(...))` | Formula ⇔ Formula ✓ |
-        | `Conjunction((PredApp(...), PredApp(...)))` | Tuple of Formulas ✓ |
+        | `negation(eq(...))` | eq returns a Formula ✓ |
+        | `negation(pred_app(...))` | pred_app is a Formula ✓ |
+        | `implication(pred_app(...), eq(...))` | Both are Formulas ✓ |
+        | `iff(pred_app(...), pred_app(...))` | Formula ⇔ Formula ✓ |
+        | `iff(pred_app(...), eq(...))` | Formula ⇔ Formula ✓ |
+        | `conjunction(pred_app(...), pred_app(...))` | All args are Formulas ✓ |
 
         ---
         """

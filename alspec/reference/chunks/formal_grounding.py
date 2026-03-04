@@ -142,12 +142,12 @@ def _eq_pred_basis():
 Every equality predicate needs three structural axioms:
 
 ```python
-Axiom("eq_token_refl",  forall([k], PredApp("eq_token", (k, k))))
-Axiom("eq_token_sym",   forall([k, k2], Implication(
-    PredApp("eq_token", (k, k2)), PredApp("eq_token", (k2, k)))))
-Axiom("eq_token_trans",  forall([k, k2, k3], Implication(
-    Conjunction((PredApp("eq_token", (k, k2)), PredApp("eq_token", (k2, k3)))),
-    PredApp("eq_token", (k, k3)))))
+Axiom("eq_token_refl",  forall([k], pred_app("eq_token", k, k)))
+Axiom("eq_token_sym",   forall([k, k2], implication(
+    pred_app("eq_token", k, k2), pred_app("eq_token", k2, k))))
+Axiom("eq_token_trans",  forall([k, k2, k3], implication(
+    conjunction(pred_app("eq_token", k, k2), pred_app("eq_token", k2, k3)),
+    pred_app("eq_token", k, k3))))
 ```
 
 These are NOT obligation cells — they don't involve constructors of the generated sort.
