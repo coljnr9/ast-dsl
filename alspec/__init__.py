@@ -14,14 +14,21 @@ from .helpers import (
     S,
     app,
     atomic,
+    conjunction,
     const,
+    definedness,
+    disjunction,
     eq,
     exists,
+    field_access,
     fn,
     forall,
     iff,
+    implication,
+    negation,
     param,
     pred,
+    pred_app,
     var,
 )
 from .result import Err, Ok, Result
@@ -65,15 +72,33 @@ from .terms import (
 )
 
 __all__ = [
-    # Axiom matching
-    "AxiomCellMatch",
-    "CellCoverage",
-    "CoverageStatus",
-    "MatchKind",
-    "MatchReport",
-    "match_spec",
-    "match_spec_sync",
-    # Sorts
+    # --- Construction Helpers (use THESE to build specs) ---
+    "S",
+    "atomic",
+    "param",
+    "fn",
+    "pred",
+    "var",
+    "app",
+    "const",
+    "eq",
+    "forall",
+    "exists",
+    "iff",
+    "negation",
+    "conjunction",
+    "disjunction",
+    "implication",
+    "pred_app",
+    "definedness",
+    "field_access",
+    # --- Assembly (spec-level, not formula-level) ---
+    "Axiom",
+    "Spec",
+    "Signature",
+    "GeneratedSortInfo",
+    "Totality",
+    # --- Sort declarations ---
     "AtomicSort",
     "CoproductAlt",
     "CoproductSort",
@@ -82,14 +107,12 @@ __all__ = [
     "SortDecl",
     "SortKind",
     "SortRef",
-    # Signature
+    # --- Signature components ---
     "FnParam",
     "FnSymbol",
-    "GeneratedSortInfo",
     "PredSymbol",
-    "Signature",
-    "Totality",
-    # Terms
+    # --- Types (for isinstance checks in internal/analysis code, NOT for construction) ---
+    "Biconditional",
     "Conjunction",
     "Definedness",
     "Disjunction",
@@ -105,27 +128,18 @@ __all__ = [
     "Term",
     "UniversalQuant",
     "Var",
-    "Biconditional",
-    # Spec
-    "Axiom",
-    "Spec",
-    # Serialization
+    # --- Axiom matching ---
+    "AxiomCellMatch",
+    "CellCoverage",
+    "CoverageStatus",
+    "MatchKind",
+    "MatchReport",
+    "match_spec",
+    "match_spec_sync",
+    # --- Serialization ---
     "dumps",
     "loads",
-    # Helpers
-    "S",
-    "atomic",
-    "param",
-    "fn",
-    "pred",
-    "var",
-    "app",
-    "const",
-    "eq",
-    "forall",
-    "exists",
-    "iff",
-    # Result
+    # --- Result ---
     "Ok",
     "Err",
     "Result",

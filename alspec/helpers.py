@@ -12,10 +12,17 @@ from alspec.sorts import (
 )
 from alspec.terms import (
     Biconditional,
+    Conjunction,
+    Definedness,
+    Disjunction,
     Equation,
     ExistentialQuant,
+    FieldAccess,
     FnApp,
     Formula,
+    Implication,
+    Negation,
+    PredApp,
     Term,
     UniversalQuant,
     Var,
@@ -74,3 +81,38 @@ def exists(variables: list[Var], body: Formula) -> ExistentialQuant:
 def iff(lhs: Formula, rhs: Formula) -> Biconditional:
     """Biconditional: lhs ⇔ rhs."""
     return Biconditional(lhs=lhs, rhs=rhs)
+
+
+def negation(formula: Formula) -> Negation:
+    """Logical negation: ¬ formula."""
+    return Negation(formula=formula)
+
+
+def conjunction(*conjuncts: Formula) -> Conjunction:
+    """Logical AND: f₁ ∧ f₂ ∧ ... ∧ fₙ."""
+    return Conjunction(conjuncts=conjuncts)
+
+
+def disjunction(*disjuncts: Formula) -> Disjunction:
+    """Logical OR: f₁ ∨ f₂ ∨ ... ∨ fₙ."""
+    return Disjunction(disjuncts=disjuncts)
+
+
+def implication(antecedent: Formula, consequent: Formula) -> Implication:
+    """Logical implication: antecedent ⇒ consequent."""
+    return Implication(antecedent=antecedent, consequent=consequent)
+
+
+def pred_app(pred_name: str, *args: Term) -> PredApp:
+    """Apply a predicate to Term arguments."""
+    return PredApp(pred_name=pred_name, args=args)
+
+
+def definedness(term: Term) -> Definedness:
+    """Definedness assertion: def(term)."""
+    return Definedness(term=term)
+
+
+def field_access(term: Term, field_name: str) -> FieldAccess:
+    """Access a named field on a product-sorted term."""
+    return FieldAccess(term=term, field_name=field_name)
