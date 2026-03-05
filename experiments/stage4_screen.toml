@@ -19,7 +19,7 @@ upstream_lens = "entity_lifecycle"
 include = [
     "counter", "boolean-flag", "stack", "door-lock",
     "bounded-counter", "traffic-light", "thermostat",
-    "session-store", "dns-zone", "auction", "shopping-cart",
+    "auction", "shopping-cart", "todo-list",
 ]
 
 [chunks]
