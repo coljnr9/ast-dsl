@@ -40,3 +40,11 @@ class Spec:
     name: str
     signature: Signature
     axioms: tuple[Axiom, ...]
+
+    def __post_init__(self) -> None:
+        for i, ax in enumerate(self.axioms):
+            if not isinstance(ax, Axiom):
+                raise TypeError(
+                    f"Spec '{self.name}' axioms[{i}] is {type(ax).__name__}, "
+                    f"expected Axiom. Raw object: {ax!r:.200}"
+                )

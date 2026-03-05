@@ -1,3 +1,5 @@
+import pytest
+
 from alspec.check import check_spec
 from alspec.signature import FnParam, FnSymbol, PredSymbol, Signature, Totality
 from alspec.sorts import (
@@ -224,3 +226,14 @@ def test_no_advisory_warnings_on_valid_spec() -> None:
     spec = Spec("AdvisoryFree", sig, (ax,))
     res = check_spec(spec)
     assert not res.warnings, f"Expected no warnings, got: {res.warnings}"
+
+
+def test_spec_rejects_bare_formula_in_axioms() -> None:
+    """Spec must reject non-Axiom objects in axioms tuple."""
+    sig = get_base_sig()
+    bare_formula = UniversalQuant(
+        variables=(Var("x", SortRef("Nat")),),
+        body=Equation(FnApp("zero", ()), FnApp("zero", ())),
+    )
+    with pytest.raises(TypeError, match="expected Axiom"):
+        Spec("BadAxioms", sig, (bare_formula,))  # type: ignore[arg-type]
