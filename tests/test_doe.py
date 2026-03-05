@@ -732,3 +732,24 @@ A = ["FORMAL_FRAME"]
         assert isinstance(score.health, float)
         assert 0.0 <= score.health <= 1.0
         assert elapsed > 0.0
+
+
+# ---------------------------------------------------------------------------
+# 7. Stage detection
+# ---------------------------------------------------------------------------
+
+
+def test_stage4_analysis_result_has_stage() -> None:
+    """AnalysisResult from Stage4Score data should report stage='stage4'."""
+    from alspec.eval.doe_analyze import AnalysisResult
+
+    ar = AnalysisResult(main_effects=(), interactions=(), stage="stage4")
+    assert ar.stage == "stage4"
+
+
+def test_stage1_analysis_result_has_stage() -> None:
+    """AnalysisResult from Stage1Score data should report stage='stage1'."""
+    from alspec.eval.doe_analyze import AnalysisResult
+
+    ar = AnalysisResult(main_effects=(), interactions=(), stage="stage1")
+    assert ar.stage == "stage1"

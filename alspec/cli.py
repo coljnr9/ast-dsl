@@ -512,10 +512,15 @@ async def handle_doe_run(config_path: Path, *, dry_run: bool) -> int:
 
     # Print summary effects
     try:
-        from alspec.eval.doe_analyze import analyze_results, print_all_effects_tables
+        from alspec.eval.doe_analyze import (
+            analyze_results, print_all_effects_tables, print_stage4_effects_tables
+        )
 
         result = analyze_results(config.output_dir)
-        print_all_effects_tables(list(result.main_effects), list(result.interactions))
+        if result.stage == "stage4":
+            print_stage4_effects_tables(list(result.main_effects), list(result.interactions))
+        else:
+            print_all_effects_tables(list(result.main_effects), list(result.interactions))
     except Exception as e:
         print(f"Warning: could not compute effects: {e}", file=sys.stderr)
 
@@ -525,7 +530,9 @@ async def handle_doe_run(config_path: Path, *, dry_run: bool) -> int:
 
 async def handle_doe_analyze(results_dir: Path) -> int:
     """Re-analyze an existing results directory."""
-    from alspec.eval.doe_analyze import analyze_results, print_all_effects_tables
+    from alspec.eval.doe_analyze import (
+        analyze_results, print_all_effects_tables, print_stage4_effects_tables
+    )
 
     if not results_dir.exists():
         print(f"Results directory not found: {results_dir}", file=sys.stderr)
@@ -537,7 +544,10 @@ async def handle_doe_analyze(results_dir: Path) -> int:
         print(f"Analysis error: {e}", file=sys.stderr)
         return 1
 
-    print_all_effects_tables(list(result.main_effects), list(result.interactions))
+    if result.stage == "stage4":
+        print_stage4_effects_tables(list(result.main_effects), list(result.interactions))
+    else:
+        print_all_effects_tables(list(result.main_effects), list(result.interactions))
 
     effects_path = results_dir / "effects.csv"
     print(f"\nFull effects written to {effects_path}")

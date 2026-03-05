@@ -62,6 +62,7 @@ class InteractionEffect:
 class AnalysisResult:
     main_effects: tuple[MainEffect, ...]
     interactions: tuple[InteractionEffect, ...]
+    stage: str  # "stage1" or "stage4"
 
 
 # ---------------------------------------------------------------------------
@@ -454,6 +455,36 @@ def print_all_effects_tables(
     )
 
 
+def print_stage4_effects_tables(
+    main_effects: list[MainEffect],
+    interactions: list[InteractionEffect],
+    *,
+    coverage_threshold: float = 0.02,
+    parse_threshold: float = 0.03,
+) -> None:
+    """Print effect tables for Stage 4 experiments: parse_rate, wf_rate, coverage.
+
+    Unlike print_all_effects_tables, this replaces the useless 'health'
+    (intrinsic_health, a constant per-domain in Stage 4) with 'coverage'
+    (obligation table cell coverage ratio, the actual Stage 4 quality metric).
+    """
+    print_effects_table(
+        main_effects, interactions,
+        response="parse_rate",
+        interaction_threshold=parse_threshold,
+    )
+    print_effects_table(
+        main_effects, interactions,
+        response="wf_rate",
+        interaction_threshold=parse_threshold,
+    )
+    print_effects_table(
+        main_effects, interactions,
+        response="coverage",
+        interaction_threshold=coverage_threshold,
+    )
+
+
 
 # ---------------------------------------------------------------------------
 # High-level analysis entrypoint
@@ -526,8 +557,10 @@ def analyze_results(results_dir: Path) -> AnalysisResult:
     # Write effects.csv
     write_effects_csv(main_effects, interactions, results_dir / "effects.csv")
 
+    is_stage4 = isinstance(scores[0], Stage4Score)
     return AnalysisResult(
         main_effects=tuple(main_effects),
         interactions=tuple(interactions),
+        stage="stage4" if is_stage4 else "stage1",
     )
 
