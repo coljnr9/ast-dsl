@@ -204,6 +204,90 @@ def _fn_list(names: list[str], partial_fns: set[str], sig: Signature) -> str:
     return ", ".join(items)
 
 
+def _structural_hint_parts(
+    cell: ObligationCell,
+    sig: Signature,
+) -> tuple[str, str, str, str]:
+    """Build structural components for a hint string.
+
+    Returns (ctor_app, obs_app, guard, delegation) where:
+      - ctor_app: "add_stock(w, p, q)" or "init" for nullary
+      - obs_app: "get_status(add_stock(w, p, q), p2)" — observer applied to ctor
+      - guard: "eq_product(p, p2)" — key equality guard, or "" if no dispatch
+      - delegation: "get_status(w, p2)" — observer applied to inner state
+    """
+    # Get the constructor symbol
+    ctor = sig.functions[cell.constructor_name]
+
+    # Get the observer symbol (function or predicate)
+    if cell.observer_is_predicate:
+        obs = sig.predicates[cell.observer_name]
+    else:
+        obs = sig.functions[cell.observer_name]
+
+    gen_sort = cell.generated_sort
+
+    # Ctor param names
+    ctor_param_names = [p.name for p in ctor.params]
+    ctor_param_name_set = set(ctor_param_names)
+
+    # Observer lookup params (skip first param which is the state/generated sort)
+    obs_lookup_params = list(obs.params[1:])
+
+    # Rename observer lookup params that collide with ctor param names
+    renamed_lookup: list[str] = []
+    for p in obs_lookup_params:
+        if p.name in ctor_param_name_set:
+            renamed_lookup.append(p.name + "2")
+        else:
+            renamed_lookup.append(p.name)
+
+    # Find the state variable: first ctor param whose sort is the generated sort
+    state_var: str | None = None
+    for p in ctor.params:
+        if p.sort == gen_sort:
+            state_var = p.name
+            break
+
+    # Build ctor application string
+    if ctor_param_names:
+        ctor_app = f"{cell.constructor_name}({', '.join(ctor_param_names)})"
+    else:
+        ctor_app = cell.constructor_name  # nullary: "init" not "init()"
+
+    # Build observer application string: obs(ctor_app, lookup_params...)
+    all_obs_args = [ctor_app] + renamed_lookup
+    obs_app = f"{cell.observer_name}({', '.join(all_obs_args)})"
+
+    # Build delegation string: obs(state_var, lookup_params...)
+    if state_var is not None:
+        deleg_args = [state_var] + renamed_lookup
+    else:
+        # Nullary ctor (no state var) — delegation doesn't apply
+        deleg_args = renamed_lookup
+    delegation = f"{cell.observer_name}({', '.join(deleg_args)})"
+
+    # Build guard string from key dispatch info
+    guard = ""
+    if cell.eq_pred and cell.key_sort:
+        # Find the ctor param with the key sort (skip state param)
+        ctor_key: str | None = None
+        for p in ctor.params:
+            if p.sort == cell.key_sort and p.sort != gen_sort:
+                ctor_key = p.name
+                break
+        # Find the observer lookup param with the key sort (use renamed name)
+        obs_key: str | None = None
+        for orig, renamed in zip(obs_lookup_params, renamed_lookup):
+            if orig.sort == cell.key_sort:
+                obs_key = renamed
+                break
+        if ctor_key is not None and obs_key is not None:
+            guard = f"{cell.eq_pred}({ctor_key}, {obs_key})"
+
+    return ctor_app, obs_app, guard, delegation
+
+
 def _cell_hint(
     cell: ObligationCell,
     sig: Signature,
@@ -221,28 +305,39 @@ def _cell_hint(
             return "write `¬def(...)` or preservation"
 
         case CellTier.KEY_DISPATCH:
+            _, obs_app, guard, delegation = _structural_hint_parts(cell, sig)
             if cell.dispatch == CellDispatch.HIT:
-                if obs_is_partial:
-                    return "HIT — define value for matching key; MISS — delegate to inner state"
-                elif cell.observer_is_predicate:
-                    return "HIT — define predicate; MISS — delegate to inner state"
+                if cell.observer_is_predicate:
+                    return f"write: `{guard} → {obs_app}` — define predicate for matching key"
                 else:
-                    return "HIT — define value; MISS — delegate to inner state"
-            else:
-                return "delegate to inner state (preservation)"
+                    return f"write: `{guard} → {obs_app} = <value>`"
+            else:  # MISS
+                if cell.observer_is_predicate:
+                    return f"write: `¬{guard} → {obs_app} ↔ {delegation}`"
+                else:
+                    return f"write: `¬{guard} → {obs_app} = {delegation}`"
 
         case CellTier.PRESERVATION:
-            return "constructor does not affect this observer's key space"
+            _, obs_app, _, delegation = _structural_hint_parts(cell, sig)
+            if cell.observer_is_predicate:
+                return f"write: `{obs_app} ↔ {delegation}`"
+            else:
+                return f"write: `{obs_app} = {delegation}`"
 
         case CellTier.BASE_CASE:
+            _, obs_app, _, _ = _structural_hint_parts(cell, sig)
             if obs_is_partial:
-                return "base case: typically `¬def` for partial"
+                return f"write: `¬def({obs_app})`"
             elif cell.observer_is_predicate:
-                return "base case: typically `false` for predicates"
+                return f"write: `{obs_app}` — typically false for base"
             else:
-                return "base case: typically a default value"
+                return f"write: `{obs_app} = <default>`"
 
         case CellTier.DOMAIN:
-            return "domain-specific — requires domain reasoning"
+            _, obs_app, _, _ = _structural_hint_parts(cell, sig)
+            if cell.observer_is_predicate:
+                return f"write: `{obs_app} ↔ <condition>`"
+            else:
+                return f"write: `{obs_app} = <value>`"
 
     return "requires domain reasoning"
