@@ -74,6 +74,7 @@ ALL_DOMAINS = [
 # Imports after path setup
 # ---------------------------------------------------------------------------
 
+from alspec.axiom_gen import generate_mechanical_axioms  # noqa: E402
 from alspec.axiom_match import CoverageStatus, match_spec  # noqa: E402
 from alspec.cache import (  # noqa: E402
     DomainSnapshot,
@@ -133,8 +134,7 @@ def _get_domain_description(domain: str) -> str:
     d = _DOMAIN_MAP.get(domain)
     if d is None:
         raise ValueError(
-            f"Unknown domain {domain!r}. "
-            f"Available: {sorted(_DOMAIN_MAP.keys())}"
+            f"Unknown domain {domain!r}. Available: {sorted(_DOMAIN_MAP.keys())}"
         )
     return d.description
 
@@ -224,7 +224,11 @@ async def _build_upstream_cache(
                         "lens": UPSTREAM_LENS,
                         "session_id": session_id,
                     },
-                    tags=[f"domain:{domain}", "phase:upstream", f"session:{session_id}"],
+                    tags=[
+                        f"domain:{domain}",
+                        "phase:upstream",
+                        f"session:{session_id}",
+                    ],
                 ):
                     result = await run_pipeline_signature_only(
                         client=client,
@@ -235,7 +239,9 @@ async def _build_upstream_cache(
                     )
 
             if not result.success:
-                logger.warning("Upstream failed for domain %s: %s", domain, result.error)
+                logger.warning(
+                    "Upstream failed for domain %s: %s", domain, result.error
+                )
                 return
 
             sig = result.signature
@@ -264,9 +270,7 @@ async def _build_upstream_cache(
                 cache[domain] = entry
 
     await asyncio.gather(*[run_one(d) for d in domains])
-    logger.info(
-        "Upstream cache: %d/%d succeeded", len(cache), len(domains)
-    )
+    logger.info("Upstream cache: %d/%d succeeded", len(cache), len(domains))
     return cache
 
 
@@ -398,11 +402,35 @@ async def _run_trial(
             error=f"No `spec` variable of type Spec (got {got})",
         )
 
-    # 2. Well-formedness
+    # 2. Merge mechanical axioms (Stage 3.5)
+    mech_report = generate_mechanical_axioms(
+        upstream.signature, upstream.obligation_table
+    )
+    mech_labels = {a.label for a in mech_report.axioms}
+    # Keep LLM axioms that don't collide with mechanical labels
+    combined_axioms = list(mech_report.axioms) + [
+        a for a in spec.axioms if a.label not in mech_labels
+    ]
+    spec = Spec(
+        name=spec.name,
+        signature=upstream.signature,
+        axioms=tuple(combined_axioms),
+    )
+    n_mech = len(mech_report.axioms)
+    n_merged = len(combined_axioms)
+    logger.debug(
+        "domain=%s rep=%d: merged %d mechanical axioms (%d total)",
+        domain,
+        replicate,
+        n_mech,
+        n_merged,
+    )
+
+    # 3. Well-formedness
     checker_report = check_spec(spec)
     well_formed = checker_report.is_well_formed
 
-    # 3. Match — uses upstream sig NOT spec.signature (consistent with doe_runner)
+    # 4. Match — uses upstream sig NOT spec.signature (consistent with doe_runner)
     try:
         table = build_obligation_table(upstream.signature)
         match_report = await match_spec(spec, table, upstream.signature)
@@ -418,14 +446,14 @@ async def _run_trial(
             error=f"Scoring/matching failed: {e}",
         )
 
-    # 4. Coverage metrics
+    # 5. Coverage metrics
     total_cells = len(match_report.coverage)
     covered_cells = sum(
         1 for c in match_report.coverage if c.status != CoverageStatus.UNCOVERED
     )
     coverage_ratio = (covered_cells / total_cells) if total_cells > 0 else 0.0
 
-    # 5. Extract uncovered cell rows (only for parse-successful trials)
+    # 6. Extract uncovered cell rows (only for parse-successful trials)
     new_rows: list[dict[str, str]] = []
     for cell in match_report.uncovered_cells:
         new_rows.append(
@@ -719,9 +747,7 @@ async def main() -> None:
                 )
 
     tasks = [
-        run_one(domain, rep)
-        for domain in usable_domains
-        for rep in range(replicates)
+        run_one(domain, rep) for domain in usable_domains for rep in range(replicates)
     ]
     await asyncio.gather(*tasks)
 
@@ -754,9 +780,10 @@ async def main() -> None:
     # Summary
     parse_ok = sum(1 for r in score_records if r["parse_success"])
     if parse_ok > 0:
-        mean_cov = sum(
-            r["coverage_ratio"] for r in score_records if r["parse_success"]
-        ) / parse_ok
+        mean_cov = (
+            sum(r["coverage_ratio"] for r in score_records if r["parse_success"])
+            / parse_ok
+        )
     else:
         mean_cov = 0.0
 
