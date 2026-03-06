@@ -6171,7 +6171,7 @@ def session_store_spec() -> Spec:
 
 RATE_LIMITER = WorkedExample(
     domain_name="Rate Limiter",
-    summary="Models a rate limiter tracking request counts against a configured maximum per window. Demonstrates multi-constructor selector extraction, cross-sort helpers (Nat with zero/succ), helper composition in accumulator axioms, comparison-driven predicate via inductive Peano geq, and preservation collapse.",
+    summary="Models a rate limiter tracking request counts against a configured maximum per window. Demonstrates multi-constructor selector extraction, cross-sort helpers (Nat with zero/succ), helper composition in accumulator axioms, comparison-driven predicate via inductive Peano geq, preservation collapse, function-valued derived observer with guard-split per-constructor axioms, and linked predicate/function derived observers.",
     patterns=frozenset({
         Pattern.SEL_EXTRACT,
         Pattern.PRESERVATION,
@@ -6179,20 +6179,26 @@ RATE_LIMITER = WorkedExample(
         Pattern.ACCUMULATION,
         Pattern.BICOND_CHAR,
         Pattern.KEYLESS_AGG,
+        Pattern.ENUMERATION,
+        Pattern.ENUM_CASE_SPLIT,
     }),
     sorts=(
         SortInfo("Limiter", "GENERATED", "Central domain object representing rate limiter state"),
         SortInfo("Nat", "ATOMIC", "Cross-sort Peano naturals for counting (zero/succ)"),
+        SortInfo("Status", "ENUMERATION", "Rate limit status with explicit distinctness (ok/exceeded)"),
     ),
     functions=(
         FunctionInfo("zero", "→ Nat", FunctionRole.CONSTANT, "Natural number zero"),
         FunctionInfo("succ", "Nat → Nat", FunctionRole.HELPER, "Successor function for Peano naturals"),
+        FunctionInfo("ok", "→ Status", FunctionRole.CONSTANT, "Rate limit not exceeded"),
+        FunctionInfo("exceeded", "→ Status", FunctionRole.CONSTANT, "Rate limit exceeded"),
         FunctionInfo("create", "Nat → Limiter", FunctionRole.CONSTRUCTOR, "Creates limiter with given maximum"),
         FunctionInfo("record", "Limiter → Limiter", FunctionRole.CONSTRUCTOR, "Records one request, increments count"),
         FunctionInfo("reset", "Limiter → Limiter", FunctionRole.CONSTRUCTOR, "Resets count to zero for window rollover"),
         FunctionInfo("set_max", "Limiter × Nat → Limiter", FunctionRole.CONSTRUCTOR, "Updates maximum threshold"),
         FunctionInfo("get_count", "Limiter → Nat", FunctionRole.OBSERVER, "Returns current request count"),
         FunctionInfo("get_max", "Limiter → Nat", FunctionRole.SELECTOR, "Multi-constructor selector of create and set_max"),
+        FunctionInfo("get_status", "Limiter → Status", FunctionRole.OBSERVER, "Derived: exceeded when geq(get_count, get_max), ok otherwise"),
         FunctionInfo("geq", "Nat × Nat", FunctionRole.PREDICATE, "Greater-or-equal comparison with Peano inductive definition"),
         FunctionInfo("over_limit", "Limiter", FunctionRole.PREDICATE, "Derived: geq(get_count(l), get_max(l))"),
     ),
@@ -6209,6 +6215,14 @@ RATE_LIMITER = WorkedExample(
         ObligationCell("over_limit", "record", CellType.DOMAIN, "geq(succ(get_count(l)), get_max(l))"),
         ObligationCell("over_limit", "reset", CellType.DOMAIN, "geq(zero, get_max(l))"),
         ObligationCell("over_limit", "set_max", CellType.DOMAIN, "geq(get_count(l), n)"),
+        ObligationCell("get_status", "create", CellType.DOMAIN, "exceeded", "geq(zero, m)"),
+        ObligationCell("get_status", "create", CellType.DOMAIN, "ok", "¬geq(zero, m)"),
+        ObligationCell("get_status", "record", CellType.DOMAIN, "exceeded", "geq(succ(get_count(l)), get_max(l))"),
+        ObligationCell("get_status", "record", CellType.DOMAIN, "ok", "¬geq(succ(get_count(l)), get_max(l))"),
+        ObligationCell("get_status", "reset", CellType.DOMAIN, "exceeded", "geq(zero, get_max(l))"),
+        ObligationCell("get_status", "reset", CellType.DOMAIN, "ok", "¬geq(zero, get_max(l))"),
+        ObligationCell("get_status", "set_max", CellType.DOMAIN, "exceeded", "geq(get_count(l), n)"),
+        ObligationCell("get_status", "set_max", CellType.DOMAIN, "ok", "¬geq(get_count(l), n)"),
     ),
     design_decisions=(
         DesignDecision("Multi-constructor selector", "get_max is declared as selector of both create and set_max"),
@@ -6216,6 +6230,8 @@ RATE_LIMITER = WorkedExample(
         DesignDecision("Peano geq axioms", "Three inductive axioms (base, zero<succ, succ-succ) prevent vacuous models under loose semantics"),
         DesignDecision("Derived over_limit", "Defined compositionally via geq(get_count, get_max); per-constructor obligation axioms still required"),
         DesignDecision("Dropped warn infrastructure", "Original design had set_warn/get_warn but stored config with no observable predicate is dead state — removed"),
+        DesignDecision("Function-valued derived observer", "get_status is defined compositionally via geq(get_count, get_max) → Status. For each constructor, substitute its post-values into the condition: record changes get_count to succ(get_count(l)) and preserves get_max, giving geq(succ(get_count(l)), get_max(l)) → exceeded, ¬geq(...) → ok. Per-constructor axioms are required — a global definition does not satisfy obligation cells"),
+        DesignDecision("Linked predicate and function observers", "over_limit (predicate) and get_status (function) are derived from the same geq condition; get_status_def links them via biconditional, demonstrating that both forms require independent obligation coverage"),
     ),
     code='''from alspec import (
     Axiom,
@@ -6229,6 +6245,7 @@ RATE_LIMITER = WorkedExample(
     fn,
     forall,
     iff,
+    implication,
     negation,
     pred,
     pred_app,
@@ -6251,10 +6268,14 @@ def rate_limiter_spec() -> Spec:
     - Comparison-driven predicate (over_limit via geq)
     - Inductive helper axioms (Peano definition of geq)
     - Preservation collapse across unrelated constructors
+    - Function-valued derived observer (get_status via geq comparison)
+    - Enumeration sort with explicit distinctness (Status: ok/exceeded)
+    - Guard-split pattern for function-valued derived observer per-constructor axioms
+    - Linked predicate and function derived observers (over_limit ↔ get_status)
 
     Obligation table: 3 observers × 4 constructors = 12 cells, all PLAIN.
     No key dispatch. No partial functions.
-    Total axioms: 16 (12 obligation + 4 non-obligation).
+    Total axioms: 26 (20 obligation + 6 non-obligation).
     """
     # --- Variables ---
     l = var("l", "Limiter")
@@ -6266,11 +6287,15 @@ def rate_limiter_spec() -> Spec:
         sorts={
             "Limiter": atomic("Limiter"),
             "Nat": atomic("Nat"),
+            "Status": atomic("Status"),
         },
         functions={
             # Nat helpers (cross-sort, pattern 10)
             "zero": fn("zero", [], "Nat"),
             "succ": fn("succ", [("n", "Nat")], "Nat"),
+            # Status enumeration
+            "ok": fn("ok", [], "Status"),
+            "exceeded": fn("exceeded", [], "Status"),
             # Limiter constructors
             "create": fn("create", [("m", "Nat")], "Limiter"),
             "record": fn("record", [("l", "Limiter")], "Limiter"),
@@ -6279,6 +6304,8 @@ def rate_limiter_spec() -> Spec:
             # Limiter observers
             "get_count": fn("get_count", [("l", "Limiter")], "Nat"),
             "get_max": fn("get_max", [("l", "Limiter")], "Nat"),
+            # Limiter observer (derived — compositional from get_count and get_max)
+            "get_status": fn("get_status", [("l", "Limiter")], "Status"),
         },
         predicates={
             "geq": pred("geq", [("a", "Nat"), ("b", "Nat")]),
@@ -6291,6 +6318,10 @@ def rate_limiter_spec() -> Spec:
                     "create": {"get_max": "Nat"},
                     "set_max": {"get_max": "Nat"},
                 },
+            ),
+            "Status": GeneratedSortInfo(
+                constructors=("ok", "exceeded"),
+                selectors={},
             ),
         },
     )
@@ -6448,6 +6479,138 @@ def rate_limiter_spec() -> Spec:
                     pred_app("over_limit", l),
                     pred_app("geq", app("get_count", l),
                         app("get_max", l)),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # ENUMERATION DISTINCTNESS — Status
+        # ok and exceeded are distinct constructors. Without this axiom,
+        # loose semantics permits models where ok = exceeded.
+        # ==================================================================
+        Axiom(
+            label="ok_exceeded_distinct",
+            formula=negation(eq(const("ok"), const("exceeded"))),
+        ),
+        # ==================================================================
+        # OBLIGATION CELLS — get_status (function-valued derived observer)
+        # get_status is defined compositionally: exceeded when count ≥ max,
+        # ok otherwise. For each constructor, determine how it changes the
+        # component observers, then substitute:
+        #
+        #   record: get_count → succ(get_count(l)), get_max → get_max(l)
+        #           guard = geq(succ(get_count(l)), get_max(l))
+        #
+        # This substitution process applies to every derived observer:
+        # look up each component's per-constructor axiom, plug the post-values
+        # into the derivation condition, write the result as a structural axiom.
+        # A global definition does not satisfy obligation cells.
+        # ==================================================================
+        # Cell 13a: get_status × create — POSITIVE guard → exceeded
+        Axiom(
+            label="get_status_create_pos",
+            formula=forall(
+                [m],
+                implication(
+                    pred_app("geq", const("zero"), m),
+                    eq(app("get_status", app("create", m)), const("exceeded")),
+                ),
+            ),
+        ),
+        # Cell 13b: get_status × create — NEGATIVE guard → ok
+        Axiom(
+            label="get_status_create_neg",
+            formula=forall(
+                [m],
+                implication(
+                    negation(pred_app("geq", const("zero"), m)),
+                    eq(app("get_status", app("create", m)), const("ok")),
+                ),
+            ),
+        ),
+        # Cell 14a: get_status × record — POSITIVE guard → exceeded
+        Axiom(
+            label="get_status_record_pos",
+            formula=forall(
+                [l],
+                implication(
+                    pred_app("geq", app("succ", app("get_count", l)),
+                        app("get_max", l)),
+                    eq(app("get_status", app("record", l)), const("exceeded")),
+                ),
+            ),
+        ),
+        # Cell 14b: get_status × record — NEGATIVE guard → ok
+        Axiom(
+            label="get_status_record_neg",
+            formula=forall(
+                [l],
+                implication(
+                    negation(pred_app("geq", app("succ", app("get_count", l)),
+                        app("get_max", l))),
+                    eq(app("get_status", app("record", l)), const("ok")),
+                ),
+            ),
+        ),
+        # Cell 15a: get_status × reset — POSITIVE guard → exceeded
+        Axiom(
+            label="get_status_reset_pos",
+            formula=forall(
+                [l],
+                implication(
+                    pred_app("geq", const("zero"), app("get_max", l)),
+                    eq(app("get_status", app("reset", l)), const("exceeded")),
+                ),
+            ),
+        ),
+        # Cell 15b: get_status × reset — NEGATIVE guard → ok
+        Axiom(
+            label="get_status_reset_neg",
+            formula=forall(
+                [l],
+                implication(
+                    negation(pred_app("geq", const("zero"), app("get_max", l))),
+                    eq(app("get_status", app("reset", l)), const("ok")),
+                ),
+            ),
+        ),
+        # Cell 16a: get_status × set_max — POSITIVE guard → exceeded
+        Axiom(
+            label="get_status_set_max_pos",
+            formula=forall(
+                [l, n],
+                implication(
+                    pred_app("geq", app("get_count", l), n),
+                    eq(app("get_status", app("set_max", l, n)), const("exceeded")),
+                ),
+            ),
+        ),
+        # Cell 16b: get_status × set_max — NEGATIVE guard → ok
+        Axiom(
+            label="get_status_set_max_neg",
+            formula=forall(
+                [l, n],
+                implication(
+                    negation(pred_app("geq", app("get_count", l), n)),
+                    eq(app("get_status", app("set_max", l, n)), const("ok")),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # DERIVED DEFINITION — get_status (non-obligation)
+        # Links the function-valued and predicate-valued derived observers:
+        # get_status returns exceeded iff over_limit holds. This shows that
+        # both forms (predicate and function) can be derived from the same
+        # underlying condition, and both still require per-constructor
+        # obligation axioms — a global definition does not substitute for
+        # structural coverage.
+        # ==================================================================
+        Axiom(
+            label="get_status_def",
+            formula=forall(
+                [l],
+                iff(
+                    eq(app("get_status", l), const("exceeded")),
+                    pred_app("over_limit", l),
                 ),
             ),
         ),

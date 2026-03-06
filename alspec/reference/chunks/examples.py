@@ -148,6 +148,9 @@ def _example_session_store() -> str:
         Concept.COMPLETENESS,
         Concept.STANDARD_PATTERNS,
         Concept.PRESERVATION,
+        Concept.GUARD_POLARITY,
+        Concept.BOTH_CASES,
+        Concept.CASE_SPLITS,
     }),
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
@@ -213,6 +216,9 @@ def _example_session_store_spec() -> str:
         Concept.COMPLETENESS,
         Concept.STANDARD_PATTERNS,
         Concept.PRESERVATION,
+        Concept.GUARD_POLARITY,
+        Concept.BOTH_CASES,
+        Concept.CASE_SPLITS,
     }),
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
