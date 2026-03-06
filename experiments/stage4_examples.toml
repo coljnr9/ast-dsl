@@ -1,0 +1,39 @@
+[experiment]
+name = "stage4-examples-validation"
+description = "Full factorial on G (primary) × H (secondary) examples to validate DoE interaction and establish optimized baseline"
+output_dir = "results/stage4-examples-v1"
+
+[design]
+resolution = "full"
+replicates = 3
+
+[pipeline]
+stage = "stage4"
+model = "google/gemini-3-flash-preview"
+temperature = 0.7
+max_concurrent = 10
+upstream_model = "google/gemini-3-flash-preview"
+upstream_lens = "entity_lifecycle"
+
+[domains]
+include = [
+    "counter", "boolean-flag", "stack", "queue", "door-lock",
+    "bounded-counter", "traffic-light", "thermostat", "todo-list",
+    "temperature-sensor", "version-history", "auction", "shopping-cart",
+    "bank-account", "email-inbox", "inventory", "bug-tracker",
+    "access-control", "library-lending", "phone-book",
+]
+
+[chunks]
+mandatory = [
+    "ROLE_PREAMBLE",
+    "TYPE_GRAMMAR",
+    "API_HELPERS",
+    "OBLIGATION_PATTERN",
+    "AXIOMS_METHODOLOGY",
+    "WF_CHECKLIST",
+]
+
+[chunks.factors]
+G_primary_examples = ["EXAMPLE_SESSION_STORE_SPEC", "EXAMPLE_RATE_LIMITER_SPEC", "EXAMPLE_DNS_ZONE_SPEC"]
+H_secondary_examples = ["EXAMPLE_COUNTER", "EXAMPLE_STACK", "EXAMPLE_BOUNDED_COUNTER"]
