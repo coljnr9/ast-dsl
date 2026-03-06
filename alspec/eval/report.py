@@ -338,7 +338,7 @@ def _rep_aggregate(results: list[EvalResult]) -> dict[str, float]:
             "mean_intrinsic": 0.0,
             "total_axioms": 0.0,
             "total_errors": 0.0,
-            "coverage_ratio": 0.0,
+            "coverage_ratio": None,
         }
 
     parsed = [r for r in results if r.success]
@@ -350,7 +350,7 @@ def _rep_aggregate(results: list[EvalResult]) -> dict[str, float]:
 
     cells_total = sum(r.obligation_cell_count for r in parsed if r.score)
     cells_covered = sum(r.covered_cell_count for r in parsed if r.score)
-    cov_ratio = (cells_covered / cells_total) if cells_total > 0 else 0.0
+    cov_ratio = (cells_covered / cells_total) if cells_total > 0 else None
 
     return {
         "parse_rate": len(parsed) / total,
@@ -404,7 +404,8 @@ def print_replicate_summary(
     out.write(f"  {'Metric':<22}│ {'Mean':>7} │ {'Stddev':>6} │ {'Min':>6} │ {'Max':>6}\n")
     out.write(f"  {'─' * 22}┼{'─' * 9}┼{'─' * 8}┼{'─' * 8}┼{'─' * 8}\n")
 
-    for label, values, is_pct in metrics:
+    for label, raw_values, is_pct in metrics:
+        values = [v for v in raw_values if v is not None]
         mean, stddev, vmin, vmax = _stats(values)
         if is_pct:
             out.write(

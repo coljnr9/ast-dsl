@@ -290,7 +290,7 @@ class TrialResult:
     replicate: int
     parse_success: bool
     well_formed: bool
-    coverage_ratio: float
+    coverage_ratio: float | None
     covered_cells: int
     total_cells: int
     error: str
@@ -365,7 +365,7 @@ async def _run_trial(
                 replicate=replicate,
                 parse_success=False,
                 well_formed=False,
-                coverage_ratio=0.0,
+                coverage_ratio=None,
                 covered_cells=0,
                 total_cells=0,
                 error=f"LLM error: {exc}",
@@ -454,7 +454,7 @@ async def _run_trial(
     covered_cells = sum(
         1 for c in match_report.coverage if c.status != CoverageStatus.UNCOVERED
     )
-    coverage_ratio = (covered_cells / total_cells) if total_cells > 0 else 0.0
+    coverage_ratio = (covered_cells / total_cells) if total_cells > 0 else None
 
     # 6. Extract uncovered cell rows (only for parse-successful trials)
     new_rows: list[dict[str, str]] = []
@@ -782,11 +782,9 @@ async def main() -> None:
 
     # Summary
     parse_ok = sum(1 for r in score_records if r["parse_success"])
-    if parse_ok > 0:
-        mean_cov = (
-            sum(r["coverage_ratio"] for r in score_records if r["parse_success"])
-            / parse_ok
-        )
+    covs = [r["coverage_ratio"] for r in score_records if r["parse_success"] and r["coverage_ratio"] is not None]
+    if covs:
+        mean_cov = sum(covs) / len(covs)
     else:
         mean_cov = 0.0
 

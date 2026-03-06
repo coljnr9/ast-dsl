@@ -40,7 +40,7 @@ class Stage4Score:
 
     # Intrinsic health metrics
     intrinsic_health: float = 0.0
-    coverage_ratio: float = 0.0
+    coverage_ratio: float | None = 0.0
     covered_cells: int = 0
     total_cells: int = 0
     unmatched_axiom_count: int = 0
@@ -169,7 +169,7 @@ async def score_stage4_output(
     # 4. Coverage & Health
     total_cells = len(match_report.coverage)
     covered_cells = sum(1 for c in match_report.coverage if c.status.value != "uncovered")
-    coverage_ratio = (covered_cells / total_cells) if total_cells > 0 else 0.0
+    coverage_ratio = (covered_cells / total_cells) if total_cells > 0 else None
     unmatched_axiom_count = len(match_report.unmatched_axioms)
     
     uncovered_cells = len(match_report.uncovered_cells)

@@ -98,7 +98,7 @@ def _normal_cdf(x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
 
-def _extract_response(score: Stage1Score | Stage4Score, response: str) -> float:
+def _extract_response(score: Stage1Score | Stage4Score, response: str) -> float | None:
     match response:
         case "health":
             if isinstance(score, Stage4Score):
@@ -165,6 +165,8 @@ def compute_main_effects(
                 if level is None:
                     continue
                 y = _extract_response(s, response)
+                if y is None:
+                    continue
                 if level == 1:
                     high_vals.append(y)
                 else:
@@ -240,6 +242,8 @@ def compute_interactions(
                     if la is None or lb is None:
                         continue
                     y = _extract_response(s, response)
+                    if y is None:
+                        continue
 
                     match (la, lb):
                         case (1, 1):

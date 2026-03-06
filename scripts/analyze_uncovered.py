@@ -172,7 +172,7 @@ def _table2(
     for rec in score_records:
         d = rec["domain"]
         trial_counts[d] += 1
-        if rec["parse_success"]:
+        if rec["parse_success"] and rec["coverage_ratio"] is not None:
             coverage_by_domain[d].append(rec["coverage_ratio"])
 
     # Aggregate uncovered stats by domain
