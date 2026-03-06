@@ -317,7 +317,7 @@ class TestDomainAnalysisInPrompts:
             spec_name="Counter",
             signature_code="sig = Signature(...)",
             signature_analysis="Step 1: ...",
-            obligation_table_md="| obs | ctor |",
+            obligation_prompt_md="| obs | ctor |",
             domain_analysis="ENTITIES: Counter with value...",
         )
         # Even when domain_analysis is supplied, Stage 4 template must NOT render it
@@ -331,7 +331,7 @@ class TestDomainAnalysisInPrompts:
             spec_name="Counter",
             signature_code="sig = Signature(...)",
             signature_analysis="Step 1: ...",
-            obligation_table_md="| obs | ctor |",
+            obligation_prompt_md="| obs | ctor |",
         )
         assert "Domain Analysis" not in prompt
 
@@ -352,7 +352,7 @@ class TestDomainAnalysisInPrompts:
             spec_name="BankAccount",
             signature_code="sig = Signature(...)",
             signature_analysis="Step 1: ...",
-            obligation_table_md="| obs | ctor |",
+            obligation_prompt_md="| obs | ctor |",
         )
         # These should NOT be in the user prompt anymore
         assert "Axiom writing rules" not in prompt

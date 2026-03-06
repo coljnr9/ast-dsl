@@ -128,9 +128,30 @@ def render_obligation_prompt(
                 sort_covered_axioms.append(ax)
 
         if sort_covered_axioms:
-            parts.append("```python")
+            from .axiom_gen import collect_variables
+            # Collect all variables across ALL axioms for this sort,
+            # preserving the order they first appear.
+            seen_vars: set[tuple[str, str]] = set()
+            all_vars: list[tuple[str, str]] = []
             for ax in sort_covered_axioms:
-                parts.append(render_axiom_to_python(ax))
+                for pair in collect_variables(ax):
+                    if pair not in seen_vars:
+                        seen_vars.add(pair)
+                        all_vars.append(pair)
+
+            code_lines: list[str] = []
+            short_names = {name for name, _sort in all_vars}
+            # Shared variable declarations at the top
+            for name, sort in all_vars:
+                code_lines.append(f'{name} = var("{name}", "{sort}")')
+            if all_vars:
+                code_lines.append("")
+            # Axiom lines using short names
+            for ax in sort_covered_axioms:
+                code_lines.append(render_axiom_to_python(ax, declarations=False))
+
+            parts.append("```python")
+            parts.extend(code_lines)
             parts.append("```")
         else:
             parts.append("(none)")

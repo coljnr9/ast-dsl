@@ -712,7 +712,7 @@ A = ["FORMAL_FRAME"]
         project_root = Path(__file__).parent.parent
         config = load_doe_config(toml_file, project_root=project_root)
         trials = generate_trials(config)
-        prompt_cache = _build_prompt_cache(trials)
+        prompt_cache = _build_prompt_cache(trials, config.stage)
 
         client_res = AsyncLLMClient.from_env()
         assert isinstance(client_res, Ok)

@@ -39,7 +39,7 @@ from alspec.eval.stage4_score import Stage4Score, _make_zero_stage4_score, score
 from alspec.eval.domains import DOMAINS  # noqa: E402
 from alspec.llm import AsyncLLMClient  # noqa: E402
 from alspec.obligation import build_obligation_table, ObligationTable  # noqa: E402
-from alspec.obligation_render import render_obligation_table  # noqa: E402
+
 from alspec.pipeline import (
     _build_signature_user_prompt,
     _build_axioms_user_prompt,

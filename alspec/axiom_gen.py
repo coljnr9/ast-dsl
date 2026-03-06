@@ -438,63 +438,171 @@ def _select_generator(
 # ---------------------------------------------------------------------------
 
 
-def render_axiom_to_python(axiom: Axiom) -> str:
+def collect_variables(axiom: Axiom) -> list[tuple[str, str]]:
+    """Collect all unique (name, sort) variable pairs from an axiom's formula.
+
+    Returns them in a stable order: forall-binding order first, then any
+    additional variables found elsewhere in the body (alphabetical fallback).
+    """
+    # Walk the formula to collect all Var nodes
+    seen: set[tuple[str, str]] = set()
+    ordered: list[tuple[str, str]] = []
+
+    def _walk_term(t: Term) -> None:
+        if isinstance(t, Var):
+            key = (t.name, str(t.sort))
+            if key not in seen:
+                seen.add(key)
+                ordered.append(key)
+        elif isinstance(t, FnApp):
+            for arg in t.args:
+                _walk_term(arg)
+        elif isinstance(t, FieldAccess):
+            _walk_term(t.term)
+
+    def _walk_formula(f: Formula) -> None:
+        if isinstance(f, Equation):
+            _walk_term(f.lhs)
+            _walk_term(f.rhs)
+        elif isinstance(f, PredApp):
+            for a in f.args:
+                _walk_term(a)
+        elif isinstance(f, Negation):
+            _walk_formula(f.formula)
+        elif isinstance(f, Conjunction):
+            for c in f.conjuncts:
+                _walk_formula(c)
+        elif isinstance(f, Disjunction):
+            for d in f.disjuncts:
+                _walk_formula(d)
+        elif isinstance(f, Implication):
+            _walk_formula(f.antecedent)
+            _walk_formula(f.consequent)
+        elif isinstance(f, Biconditional):
+            _walk_formula(f.lhs)
+            _walk_formula(f.rhs)
+        elif isinstance(f, UniversalQuant):
+            # Binding order first
+            for v in f.variables:
+                key = (v.name, str(v.sort))
+                if key not in seen:
+                    seen.add(key)
+                    ordered.append(key)
+            _walk_formula(f.body)
+        elif isinstance(f, ExistentialQuant):
+            for v in f.variables:
+                key = (v.name, str(v.sort))
+                if key not in seen:
+                    seen.add(key)
+                    ordered.append(key)
+            _walk_formula(f.body)
+        elif isinstance(f, Definedness):
+            _walk_term(f.term)
+
+    _walk_formula(axiom.formula)
+    return ordered
+
+
+def render_axiom_to_python(axiom: Axiom, *, declarations: bool = True) -> str:
     """Render an Axiom as a Python DSL source code string.
 
-    Produces code like:
+    If declarations=True (default), includes variable declarations
+    as `name = var("name", "Sort")` lines before the Axiom line:
+
+        s = var("s", "Stack")
+        e = var("e", "Elem")
         Axiom("pop_push_extract", forall([s, e], eq(app("pop", app("push", s, e)), s)))
+
+    If declarations=False, emits only the Axiom(...) expression using short
+    variable names. Caller is responsible for ensuring the variable declarations
+    are in scope.
 
     Uses the helper functions (forall, eq, app, var, const, pred_app, implication,
     negation, iff, definedness, field_access, exists, conjunction, etc.)
     — the same vocabulary the LLM uses to construct axioms.
     """
-    body = _render_formula(axiom.formula)
-    return f'Axiom("{axiom.label}", {body})'
+    vars_in_order = collect_variables(axiom)
+    short_names: set[str] = {name for name, _sort in vars_in_order}
+
+    body = _render_formula(axiom.formula, short_names)
+    axiom_line = f'Axiom("{axiom.label}", {body})'
+
+    if not declarations:
+        return axiom_line
+
+    decl_lines = [f'{name} = var("{name}", "{sort}")' for name, sort in vars_in_order]
+    if decl_lines:
+        return "\n".join(decl_lines) + "\n" + axiom_line
+    return axiom_line
 
 
-def _render_term(term: Term) -> str:
-    """Recursive renderer for Terms."""
+def _render_term(term: Term, short_names: set[str] | None = None) -> str:
+    """Recursive renderer for Terms.
+
+    If short_names is provided, Var nodes whose name is in that set are
+    rendered as bare identifiers (e.g. `s`) rather than `var("s", "Sort")`.
+    """
     if isinstance(term, Var):
+        if short_names is not None and term.name in short_names:
+            return term.name
         return f'var("{term.name}", "{term.sort}")'
     elif isinstance(term, FnApp):
         if not term.args:
             return f'const("{term.fn_name}")'
-        args_code = ", ".join(_render_term(arg) for arg in term.args)
+        args_code = ", ".join(_render_term(arg, short_names) for arg in term.args)
         return f'app("{term.fn_name}", {args_code})'
     elif isinstance(term, FieldAccess):
-        return f'field_access({_render_term(term.term)}, "{term.field_name}")'
+        return f'field_access({_render_term(term.term, short_names)}, "{term.field_name}")'
     elif isinstance(term, Literal):
         return f'Literal("{term.value}", SortRef("{term.sort}"))'
     else:
         raise ValueError(f"Unknown Term type: {type(term)}")
 
 
-def _render_formula(formula: Formula) -> str:
+def _render_formula(formula: Formula, short_names: set[str] | None = None) -> str:
     """Recursive renderer for Formulas."""
+    def rt(t: Term) -> str:
+        return _render_term(t, short_names)
+
+    def rf(f: Formula) -> str:
+        return _render_formula(f, short_names)
+
     if isinstance(formula, Equation):
-        return f"eq({_render_term(formula.lhs)}, {_render_term(formula.rhs)})"
+        return f"eq({rt(formula.lhs)}, {rt(formula.rhs)})"
     elif isinstance(formula, PredApp):
-        args_code = ", ".join(_render_term(arg) for arg in formula.args)
+        args_code = ", ".join(rt(a) for a in formula.args)
         return f'pred_app("{formula.pred_name}", {args_code})'
     elif isinstance(formula, Negation):
-        return f"negation({_render_formula(formula.formula)})"
+        return f"negation({rf(formula.formula)})"
     elif isinstance(formula, Conjunction):
-        args_code = ", ".join(_render_formula(f) for f in formula.conjuncts)
+        args_code = ", ".join(rf(f) for f in formula.conjuncts)
         return f"conjunction({args_code})"
     elif isinstance(formula, Disjunction):
-        args_code = ", ".join(_render_formula(f) for f in formula.disjuncts)
+        args_code = ", ".join(rf(f) for f in formula.disjuncts)
         return f"disjunction({args_code})"
     elif isinstance(formula, Implication):
-        return f"implication({_render_formula(formula.antecedent)}, {_render_formula(formula.consequent)})"
+        return f"implication({rf(formula.antecedent)}, {rf(formula.consequent)})"
     elif isinstance(formula, Biconditional):
-        return f"iff({_render_formula(formula.lhs)}, {_render_formula(formula.rhs)})"
+        return f"iff({rf(formula.lhs)}, {rf(formula.rhs)})"
     elif isinstance(formula, UniversalQuant):
-        vars_code = ", ".join(f'var("{v.name}", "{v.sort}")' for v in formula.variables)
-        return f"forall([{vars_code}], {_render_formula(formula.body)})"
+        if short_names is not None:
+            vars_code = ", ".join(
+                v.name if v.name in short_names else f'var("{v.name}", "{v.sort}")'
+                for v in formula.variables
+            )
+        else:
+            vars_code = ", ".join(f'var("{v.name}", "{v.sort}")' for v in formula.variables)
+        return f"forall([{vars_code}], {rf(formula.body)})"
     elif isinstance(formula, ExistentialQuant):
-        vars_code = ", ".join(f'var("{v.name}", "{v.sort}")' for v in formula.variables)
-        return f"exists([{vars_code}], {_render_formula(formula.body)})"
+        if short_names is not None:
+            vars_code = ", ".join(
+                v.name if v.name in short_names else f'var("{v.name}", "{v.sort}")'
+                for v in formula.variables
+            )
+        else:
+            vars_code = ", ".join(f'var("{v.name}", "{v.sort}")' for v in formula.variables)
+        return f"exists([{vars_code}], {rf(formula.body)})"
     elif isinstance(formula, Definedness):
-        return f"definedness({_render_term(formula.term)})"
+        return f"definedness({rt(formula.term)})"
     else:
         raise ValueError(f"Unknown Formula type: {type(formula)}")

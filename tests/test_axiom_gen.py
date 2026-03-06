@@ -593,22 +593,37 @@ class TestApproachB:
 
     def test_render_axiom_round_trip(self):
         """Rendered Python code must produce identical Axiom objects when exec'd."""
-        from alspec.axiom_gen import render_axiom_to_python
+        from alspec.axiom_gen import render_axiom_to_python, collect_variables
         for domain_name, spec in _load_all_golden_specs():
             sig = spec.signature
             table = build_obligation_table(sig)
             report = generate_mechanical_axioms(sig, table)
             for axiom in report.axioms:
+                # --- declarations=True: exec var decls, eval the Axiom line ---
                 code = render_axiom_to_python(axiom)
-                # Build a namespace with all the helpers
-                ns = {}
+                ns: dict = {}
                 exec("from alspec import *", ns)
                 exec("from alspec.helpers import *", ns)
-                # eval the code which returns the Axiom object
-                recovered = eval(code, ns)
+                lines = code.strip().splitlines()
+                exec("\n".join(lines[:-1]), ns)   # var declarations
+                recovered = eval(lines[-1], ns)   # Axiom(...) expression
                 assert recovered == axiom, (
-                    f"Round-trip failed for {axiom.label} in {domain_name}: "
-                    f"rendered as:\n{code}"
+                    f"Round-trip (declarations=True) failed for {axiom.label} "
+                    f"in {domain_name}:\n{code}"
+                )
+
+                # --- declarations=False: caller provides namespace ---
+                vars_in_order = collect_variables(axiom)
+                ns2: dict = {}
+                exec("from alspec import *", ns2)
+                exec("from alspec.helpers import *", ns2)
+                for name, sort in vars_in_order:
+                    exec(f'{name} = var("{name}", "{sort}")', ns2)
+                body_only = render_axiom_to_python(axiom, declarations=False)
+                recovered2 = eval(body_only, ns2)
+                assert recovered2 == axiom, (
+                    f"Round-trip (declarations=False) failed for {axiom.label} "
+                    f"in {domain_name}:\n{body_only}"
                 )
 
     def test_remaining_cells_exclude_mechanical(self):
