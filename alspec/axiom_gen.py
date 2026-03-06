@@ -3,14 +3,18 @@
 Generates axioms for obligation cells whose content is fully determined
 by the signature structure, requiring no domain knowledge.
 
-Covers three cell tiers:
+Covers two cell tiers:
   - SELECTOR_EXTRACT: sel(ctor(x₁,...,xₙ)) = xᵢ
   - KEY_DISPATCH MISS: ¬eq(k,k2) → obs(ctor(s,k,...),k2,...) = obs(s,k2,...)
-  - PRESERVATION: obs(ctor(s,...),k2,...) = obs(s,k2,...)
 
-Formal basis: THEORY.md §§8-9, CASL Reference Manual §2.3.4.
-These axioms are theorems of the free type semantics (selectors)
-or logical consequences of the frame axiom principle (MISS, PRESERVATION).
+Formal basis: CASL Reference Manual §2.3.4 (selector axioms from free type
+declarations) and the standard store/map frame axiom pattern (MISS delegation
+with provably different keys).
+
+PRESERVATION is NOT generated mechanically. The absence of a shared key sort
+does not imply non-interference — the constructor may affect all keys through
+domain logic. PRESERVATION remains as an informational tier hint in the
+obligation table, but axiom content is determined by the LLM.
 """
 
 from __future__ import annotations
@@ -297,8 +301,12 @@ def _generate_preservation(
 ) -> Axiom:
     """Generate obs(ctor(s,...),k2,...) = obs(s,k2,...) for a PRESERVATION cell.
 
-    The strongest frame axiom: the constructor doesn't take the observer's
-    key sort at all, so the observation unconditionally delegates.
+    NOTE: This function is NOT called by generate_mechanical_axioms().
+    PRESERVATION is not mechanically justified — the absence of a shared key
+    sort does not imply non-interference. This function is retained as a
+    utility for potential future opt-in use (e.g., user-confirmed preservation).
+
+    If called, it generates the unconditional delegation axiom.
     """
     all_vars, ctor_vars, obs_vars, state_var, _, _ = _build_cell_variables(cell, sig)
 
@@ -346,11 +354,14 @@ _MECHANICAL_DISPATCHES: frozenset[tuple[CellTier, CellDispatch]] = frozenset(
     }
 )
 
-_MECHANICAL_PRESERVATION: frozenset[CellTier] = frozenset(
-    {
-        CellTier.PRESERVATION,
-    }
-)
+# PRESERVATION is NOT mechanical. The absence of a shared key sort between
+# observer and constructor does not imply the observation is preserved —
+# the constructor may affect all keys through domain logic (e.g., clear_faults
+# in thermocouple, cycle with fault latching). Only KEY_DISPATCH MISS has
+# a genuine frame-axiom justification (provably different keys via ¬eq_K).
+# PRESERVATION remains as an informational tier hint for the LLM prompt,
+# but axiom_gen does not generate axioms for it.
+_MECHANICAL_PRESERVATION: frozenset[CellTier] = frozenset()
 
 
 def generate_mechanical_axioms(
@@ -425,10 +436,6 @@ def _select_generator(
     # KEY_DISPATCH MISS only
     if cell.tier == CellTier.KEY_DISPATCH and cell.dispatch == CellDispatch.MISS:
         return _generate_miss  # type: ignore[return-value]
-
-    # PRESERVATION: any dispatch (always PLAIN for preservation)
-    if cell.tier == CellTier.PRESERVATION:
-        return _generate_preservation  # type: ignore[return-value]
 
     return None  # type: ignore[return-value]
 

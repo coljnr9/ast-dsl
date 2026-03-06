@@ -205,9 +205,12 @@ class CellTier(Enum):
         Axiom must be split into HIT (eq_k holds) and MISS (¬eq_k).
         Mechanical if MISS delegates to inner state; domain reasoning for HIT.
 
-    PRESERVATION: Observer's key sort is not affected by this constructor.
-        Constructor does not take the observer's key sort as a parameter.
-        Axiom typically preserves the observer's value from the previous state.
+    PRESERVATION: Informational hint — observer has key sorts the constructor
+        does not take. This SUGGESTS preservation but is NOT mechanically
+        justified. The constructor may affect all keys through domain logic
+        (e.g., clear_faults resets all fault types despite having no FaultType
+        parameter). The LLM must confirm preservation via domain reasoning.
+        axiom_gen does NOT generate axioms for this tier.
 
     BASE_CASE: Constructor is the base constructor (no recursive self-referential parameter).
         Typically results in base values: ¬def for partial, false for predicates.
@@ -301,13 +304,19 @@ def _compute_tier(
     if any(s in equality_preds for s in shared):
         return CellTier.KEY_DISPATCH, None, None
 
-    # 3. Preservation (observer has keys, constructor doesn't take them)
-    if obs_key_sorts and not (obs_key_sorts & ctor_non_state_sorts):
-        return CellTier.PRESERVATION, None, None
-
-    # 4. Base case (constructor with no recursive self-referential parameter)
+    # 3. Base case (constructor with no recursive self-referential parameter)
+    # Must be checked before PRESERVATION: nullary/base constructors like
+    # `empty` should be BASE_CASE, not PRESERVATION, even when the observer
+    # has key sorts that the constructor obviously doesn't take.
     if all(p.sort != gen_sort for p in ctor.params):
         return CellTier.BASE_CASE, None, None
+
+    # 4. Preservation hint (observer has keys, constructor doesn't take them)
+    # This is an INFORMATIONAL hint only — axiom_gen does NOT generate axioms
+    # for this tier. The absence of a shared key sort suggests preservation
+    # is likely, but it requires domain confirmation by the LLM.
+    if obs_key_sorts and not (obs_key_sorts & ctor_non_state_sorts):
+        return CellTier.PRESERVATION, None, None
 
     return CellTier.DOMAIN, None, None
 

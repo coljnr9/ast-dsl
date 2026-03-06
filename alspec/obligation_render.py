@@ -218,9 +218,9 @@ def render_obligation_prompt(
                     case CellTier.SELECTOR_FOREIGN:
                         hint = "SELECTOR_FOREIGN: write ¬def(...) or preservation"
                     case CellTier.PRESERVATION:
-                        hint = "PRESERVATION"
+                        hint = "DOMAIN (likely preservation — constructor lacks observer's key sort)"
                         if obs_name in table.pred_roles:
-                             hint = "PRESERVATION: typically delegates via iff"
+                             hint = "DOMAIN (likely preservation via iff — constructor lacks observer's key sort)"
                     case _:
                         hint = cell.tier.value
 
