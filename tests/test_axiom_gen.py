@@ -12,6 +12,7 @@ from pathlib import Path
 from alspec.axiom_gen import (
     MechanicalAxiomReport,
     generate_mechanical_axioms,
+    render_axiom_to_python,
 )
 from alspec.axiom_match import CoverageStatus, match_spec_sync
 from alspec.check import check_spec
@@ -586,3 +587,48 @@ class TestIntegration:
                 assert cc.status != CoverageStatus.UNCOVERED, (
                     f"Generated axiom for {key} was not recognized by matcher"
                 )
+
+class TestApproachB:
+    """Tests for the Approach B prompt generation logic."""
+
+    def test_render_axiom_round_trip(self):
+        """Rendered Python code must produce identical Axiom objects when exec'd."""
+        from alspec.axiom_gen import render_axiom_to_python
+        for domain_name, spec in _load_all_golden_specs():
+            sig = spec.signature
+            table = build_obligation_table(sig)
+            report = generate_mechanical_axioms(sig, table)
+            for axiom in report.axioms:
+                code = render_axiom_to_python(axiom)
+                # Build a namespace with all the helpers
+                ns = {}
+                exec("from alspec import *", ns)
+                exec("from alspec.helpers import *", ns)
+                # eval the code which returns the Axiom object
+                recovered = eval(code, ns)
+                assert recovered == axiom, (
+                    f"Round-trip failed for {axiom.label} in {domain_name}: "
+                    f"rendered as:\n{code}"
+                )
+
+    def test_remaining_cells_exclude_mechanical(self):
+        """render_obligation_prompt should not list mechanically covered cells."""
+        from alspec.obligation_render import render_obligation_prompt
+
+        for domain_name, spec in _load_all_golden_specs():
+            sig = spec.signature
+            table = build_obligation_table(sig)
+            report = generate_mechanical_axioms(sig, table)
+            prompt = render_obligation_prompt(sig, table, report)
+
+            # The mechanical axiom labels should appear in the "already generated" section
+            for axiom in report.axioms:
+                assert (
+                    axiom.label in prompt
+                ), f"Mechanical axiom {axiom.label} missing from prompt for {domain_name}"
+
+            # We'll check that a purely mechanical cell is NOT in the remaining list.
+            if domain_name == "stack":
+                remaining_section = prompt.split("Remaining axiom obligations")[1]
+                # top(push(s, e)) should be mechanical (SELECTOR_EXTRACT)
+                assert "top(push(s, e))" not in remaining_section

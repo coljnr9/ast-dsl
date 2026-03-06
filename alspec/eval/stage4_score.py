@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from alspec.axiom_gen import generate_mechanical_axioms
 from alspec.axiom_match import match_spec
 from alspec.check import check_spec
 from alspec.obligation import build_obligation_table
@@ -132,6 +133,22 @@ async def score_stage4_output(
             f"Stage 4 code did not produce a `spec` variable of type Spec (got {type(spec).__name__ if spec is not None else 'nothing'})",
             factor_levels=factor_levels,
         )
+
+    # 1.5. Merge mechanical axioms (Stage 3.5)
+    # The LLM sees mechanical axioms in the prompt and is told not to repeat them.
+    # We merge them here so that well-formedness and coverage reflect the complete spec.
+    table = build_obligation_table(sig)
+    mech_report = generate_mechanical_axioms(sig, table)
+    mech_labels = {a.label for a in mech_report.axioms}
+
+    combined_axioms = list(mech_report.axioms) + [
+        a for a in spec.axioms if a.label not in mech_labels
+    ]
+    spec = Spec(
+        name=spec.name,
+        signature=sig,  # Use the validated signature
+        axioms=tuple(combined_axioms),
+    )
 
     # 2. Check well-formedness
     checker_report = check_spec(spec)

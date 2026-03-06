@@ -18,7 +18,21 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from .helpers import app, eq, forall, iff, implication, negation, pred_app, var
+from .helpers import (
+    app,
+    conjunction,
+    definedness,
+    disjunction,
+    eq,
+    exists,
+    field_access,
+    forall,
+    iff,
+    implication,
+    negation,
+    pred_app,
+    var,
+)
 from .obligation import (
     CellDispatch,
     CellTier,
@@ -27,7 +41,24 @@ from .obligation import (
 )
 from .signature import FnSymbol, PredSymbol, Signature, SortRef
 from .spec import Axiom
-from .terms import Formula, Var
+from .terms import (
+    Biconditional,
+    Conjunction,
+    Definedness,
+    Disjunction,
+    Equation,
+    ExistentialQuant,
+    FieldAccess,
+    FnApp,
+    Formula,
+    Implication,
+    Literal,
+    Negation,
+    PredApp,
+    Term,
+    UniversalQuant,
+    Var,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -400,3 +431,70 @@ def _select_generator(
         return _generate_preservation  # type: ignore[return-value]
 
     return None  # type: ignore[return-value]
+
+
+# ---------------------------------------------------------------------------
+# Python renderer (inverse of the DSL)
+# ---------------------------------------------------------------------------
+
+
+def render_axiom_to_python(axiom: Axiom) -> str:
+    """Render an Axiom as a Python DSL source code string.
+
+    Produces code like:
+        Axiom("pop_push_extract", forall([s, e], eq(app("pop", app("push", s, e)), s)))
+
+    Uses the helper functions (forall, eq, app, var, const, pred_app, implication,
+    negation, iff, definedness, field_access, exists, conjunction, etc.)
+    — the same vocabulary the LLM uses to construct axioms.
+    """
+    body = _render_formula(axiom.formula)
+    return f'Axiom("{axiom.label}", {body})'
+
+
+def _render_term(term: Term) -> str:
+    """Recursive renderer for Terms."""
+    if isinstance(term, Var):
+        return f'var("{term.name}", "{term.sort}")'
+    elif isinstance(term, FnApp):
+        if not term.args:
+            return f'const("{term.fn_name}")'
+        args_code = ", ".join(_render_term(arg) for arg in term.args)
+        return f'app("{term.fn_name}", {args_code})'
+    elif isinstance(term, FieldAccess):
+        return f'field_access({_render_term(term.term)}, "{term.field_name}")'
+    elif isinstance(term, Literal):
+        return f'Literal("{term.value}", SortRef("{term.sort}"))'
+    else:
+        raise ValueError(f"Unknown Term type: {type(term)}")
+
+
+def _render_formula(formula: Formula) -> str:
+    """Recursive renderer for Formulas."""
+    if isinstance(formula, Equation):
+        return f"eq({_render_term(formula.lhs)}, {_render_term(formula.rhs)})"
+    elif isinstance(formula, PredApp):
+        args_code = ", ".join(_render_term(arg) for arg in formula.args)
+        return f'pred_app("{formula.pred_name}", {args_code})'
+    elif isinstance(formula, Negation):
+        return f"negation({_render_formula(formula.formula)})"
+    elif isinstance(formula, Conjunction):
+        args_code = ", ".join(_render_formula(f) for f in formula.conjuncts)
+        return f"conjunction({args_code})"
+    elif isinstance(formula, Disjunction):
+        args_code = ", ".join(_render_formula(f) for f in formula.disjuncts)
+        return f"disjunction({args_code})"
+    elif isinstance(formula, Implication):
+        return f"implication({_render_formula(formula.antecedent)}, {_render_formula(formula.consequent)})"
+    elif isinstance(formula, Biconditional):
+        return f"iff({_render_formula(formula.lhs)}, {_render_formula(formula.rhs)})"
+    elif isinstance(formula, UniversalQuant):
+        vars_code = ", ".join(f'var("{v.name}", "{v.sort}")' for v in formula.variables)
+        return f"forall([{vars_code}], {_render_formula(formula.body)})"
+    elif isinstance(formula, ExistentialQuant):
+        vars_code = ", ".join(f'var("{v.name}", "{v.sort}")' for v in formula.variables)
+        return f"exists([{vars_code}], {_render_formula(formula.body)})"
+    elif isinstance(formula, Definedness):
+        return f"definedness({_render_term(formula.term)})"
+    else:
+        raise ValueError(f"Unknown Formula type: {type(formula)}")

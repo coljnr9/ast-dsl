@@ -7,7 +7,8 @@ import importlib.util
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 from alspec.obligation import build_obligation_table
-from alspec.obligation_render import render_obligation_table
+from alspec.obligation_render import render_obligation_prompt
+from alspec.axiom_gen import generate_mechanical_axioms
 from alspec.signature import Signature
 
 
@@ -44,7 +45,8 @@ def main():
         )
 
         table = build_obligation_table(patched_sig)
-        rendered = render_obligation_table(patched_sig, table)
+        mech_report = generate_mechanical_axioms(patched_sig, table)
+        rendered = render_obligation_prompt(patched_sig, table, mech_report)
 
         print(f"\n{'='*70}")
         print(f"  {domain_id}")

@@ -14,6 +14,7 @@ from langfuse.openai import AsyncOpenAI  # type: ignore[attr-defined]
 
 from alspec.result import Err, Ok, Result
 
+_TOOL_CHOICE_AUTO_MODELS = ["inception/mercury-2"]
 # ---------------------------------------------------------------------------
 # Token usage metrics
 # ---------------------------------------------------------------------------
@@ -166,7 +167,6 @@ _TOOL_REGISTRY: dict[str, dict[str, object]] = {
 }
 
 
-
 class AsyncLLMClient:
     """An asynchronous LLM client that wraps the OpenAI SDK for OpenRouter.
 
@@ -220,10 +220,13 @@ class AsyncLLMClient:
         try:
             messages = self._prepare_messages(messages)
             tool_schema = _TOOL_REGISTRY[tool_name]
-            tool_choice: dict[str, object] = {
-                "type": "function",
-                "function": {"name": tool_name},
-            }
+            if model in _TOOL_CHOICE_AUTO_MODELS:
+                tool_choice: str | dict[str, object] = "auto"
+            else:
+                tool_choice: str | dict[str, object] = {
+                    "type": "function",
+                    "function": {"name": tool_name},
+                }
             extra_body: dict[str, object] = {}
             match self._session_id:
                 case str(sid):
@@ -300,10 +303,13 @@ class AsyncLLMClient:
         try:
             messages = self._prepare_messages(messages)
             tool_schema = _TOOL_REGISTRY["submit_analysis"]
-            tool_choice: dict[str, object] = {
-                "type": "function",
-                "function": {"name": "submit_analysis"},
-            }
+            if model in _TOOL_CHOICE_AUTO_MODELS:
+                tool_choice: str | dict[str, object] = "auto"
+            else:
+                tool_choice: str | dict[str, object] = {
+                    "type": "function",
+                    "function": {"name": "submit_analysis"},
+                }
             extra_body: dict[str, object] = {}
             match self._session_id:
                 case str(sid):
@@ -358,9 +364,7 @@ class AsyncLLMClient:
                 return Ok((a, usage))
             case _:
                 return Err(
-                    RuntimeError(
-                        "submit_analysis arguments missing 'analysis' field"
-                    )
+                    RuntimeError("submit_analysis arguments missing 'analysis' field")
                 )
 
     async def generate_text(

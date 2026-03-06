@@ -87,11 +87,11 @@ from alspec.check import check_spec  # noqa: E402
 from alspec.eval.domains import DOMAINS, DomainPrompt  # noqa: E402
 from alspec.llm import AsyncLLMClient  # noqa: E402
 from alspec.obligation import ObligationTable, build_obligation_table  # noqa: E402
-from alspec.obligation_render import render_obligation_table  # noqa: E402
 from alspec.pipeline import (  # noqa: E402
     _build_axioms_user_prompt,
     run_pipeline_signature_only,
 )
+from alspec.obligation_render import render_obligation_prompt
 from alspec.prompt_chunks import ChunkId, Stage, assemble_prompt  # noqa: E402
 from alspec.result import Err, Ok  # noqa: E402
 from alspec.signature import Signature  # noqa: E402
@@ -151,9 +151,10 @@ class UpstreamCache:
     domain: str
     signature: Signature
     obligation_table: ObligationTable
+    mech_report: MechanicalAxiomReport
     signature_code: str
     signature_analysis: str
-    obligation_table_rendered: str
+    obligation_prompt_md: str
     analysis_text: str | None
     spec_name: str
 
@@ -169,7 +170,8 @@ def _upstream_cache_from_snapshot(
     sig = restore_signature(snapshot)
 
     table = build_obligation_table(sig)
-    table_md = render_obligation_table(sig, table)
+    mech_report = generate_mechanical_axioms(sig, table)
+    prompt_md = render_obligation_prompt(sig, table, mech_report)
 
     assert snapshot.stage2 is not None  # guaranteed by load validation
 
@@ -177,9 +179,10 @@ def _upstream_cache_from_snapshot(
         domain=snapshot.domain,
         signature=sig,
         obligation_table=table,
+        mech_report=mech_report,
         signature_code=snapshot.stage2.signature_code,
         signature_analysis=snapshot.stage2.signature_analysis,
-        obligation_table_rendered=table_md,
+        obligation_prompt_md=prompt_md,
         analysis_text=snapshot.stage1.analysis_text if snapshot.stage1 else None,
         spec_name=snapshot.domain.replace("-", " ").title().replace(" ", ""),
     )
@@ -251,7 +254,8 @@ async def _build_upstream_cache(
 
             try:
                 table = build_obligation_table(sig)
-                table_md = render_obligation_table(sig, table)
+                mech_report = generate_mechanical_axioms(sig, table)
+                prompt_md = render_obligation_prompt(sig, table, mech_report)
             except Exception as e:
                 logger.warning("Obligation table failed for domain %s: %s", domain, e)
                 return
@@ -260,9 +264,10 @@ async def _build_upstream_cache(
                 domain=domain,
                 signature=sig,
                 obligation_table=table,
+                mech_report=mech_report,
                 signature_code=result.signature_code or "",
                 signature_analysis=result.signature_analysis or "",
-                obligation_table_rendered=table_md,
+                obligation_prompt_md=prompt_md,
                 analysis_text=result.domain_analysis,
                 spec_name=domain.replace("-", " ").title().replace(" ", ""),
             )
@@ -320,7 +325,7 @@ async def _run_trial(
         spec_name=upstream.spec_name,
         signature_code=upstream.signature_code,
         signature_analysis=upstream.signature_analysis,
-        obligation_table_md=upstream.obligation_table_rendered,
+        obligation_prompt_md=upstream.obligation_prompt_md,
         domain_analysis=upstream.analysis_text,
     )
 
@@ -403,9 +408,7 @@ async def _run_trial(
         )
 
     # 2. Merge mechanical axioms (Stage 3.5)
-    mech_report = generate_mechanical_axioms(
-        upstream.signature, upstream.obligation_table
-    )
+    mech_report = upstream.mech_report
     mech_labels = {a.label for a in mech_report.axioms}
     # Keep LLM axioms that don't collide with mechanical labels
     combined_axioms = list(mech_report.axioms) + [

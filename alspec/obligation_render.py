@@ -7,6 +7,8 @@ and the CellTier annotation that indicates how deterministic the fill is.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from .obligation import (
     CellDispatch,
     CellTier,
@@ -17,80 +19,87 @@ from .obligation import (
 )
 from .signature import Signature, Totality
 
+if TYPE_CHECKING:
+    from .axiom_gen import MechanicalAxiomReport
 
-def render_obligation_table(sig: Signature, table: ObligationTable) -> str:
-    """Render the obligation table as a markdown string.
 
-    Produces one section per generated sort, with:
-      - Role summary (constructors, observers, selectors, constants, uninterpreted)
-      - The obligation grid as a markdown table with Cell Type and Hint columns
-      - Notes on equality basis axioms needed
-      - Notes on partial constructor definedness axioms needed
+def render_obligation_prompt(
+    sig: Signature,
+    table: ObligationTable,
+    mechanical_report: MechanicalAxiomReport,
+) -> str:
+    """Render the obligation prompt for Stage 4 axiom generation.
+
+    Produces two sections:
+    1. Completed mechanical axioms as Python DSL code
+    2. Remaining obligation cells as a flat task list grouped by observer
+
+    This replaces the old grid-based obligation table. The rationale:
+    - Mechanical axioms serve as in-context examples in the LLM's output format
+    - KEY_DISPATCH MISS axioms scaffold the corresponding HIT axioms
+    - Flat task list matches the CASL literature's specification format
+    - Eliminates the grid-to-code translation cognitive overhead
     """
+    from .axiom_gen import render_axiom_to_python
+
     parts: list[str] = []
+
+    # Get covered cell keys (observer_name, constructor_name, dispatch)
+    covered_keys = {
+        (c.observer_name, c.constructor_name, c.dispatch)
+        for c in mechanical_report.cells_covered
+    }
 
     # Group cells by generated sort
     sort_cells: dict[str, list[ObligationCell]] = {}
     for cell in table.cells:
         sort_cells.setdefault(cell.generated_sort, []).append(cell)
 
+    # Partial functions set for profile rendering
+    partial_fns = {
+        name for name, f in sig.functions.items() if f.totality == Totality.PARTIAL
+    }
+
     for gen_sort in sorted(sig.generated_sorts.keys()):
         cells = sort_cells.get(gen_sort, [])
         info = sig.generated_sorts[gen_sort]
         ctor_names = list(info.constructors)
 
-        # Gather role info
-        fn_observers = sorted(
-            n for n, r in table.fn_roles.items()
-            if r.kind == FnKind.OBSERVER and r.sort == gen_sort
-        )
-        fn_selectors = sorted(
-            n for n, r in table.fn_roles.items()
-            if r.kind == FnKind.SELECTOR and r.sort == gen_sort
-        )
-        pred_observers = sorted(
-            n for n, r in table.pred_roles.items()
-            if r.kind == PredKind.OBSERVER and r.sort == gen_sort
-        )
-        constants = sorted(
-            n for n, r in table.fn_roles.items()
-            if r.kind == FnKind.CONSTANT
-        )
-        uninterpreted = sorted(
-            n for n, r in table.fn_roles.items()
-            if r.kind == FnKind.UNINTERPRETED
-        )
-        equality_preds = sorted(
-            n for n, r in table.pred_roles.items()
-            if r.kind == PredKind.EQUALITY
-        )
-
-        # Partial functions
-        partial_fns = {
-            name for name, f in sig.functions.items()
-            if f.totality == Totality.PARTIAL
-        }
-        partial_constructors = [c for c in ctor_names if c in partial_fns]
-
-        # Header
-        parts.append(f"### Obligation Table: `{gen_sort}`\n")
+        # Header for the sort
+        parts.append(f"## Sort: {gen_sort}\n")
 
         # Role summary
-        parts.append("**Roles:**\n")
-        parts.append(f"- Constructors: {_fn_list(ctor_names, partial_fns, sig)}")
-        if fn_observers:
-            parts.append(f"- Function observers: {_fn_list(fn_observers, partial_fns, sig)}")
+        parts.append(f"**Constructors:** {_fn_list(ctor_names, partial_fns, sig)}")
+
+        fn_observers = sorted(
+            n
+            for n, r in table.fn_roles.items()
+            if r.kind == FnKind.OBSERVER and r.sort == gen_sort
+        )
+        # Filter profiles to ONLY show the ones for this sort
+        parts.append(f"**Observers:** {_fn_list(fn_observers, partial_fns, sig)}")
+
+        fn_selectors = sorted(
+            n
+            for n, r in table.fn_roles.items()
+            if r.kind == FnKind.SELECTOR and r.sort == gen_sort
+        )
         if fn_selectors:
-            parts.append(f"- Selectors (component extractors): {_fn_list(fn_selectors, partial_fns, sig)}")
+            parts.append(f"**Selectors:** {_fn_list(fn_selectors, partial_fns, sig)}")
+        else:
+            parts.append("**Selectors:** (none)")
+
+        pred_observers = sorted(
+            n
+            for n, r in table.pred_roles.items()
+            if r.kind == PredKind.OBSERVER and r.sort == gen_sort
+        )
         if pred_observers:
-            parts.append(f"- Predicate observers: {', '.join(f'`{p}`' for p in pred_observers)}")
-        if constants:
-            parts.append(f"- Constants: {', '.join(f'`{c}`' for c in constants)}")
-        if uninterpreted:
-            parts.append(f"- Uninterpreted: {', '.join(f'`{u}`' for u in uninterpreted)}")
-        if equality_preds:
-            parts.append(f"- Equality predicates: {', '.join(f'`{e}`' for e in equality_preds)}")
-        parts.append("")
+            parts.append(
+                f"**Predicates:** {', '.join(f'`{p}`' for p in pred_observers)}"
+            )
+        else:
+            parts.append("**Predicates:** (none)")
 
         # Key dispatch info
         key_sorts = set()
@@ -103,67 +112,114 @@ def render_obligation_table(sig: Signature, table: ObligationTable) -> str:
         if key_sorts:
             ks = ", ".join(f"`{k}`" for k in sorted(key_sorts))
             ep = ", ".join(f"`{e}`" for e in sorted(eq_preds_used))
-            parts.append(f"**Key dispatch:** {ep} over {ks}\n")
-
-        # The obligation grid with Cell Type and Hint columns
-        parts.append("| # | Observer | Constructor | Dispatch | Cell Type | Hint |")
-        parts.append("|---|----------|------------|----------|-----------|------|")
-
-        for i, cell in enumerate(cells, 1):
-            obs_name = cell.observer_name
-            obs_type = "pred" if cell.observer_is_predicate else "fn"
-            is_partial = obs_name in partial_fns and not cell.observer_is_predicate
-
-            # Observer label
-            partial_marker = " _(partial)_" if is_partial else ""
-            obs_label = f"`{obs_name}` ({obs_type}){partial_marker}"
-
-            # Constructor label
-            ctor_label = f"`{cell.constructor_name}`"
-            ctor_is_partial = cell.constructor_name in partial_fns
-            if ctor_is_partial:
-                ctor_label += " _(partial)_"
-
-            # Dispatch
-            match cell.dispatch:
-                case CellDispatch.PLAIN:
-                    dispatch_str = "—"
-                case CellDispatch.HIT:
-                    dispatch_str = f"hit (`{cell.eq_pred}`)"
-                case CellDispatch.MISS:
-                    dispatch_str = f"miss (`¬{cell.eq_pred}`)"
-
-            # Cell type label
-            match cell.tier:
-                case CellTier.SELECTOR_EXTRACT:
-                    tier_str = "`SELECTOR_EXTRACT`"
-                case CellTier.SELECTOR_FOREIGN:
-                    tier_str = "`SELECTOR_FOREIGN`"
-                case CellTier.KEY_DISPATCH:
-                    tier_str = "`KEY_DISPATCH`"
-                case CellTier.PRESERVATION:
-                    tier_str = "`PRESERVATION`"
-                case CellTier.BASE_CASE:
-                    tier_str = "`BASE_CASE`"
-                case CellTier.DOMAIN:
-                    tier_str = "`DOMAIN`"
-
-            # Hint
-            hint = _cell_hint(cell, sig, partial_fns, ctor_names)
-
-            parts.append(f"| {i} | {obs_label} | {ctor_label} | {dispatch_str} | {tier_str} | {hint} |")
+            parts.append(f"**Key dispatch:** {ep} over {ks}")
 
         parts.append("")
 
-        # Extra axioms needed outside the table
-        extras: list[str] = []
+        # Section 1: Mechanical axioms
+        parts.append("### Mechanical axioms (already generated — do not repeat these)\n")
+        parts.append("These axioms are included in the final specification automatically.")
+        parts.append("They are shown here as context for writing the remaining axioms.\n")
 
+        # Filter mechanical axioms for this sort
+        sort_covered_axioms = []
+        for ax, cell in zip(mechanical_report.axioms, mechanical_report.cells_covered):
+            if cell.generated_sort == gen_sort:
+                sort_covered_axioms.append(ax)
+
+        if sort_covered_axioms:
+            parts.append("```python")
+            for ax in sort_covered_axioms:
+                parts.append(render_axiom_to_python(ax))
+            parts.append("```")
+        else:
+            parts.append("(none)")
+
+        parts.append("")
+
+        # Section 2: Remaining obligations
+        parts.append("### Remaining axiom obligations (you must write these)\n")
+
+        # Group remaining cells by observer
+        remaining_cells = [
+            c
+            for c in cells
+            if (c.observer_name, c.constructor_name, c.dispatch) not in covered_keys
+        ]
+
+        if not remaining_cells:
+            parts.append("All obligations for this sort are handled mechanically.\n")
+            continue
+
+        obs_remaining: dict[str, list[ObligationCell]] = {}
+        for c in remaining_cells:
+            obs_remaining.setdefault(c.observer_name, []).append(c)
+
+        for obs_name in sorted(obs_remaining.keys()):
+            # Observer heading with profile
+            if obs_name in table.pred_roles:
+                p = sig.predicates[obs_name]
+                profile_args = " × ".join(p.sort for p in p.params)
+                heading = f"#### {obs_name} (predicate: {profile_args})"
+            else:
+                f = sig.functions[obs_name]
+                profile_args = " × ".join(p.sort for p in f.params)
+                arrow = "→?" if obs_name in partial_fns else "→"
+                profile = f"{profile_args} {arrow} {f.result}"
+                heading = f"#### {obs_name} ({'partial ' if obs_name in partial_fns else ''}observer: {profile})"
+
+            parts.append(heading)
+
+            for cell in obs_remaining[obs_name]:
+                ctor_app, obs_app, guard, delegation = _structural_hint_parts(cell, sig)
+                item = f"- `{obs_app}`"
+                if guard and cell.dispatch == CellDispatch.HIT:
+                    item += f" when `{guard}`"
+
+                # Tier hint
+                match cell.tier:
+                    case CellTier.BASE_CASE:
+                        hint = "BASE_CASE"
+                        if obs_name in partial_fns:
+                            hint += ": likely ¬def(...)"
+                        elif obs_name in table.pred_roles:
+                            hint += ": typically false for base"
+                    case CellTier.KEY_DISPATCH:
+                        if cell.dispatch == CellDispatch.HIT:
+                            if obs_name in table.pred_roles:
+                                hint = "HIT: define predicate for matching key"
+                            else:
+                                hint = "HIT: domain-specific equation needed"
+                        else:
+                            hint = "MISS"  # Should be mechanical, but if not
+                    case CellTier.DOMAIN:
+                        hint = "DOMAIN"
+                    case CellTier.SELECTOR_FOREIGN:
+                        hint = "SELECTOR_FOREIGN: write ¬def(...) or preservation"
+                    case CellTier.PRESERVATION:
+                        hint = "PRESERVATION"
+                        if obs_name in table.pred_roles:
+                             hint = "PRESERVATION: typically delegates via iff"
+                    case _:
+                        hint = cell.tier.value
+
+                parts.append(f"{item} — {hint}")
+            parts.append("")
+
+        # Additional axioms (outside the table)
+        equality_preds = sorted(
+            n
+            for n, r in table.pred_roles.items()
+            if r.kind == PredKind.EQUALITY and r.sort == gen_sort
+        )
+        partial_constructors = [c for c in ctor_names if c in partial_fns]
+
+        extras: list[str] = []
         if equality_preds:
             for ep in equality_preds:
                 extras.append(
                     f"- **`{ep}` basis:** reflexivity, symmetry, transitivity (3 axioms)"
                 )
-
         if partial_constructors:
             for pc in partial_constructors:
                 extras.append(
@@ -172,22 +228,9 @@ def render_obligation_table(sig: Signature, table: ObligationTable) -> str:
                 )
 
         if extras:
-            parts.append("**Additional axioms (outside the table):**\n")
+            parts.append("**Additional axioms (outside the table):**")
             parts.extend(extras)
             parts.append("")
-
-        # Cell count summary
-        n_extra = len(equality_preds) * 3 + len(partial_constructors)
-        parts.append(
-            f"**Expected axiom count:** {len(cells)} obligation cells"
-            + (f" + {n_extra} additional = {len(cells) + n_extra} minimum" if n_extra else "")
-            + "\n"
-        )
-        parts.append(
-            "Note: Some hit+miss pairs may collapse into a single universal preservation "
-            "axiom if the constructor does not affect the observer for any key. The actual "
-            "axiom count may be lower than the cell count.\n"
-        )
 
     return "\n".join(parts)
 
@@ -288,56 +331,3 @@ def _structural_hint_parts(
     return ctor_app, obs_app, guard, delegation
 
 
-def _cell_hint(
-    cell: ObligationCell,
-    sig: Signature,
-    partial_fns: set[str],
-    constructors: list[str],
-) -> str:
-    """Generate a hint for a single cell based on its CellTier and context."""
-    obs_is_partial = cell.observer_name in partial_fns and not cell.observer_is_predicate
-
-    match cell.tier:
-        case CellTier.SELECTOR_EXTRACT:
-            return "mechanical: `sel(ctor(x1,...,xn)) = xi`"
-
-        case CellTier.SELECTOR_FOREIGN:
-            return "write `¬def(...)` or preservation"
-
-        case CellTier.KEY_DISPATCH:
-            _, obs_app, guard, delegation = _structural_hint_parts(cell, sig)
-            if cell.dispatch == CellDispatch.HIT:
-                if cell.observer_is_predicate:
-                    return f"write: `{guard} → {obs_app}` — define predicate for matching key"
-                else:
-                    return f"write: `{guard} → {obs_app} = <value>`"
-            else:  # MISS
-                if cell.observer_is_predicate:
-                    return f"write: `¬{guard} → {obs_app} ↔ {delegation}`"
-                else:
-                    return f"write: `¬{guard} → {obs_app} = {delegation}`"
-
-        case CellTier.PRESERVATION:
-            _, obs_app, _, delegation = _structural_hint_parts(cell, sig)
-            if cell.observer_is_predicate:
-                return f"write: `{obs_app} ↔ {delegation}`"
-            else:
-                return f"write: `{obs_app} = {delegation}`"
-
-        case CellTier.BASE_CASE:
-            _, obs_app, _, _ = _structural_hint_parts(cell, sig)
-            if obs_is_partial:
-                return f"write: `¬def({obs_app})`"
-            elif cell.observer_is_predicate:
-                return f"write: `{obs_app}` — typically false for base"
-            else:
-                return f"write: `{obs_app} = <default>`"
-
-        case CellTier.DOMAIN:
-            _, obs_app, _, _ = _structural_hint_parts(cell, sig)
-            if cell.observer_is_predicate:
-                return f"write: `{obs_app} ↔ <condition>`"
-            else:
-                return f"write: `{obs_app} = <value>`"
-
-    return "requires domain reasoning"

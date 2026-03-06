@@ -11,7 +11,8 @@ import importlib.util
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 from alspec.obligation import build_obligation_table, classify_functions, classify_predicates, FnKind, PredKind
-from alspec.obligation_render import render_obligation_table
+from alspec.obligation_render import render_obligation_prompt
+from alspec.axiom_gen import generate_mechanical_axioms
 from alspec.signature import GeneratedSortInfo, Signature
 
 
@@ -56,7 +57,8 @@ def main():
         other_preds = sorted(n for n, r in pred_roles.items() if r.kind == PredKind.OTHER)
 
         if mode == "--all" or (mode == "--render" and len(sys.argv) > 2 and sys.argv[2] == domain_id):
-            rendered = render_obligation_table(sig, table)
+            mech_report = generate_mechanical_axioms(sig, table)
+            rendered = render_obligation_prompt(sig, table, mech_report)
             print(f"\n{'='*70}")
             print(f"  {domain_id}")
             print(f"{'='*70}")

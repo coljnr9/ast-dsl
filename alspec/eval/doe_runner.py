@@ -44,7 +44,9 @@ from alspec.pipeline import (
     _build_signature_user_prompt,
     _build_axioms_user_prompt,
     run_pipeline_signature_only,
-)  # noqa: E402
+)
+from alspec.axiom_gen import generate_mechanical_axioms
+from alspec.obligation_render import render_obligation_prompt
 from alspec.prompt_chunks import Stage, assemble_prompt  # noqa: E402
 from alspec.result import Err, Ok  # noqa: E402
 from alspec.signature import Signature  # noqa: E402
@@ -66,7 +68,7 @@ class UpstreamCache:
     obligation_table: ObligationTable
     signature_code: str  # raw code string to include in Stage 4 user prompt
     signature_analysis: str
-    obligation_table_rendered: str
+    obligation_prompt_md: str
     analysis_text: str | None  # Stage 1 output (if lens used)
     spec_name: str  # domain ID formatted as spec name
     upstream_trace_name: str  # for Langfuse cross-referencing
@@ -189,7 +191,8 @@ async def _build_upstream_cache(
 
                     try:
                         table = build_obligation_table(sig)
-                        table_md = render_obligation_table(sig, table)
+                        mech_report = generate_mechanical_axioms(sig, table)
+                        prompt_md = render_obligation_prompt(sig, table, mech_report)
                     except Exception as e:
                         logger.warning(
                             "Upstream obligation table failed for domain %s: %s", domain, e
@@ -207,7 +210,7 @@ async def _build_upstream_cache(
                         obligation_table=table,
                         signature_code=result.signature_code or "",
                         signature_analysis=result.signature_analysis or "",
-                        obligation_table_rendered=table_md,
+                        obligation_prompt_md=prompt_md,
                         analysis_text=result.domain_analysis,
                         spec_name=domain.replace("-", " ").title().replace(" ", ""),
                         upstream_trace_name=upstream_trace_name,
@@ -400,7 +403,7 @@ async def execute_stage4_trial(
         spec_name=upstream.spec_name,
         signature_code=upstream.signature_code,
         signature_analysis=upstream.signature_analysis,
-        obligation_table_md=upstream.obligation_table_rendered,
+        obligation_prompt_md=upstream.obligation_prompt_md,
         domain_analysis=upstream.analysis_text,
     )
 
@@ -446,7 +449,7 @@ async def execute_stage4_trial(
                 input={
                     "domain": domain,
                     "signature_code": upstream.signature_code,
-                    "obligation_table": upstream.obligation_table_rendered,
+                    "obligation_prompt": upstream.obligation_prompt_md,
                     "system_prompt_chunks": [c.name for c in trial.chunk_ids],
                 }
             )

@@ -18,8 +18,9 @@ from pathlib import Path
 from typing import Any
 
 from .llm import AsyncLLMClient, UsageInfo
+from .axiom_gen import generate_mechanical_axioms
 from .obligation import build_obligation_table, ObligationTable
-from .obligation_render import render_obligation_table
+from .obligation_render import render_obligation_prompt
 from .prompt import render
 from .prompt_chunks import ChunkId, Stage, assemble_prompt, build_default_prompt
 from .result import Err, Ok, Result
@@ -112,7 +113,7 @@ def _build_axioms_user_prompt(
     spec_name: str,
     signature_code: str,
     signature_analysis: str,
-    obligation_table_md: str,
+    obligation_prompt_md: str,
     domain_analysis: str | None = None,
 ) -> str:
     """Build Stage 4 user prompt: generate axioms from signature + obligation table."""
@@ -123,7 +124,7 @@ def _build_axioms_user_prompt(
         spec_name=spec_name,
         signature_code=signature_code,
         signature_analysis=signature_analysis,
-        obligation_table_md=obligation_table_md,
+        obligation_prompt_md=obligation_prompt_md,
     )
 
 
@@ -463,7 +464,8 @@ async def run_pipeline(
     ob_start = time.time()
     try:
         table = build_obligation_table(sig)
-        table_md = render_obligation_table(sig, table)
+        mech_report = generate_mechanical_axioms(sig, table)
+        table_md = render_obligation_prompt(sig, table, mech_report)
         ob_elapsed_ms = int((time.time() - ob_start) * 1000)
 
         # Log to Langfuse as a child span (deterministic stage — not a generation)
@@ -522,7 +524,7 @@ async def run_pipeline(
         spec_name=spec_name,
         signature_code=code2,
         signature_analysis=analysis2,
-        obligation_table_md=table_md,
+        obligation_prompt_md=table_md,
         domain_analysis=domain_analysis,
     )
     system4 = _build_axioms_system_prompt()
@@ -574,7 +576,17 @@ async def run_pipeline(
                 spec_analysis=analysis4,
             )
         case Spec() as spec:
-            pass
+            # Merge mechanical axioms (belt-and-suspenders: LLM was told not to repeat
+            # these, but we merge anyway to guarantee coverage)
+            mech_labels = {a.label for a in mech_report.axioms}
+            combined_axioms = list(mech_report.axioms) + [
+                a for a in spec.axioms if a.label not in mech_labels
+            ]
+            spec = Spec(
+                name=spec.name,
+                signature=sig,  # Use the validated signature
+                axioms=tuple(combined_axioms),
+            )
 
     score = await score_spec(spec, strict=False, audit=True)
 
