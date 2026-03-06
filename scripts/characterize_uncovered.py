@@ -26,11 +26,12 @@ import json
 import logging
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
+from langfuse import get_client, propagate_attributes
 
 load_dotenv()
 
@@ -73,29 +74,32 @@ ALL_DOMAINS = [
 # Imports after path setup
 # ---------------------------------------------------------------------------
 
-from alspec.axiom_match import match_spec, CoverageStatus
-from alspec.check import check_spec
-from alspec.eval.domains import DOMAINS, DomainPrompt
-from alspec.eval.stage1_score import (
-    compute_intrinsic_health,
-    _constructor_names,
-    _observer_count,
-    _check_well_formed,
+from alspec.axiom_match import CoverageStatus, match_spec  # noqa: E402
+from alspec.cache import (  # noqa: E402
+    DomainSnapshot,
+    load_cache,
+    restore_signature,
+    save_cache,
+    snapshot_from_pipeline_result,
 )
-from alspec.llm import AsyncLLMClient
-from alspec.obligation import build_obligation_table, ObligationTable
-from alspec.obligation_render import render_obligation_table
-from alspec.pipeline import (
+from alspec.check import check_spec  # noqa: E402
+from alspec.eval.domains import DOMAINS, DomainPrompt  # noqa: E402
+from alspec.llm import AsyncLLMClient  # noqa: E402
+from alspec.obligation import ObligationTable, build_obligation_table  # noqa: E402
+from alspec.obligation_render import render_obligation_table  # noqa: E402
+from alspec.pipeline import (  # noqa: E402
     _build_axioms_user_prompt,
-    _build_signature_user_prompt,
     run_pipeline_signature_only,
 )
-from alspec.prompt_chunks import ChunkId, Stage, assemble_prompt
-from alspec.result import Err, Ok
-from alspec.signature import Signature
-from alspec.spec import Spec
+from alspec.prompt_chunks import ChunkId, Stage, assemble_prompt  # noqa: E402
+from alspec.result import Err, Ok  # noqa: E402
+from alspec.signature import Signature  # noqa: E402
+from alspec.spec import Spec  # noqa: E402
 
 logger = logging.getLogger(__name__)
+
+# Langfuse client
+langfuse = get_client()
 
 # ---------------------------------------------------------------------------
 # Fixed chunk config: mandatory + G + H (from stage4_screen.toml optimal)
@@ -139,7 +143,7 @@ def _get_domain_description(domain: str) -> str:
 # Upstream cache (mirrors _build_upstream_cache from doe_runner.py)
 # ---------------------------------------------------------------------------
 
-from dataclasses import dataclass
+from dataclasses import dataclass  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -154,10 +158,49 @@ class UpstreamCache:
     spec_name: str
 
 
+def _upstream_cache_from_snapshot(
+    snapshot: DomainSnapshot,
+) -> UpstreamCache:
+    """Convert a loaded DomainSnapshot into the runtime UpstreamCache.
+
+    Regenerates deterministic stages (obligation table, rendered markdown)
+    from the frozen signature.
+    """
+    sig = restore_signature(snapshot)
+
+    table = build_obligation_table(sig)
+    table_md = render_obligation_table(sig, table)
+
+    assert snapshot.stage2 is not None  # guaranteed by load validation
+
+    return UpstreamCache(
+        domain=snapshot.domain,
+        signature=sig,
+        obligation_table=table,
+        signature_code=snapshot.stage2.signature_code,
+        signature_analysis=snapshot.stage2.signature_analysis,
+        obligation_table_rendered=table_md,
+        analysis_text=snapshot.stage1.analysis_text if snapshot.stage1 else None,
+        spec_name=snapshot.domain.replace("-", " ").title().replace(" ", ""),
+    )
+
+
+def _snapshot_from_upstream_cache(uc: UpstreamCache) -> DomainSnapshot:
+    """Convert a runtime UpstreamCache to a DomainSnapshot for saving."""
+    return snapshot_from_pipeline_result(
+        domain=uc.domain,
+        analysis_text=uc.analysis_text,
+        signature=uc.signature,
+        signature_code=uc.signature_code,
+        signature_analysis=uc.signature_analysis,
+    )
+
+
 async def _build_upstream_cache(
     client: AsyncLLMClient,
     domains: list[str],
     semaphore: asyncio.Semaphore,
+    session_id: str,
 ) -> dict[str, UpstreamCache]:
     """Run Stages 1-2-3 for each domain and cache results."""
     logger.info("Building upstream cache (Stages 1-3) for %d domains...", len(domains))
@@ -167,13 +210,29 @@ async def _build_upstream_cache(
     async def run_one(domain: str) -> None:
         async with semaphore:
             desc = _get_domain_description(domain)
-            result = await run_pipeline_signature_only(
-                client=client,
-                domain_id=domain,
-                domain_description=desc,
-                model=UPSTREAM_MODEL,
-                lens=UPSTREAM_LENS,
-            )
+
+            with langfuse.start_as_current_observation(
+                as_type="span",
+                name=f"characterize/upstream/{domain}",
+            ):
+                with propagate_attributes(
+                    trace_name=f"characterize/upstream/{domain}",
+                    session_id=session_id,
+                    metadata={
+                        "domain": domain,
+                        "model": UPSTREAM_MODEL,
+                        "lens": UPSTREAM_LENS,
+                        "session_id": session_id,
+                    },
+                    tags=[f"domain:{domain}", "phase:upstream", f"session:{session_id}"],
+                ):
+                    result = await run_pipeline_signature_only(
+                        client=client,
+                        domain_id=domain,
+                        domain_description=desc,
+                        model=UPSTREAM_MODEL,
+                        lens=UPSTREAM_LENS,
+                    )
 
             if not result.success:
                 logger.warning("Upstream failed for domain %s: %s", domain, result.error)
@@ -241,6 +300,8 @@ async def _run_trial(
     system_prompt: str,
     uncovered_rows: list[dict[str, str]],
     lock: asyncio.Lock,
+    session_id: str,
+    cache_id: str,
 ) -> TrialResult:
     """Run one (domain, replicate) trial. Returns a TrialResult.
 
@@ -264,9 +325,29 @@ async def _run_trial(
         {"role": "user", "content": user_prompt},
     ]
 
-    result = await client.generate_with_tool_call(
-        messages, model=MODEL, tool_name="submit_spec"
-    )
+    trace_name = f"characterize/trial/{domain}"
+    with langfuse.start_as_current_observation(
+        as_type="span",
+        name=trace_name,
+    ):
+        with propagate_attributes(
+            trace_name=trace_name,
+            session_id=session_id,
+            metadata={
+                "cache_id": cache_id,
+                "domain": domain,
+                "replicate": str(replicate),
+                "session_id": session_id,
+            },
+            tags=[
+                f"domain:{domain}",
+                f"session:{session_id}",
+                f"cache:{cache_id}",
+            ],
+        ):
+            result = await client.generate_with_tool_call(
+                messages, model=MODEL, tool_name="submit_spec"
+            )
 
     match result:
         case Err(exc):
@@ -408,6 +489,21 @@ async def main() -> None:
         default=str(OUTPUT_DIR),
         help=f"Output directory (default: {OUTPUT_DIR})",
     )
+
+    cache_group = parser.add_mutually_exclusive_group()
+    cache_group.add_argument(
+        "--cache",
+        type=str,
+        default=None,
+        help="Load a saved pipeline cache (skip Stages 1-3). PATH must be a directory containing manifest.json.",
+    )
+    cache_group.add_argument(
+        "--save-cache",
+        type=str,
+        default=None,
+        help="After running Stages 1-3, save the upstream outputs to PATH for future reuse. Fails if PATH already exists.",
+    )
+
     args = parser.parse_args()
 
     if args.domains is not None:
@@ -443,8 +539,110 @@ async def main() -> None:
 
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 
+    # Langfuse session setup
+    timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    session_id = f"characterize-{timestamp}"
+    logger.info("Langfuse Session ID: %s", session_id)
+
     # Phase A: upstream cache
-    upstream_cache = await _build_upstream_cache(client, domains, semaphore)
+    upstream_cache: dict[str, UpstreamCache] = {}
+    cache_id = "fresh"
+
+    if args.cache:
+        cache_dir = Path(args.cache)
+        logger.info("Loading cache from %s...", cache_dir)
+        manifest, snapshots = load_cache(cache_dir)
+
+        if manifest.cache_through.value < Stage.SIGNATURE.value:
+            logger.error(
+                "Cache only goes through %s, but we need at least SIGNATURE.",
+                manifest.cache_through.name,
+            )
+            sys.exit(1)
+
+        cache_id = manifest.content_hash[:12]
+
+        # Use a main trace for cache loading
+        trace_name = "characterize/cache-load"
+        with langfuse.start_as_current_observation(
+            as_type="span",
+            name=trace_name,
+        ):
+            with propagate_attributes(
+                trace_name=trace_name,
+                session_id=session_id,
+                metadata={
+                    "cache_dir": str(cache_dir),
+                    "cache_id": cache_id,
+                    "cache_through": manifest.cache_through.name,
+                    "model": manifest.model,
+                    "lens": manifest.lens or "none",
+                    "domains": ",".join(manifest.domains),
+                },
+                tags=["phase:cache-load", f"cache:{cache_id}"],
+            ):
+                for domain, snap in snapshots.items():
+                    if domains and domain not in domains:
+                        continue
+
+                    # Regeneration as a child span
+                    span_name = f"characterize/regenerate/{domain}"
+                    with langfuse.start_as_current_observation(
+                        as_type="span",
+                        name=span_name,
+                    ):
+                        with propagate_attributes(
+                            trace_name=span_name,
+                            metadata={
+                                "domain": domain,
+                                "cache_id": cache_id,
+                            },
+                        ):
+                            uc = _upstream_cache_from_snapshot(snap)
+                            upstream_cache[domain] = uc
+                            # Tags are added via propagate_attributes if supported,
+                            # but we can't easily add tags to nested observations
+                            # through propagate_attributes in this logic.
+                            # The metadata is enough for now.
+
+    else:
+        upstream_cache = await _build_upstream_cache(
+            client, domains, semaphore, session_id
+        )
+
+        if args.save_cache:
+            save_dir = Path(args.save_cache)
+            logger.info("Saving cache to %s...", save_dir)
+            snapshots = {
+                domain: _snapshot_from_upstream_cache(uc)
+                for domain, uc in upstream_cache.items()
+            }
+            manifest = save_cache(
+                save_dir,
+                snapshots,
+                model=UPSTREAM_MODEL,
+                lens=UPSTREAM_LENS,
+                cache_through=Stage.SIGNATURE,
+            )
+            cache_id = manifest.content_hash[:12]
+
+            cache_save_trace = "characterize/cache-save"
+            with langfuse.start_as_current_observation(
+                as_type="span",
+                name=cache_save_trace,
+            ):
+                with propagate_attributes(
+                    trace_name=cache_save_trace,
+                    session_id=session_id,
+                    metadata={
+                        "cache_dir": str(save_dir),
+                        "cache_id": cache_id,
+                        "domains_saved": str(len(snapshots)),
+                    },
+                    tags=["phase:cache-save", f"cache:{cache_id}"],
+                ):
+                    pass
+
     if not upstream_cache:
         logger.error("All upstream runs failed. Aborting.")
         sys.exit(1)
@@ -477,6 +675,8 @@ async def main() -> None:
                 system_prompt=system_prompt,
                 uncovered_rows=uncovered_rows,
                 lock=lock,
+                session_id=session_id,
+                cache_id=cache_id,
             )
 
         async with lock:
@@ -526,7 +726,7 @@ async def main() -> None:
     await asyncio.gather(*tasks)
 
     # Write outputs
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)  # noqa: ASYNC240
 
     scores_path = output_dir / "scores.jsonl"
     with scores_path.open("w", encoding="utf-8") as f:

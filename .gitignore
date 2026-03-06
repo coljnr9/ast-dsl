@@ -19,3 +19,6 @@ algebraic-specification-references/
 # Experiment Results
 results/
 data/analysis/
+
+# Pipeline cache directories
+*cache/

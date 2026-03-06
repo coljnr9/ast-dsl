@@ -12,6 +12,7 @@ from typing import Any
 from .signature import (
     FnParam,
     FnSymbol,
+    GeneratedSortInfo,
     PredSymbol,
     Signature,
     Totality,
@@ -127,12 +128,31 @@ def pred_symbol_from_json(d: dict[str, Any]) -> PredSymbol:
     return PredSymbol(name=d["name"], params=params)
 
 
+def generated_sort_info_to_json(info: GeneratedSortInfo) -> dict[str, Any]:
+    return {
+        "constructors": list(info.constructors),
+        "selectors": {
+            ctor: dict(sel_map) for ctor, sel_map in info.selectors.items()
+        },
+    }
+
+
+def generated_sort_info_from_json(d: dict[str, Any]) -> GeneratedSortInfo:
+    return GeneratedSortInfo(
+        constructors=tuple(d["constructors"]),
+        selectors={ctor: dict(sel_map) for ctor, sel_map in d["selectors"].items()},
+    )
+
+
 def signature_to_json(sig: Signature) -> dict[str, Any]:
     return {
         "type": "signature",
         "sorts": {k: sort_to_json(v) for k, v in sig.sorts.items()},
         "functions": {k: fn_symbol_to_json(v) for k, v in sig.functions.items()},
         "predicates": {k: pred_symbol_to_json(v) for k, v in sig.predicates.items()},
+        "generated_sorts": {
+            k: generated_sort_info_to_json(v) for k, v in sig.generated_sorts.items()
+        },
     }
 
 
@@ -140,7 +160,16 @@ def signature_from_json(d: dict[str, Any]) -> Signature:
     sorts = {k: sort_from_json(v) for k, v in d["sorts"].items()}
     functions = {k: fn_symbol_from_json(v) for k, v in d["functions"].items()}
     predicates = {k: pred_symbol_from_json(v) for k, v in d["predicates"].items()}
-    return Signature(sorts=sorts, functions=functions, predicates=predicates)
+    generated_sorts = {
+        k: generated_sort_info_from_json(v)
+        for k, v in d.get("generated_sorts", {}).items()
+    }
+    return Signature(
+        sorts=sorts,
+        functions=functions,
+        predicates=predicates,
+        generated_sorts=generated_sorts,
+    )
 
 
 # ---------------------------------------------------------------------------
