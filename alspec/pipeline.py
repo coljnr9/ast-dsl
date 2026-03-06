@@ -622,6 +622,8 @@ async def _main():
     run_parser.add_argument("--model", default="google/gemini-3-flash-preview", help="LLM model")
     run_parser.add_argument("--signature-only", action="store_true", help="Run Stage 1+2 only")
     run_parser.add_argument("--cached-analysis", action="store_true", help="Use cached analysis")
+    run_parser.add_argument("--description", type=str, default=None, help="Domain description (default: domain ID with hyphens replaced by spaces)")
+    run_parser.add_argument("--source", type=str, nargs="+", default=None, help="Source/reference file(s) for domain analysis")
 
     args = parser.parse_args()
 
@@ -633,22 +635,36 @@ async def _main():
             print(f"Error: {e}")
             sys.exit(1)
 
+    from datetime import datetime, timezone
+    timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
+    session_id = f"pipeline-{args.domain}-{timestamp}"
+    try:
+        client._session_id = session_id
+    except AttributeError:
+        pass
+    print(f"Langfuse session: {session_id}", file=sys.stderr)
+
+    domain_description = args.description or args.domain.replace("-", " ")
+    sources = [Path(s) for s in args.source] if args.source else None
+
     if args.signature_only:
         result = await run_pipeline_signature_only(
             client=client,
             domain_id=args.domain,
-            domain_description=args.domain.replace("-", " "),
+            domain_description=domain_description,
             model=args.model,
             lens=args.lens,
+            sources=sources,
             cached_analysis=args.cached_analysis,
         )
     else:
         result = await run_pipeline(
             client=client,
             domain_id=args.domain,
-            domain_description=args.domain.replace("-", " "),
+            domain_description=domain_description,
             model=args.model,
             lens=args.lens,
+            sources=sources,
             cached_analysis=args.cached_analysis,
         )
 
@@ -664,7 +680,14 @@ async def _main():
             print("\n--- Spec Code ---")
             print(result.spec_code)
         if result.score:
-            print(f"\nScore (Golden Health): {result.score.health:.3f}")
+            s = result.score
+            print(f"\nHealth: {s.health:.3f}")
+            if s.coverage_ratio is not None:
+                print(f"Coverage: {s.covered_cell_count}/{s.obligation_cell_count} cells ({s.coverage_ratio:.1%})")
+            if s.unmatched_axiom_count > 0:
+                print(f"Unmatched axioms: {s.unmatched_axiom_count}")
+            if not s.well_formed:
+                print(f"Well-formedness errors: {s.error_count}")
     else:
         print(f"Pipeline failed at {result.error_stage}: {result.error}")
         sys.exit(1)

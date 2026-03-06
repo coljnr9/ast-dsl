@@ -7,9 +7,10 @@ def render() -> str:
         ## 2. Type Grammar
 
         ```
-        Term     = Var(name, sort)
-                 | FnApp(fn_name, tuple[Term, ...])    ← args are Terms
-                 | FieldAccess(Term, field_name)        ← inner is a Term
+        Term     = var(name, sort)
+                 | app(fn_name, *args)
+                 | const(name)
+                 | field_access(term, field_name)
                  | Literal(value, sort)
 
         Formula  = eq(Term, Term)                          ← Equation

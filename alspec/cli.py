@@ -18,6 +18,7 @@ from alspec.spec import Spec
 async def handle_generate(
     prompt: str | None = None,
     domain: str | None = None,
+    description: str | None = None,
     lens: str | None = None,
     model: str = "google/gemini-3-flash-preview",
     sources: list[Path] | None = None,
@@ -32,11 +33,18 @@ async def handle_generate(
             print(f"Error initializing LLM client: {e}", file=sys.stderr)
             return 1
 
-    if domain:
-        from alspec.eval.domains import DOMAINS
+    from datetime import datetime, timezone
 
-        domain_info = next((d for d in DOMAINS if d.id == domain), None)
-        desc = domain_info.description if domain_info else domain.replace("-", " ")
+    timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
+
+    if domain:
+        session_id = f"generate-{domain}-{timestamp}"
+        try:
+            client._session_id = session_id
+        except AttributeError:
+            pass
+        print(f"Langfuse session: {session_id}", file=sys.stderr)
+        desc = description or domain.replace("-", " ")
 
         if signature_only:
             from alspec.pipeline import run_pipeline_signature_only
@@ -79,7 +87,14 @@ async def handle_generate(
                     print("\n--- Spec (Stage 4) ---")
                     print(result.spec_code)
                 if result.score:
-                    print(f"\nScore (Golden Health): {result.score.health:.3f}")
+                    s = result.score
+                    print(f"\nHealth: {s.health:.3f}")
+                    if s.coverage_ratio is not None:
+                        print(f"Coverage: {s.covered_cell_count}/{s.obligation_cell_count} cells ({s.coverage_ratio:.1%})")
+                    if s.unmatched_axiom_count > 0:
+                        print(f"Unmatched axioms: {s.unmatched_axiom_count}")
+                    if not s.well_formed:
+                        print(f"Well-formedness errors: {s.error_count}")
                 return 0
             else:
                 print(f"Error at stage '{result.error_stage}': {result.error}", file=sys.stderr)
@@ -608,6 +623,10 @@ async def async_main() -> int:
     group.add_argument("--domain", help="Domain ID (e.g. 'auction').")
 
     generate_parser.add_argument(
+        "--description", type=str, default=None,
+        help="Domain description text (default: domain ID with hyphens as spaces)",
+    )
+    generate_parser.add_argument(
         "--lens",
         type=str,
         default="entity_lifecycle",
@@ -765,6 +784,7 @@ async def async_main() -> int:
             return await handle_generate(
                 prompt=args.prompt,
                 domain=args.domain,
+                description=getattr(args, 'description', None),
                 lens=args.lens if args.lens != "none" else None,
                 model=args.model,
                 sources=source_paths,
