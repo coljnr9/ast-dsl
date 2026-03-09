@@ -46,6 +46,8 @@ from alspec.axiom_match import (
     _peel_quantifiers,
     _ctor_root,
     _is_distinctness_axiom,
+    _has_observer_on_variable,
+    _is_conclusion_definition,
     match_spec_sync,
 )
 from alspec.obligation import (
@@ -2293,3 +2295,184 @@ class TestCompositionalObserver:
         result = _find_obs_ctor(f, fn_roles, pred_roles)
         assert result == ("get_q", False, "init")
 
+
+class TestHasObserverOnVariable:
+    """Unit tests for the _has_observer_on_variable helper."""
+
+    def test_equation_with_fn_observer(self):
+        from alspec import var, app, const, eq
+        from alspec.obligation import FnRole, FnKind, PredRole
+        from alspec.axiom_match import _has_observer_on_variable
+
+        fn_roles = {
+            "get_status": FnRole("get_status", FnKind.OBSERVER, "Thermostat"),
+            "on": FnRole("on", FnKind.CONSTANT, None),
+        }
+        pred_roles: dict[str, PredRole] = {}
+        th = var("th", "Thermostat")
+        f = eq(app("get_status", th), const("on"))
+        assert _has_observer_on_variable(f, fn_roles, pred_roles) is True
+
+    def test_equation_with_ctor_root_is_false(self):
+        """obs(ctor(...)) should NOT match — that's a cell axiom."""
+        from alspec import var, app, const, eq
+        from alspec.obligation import FnRole, FnKind, PredRole
+        from alspec.axiom_match import _has_observer_on_variable
+
+        fn_roles = {
+            "get_status": FnRole("get_status", FnKind.OBSERVER, "Thermostat"),
+            "create": FnRole("create", FnKind.CONSTRUCTOR, "Thermostat"),
+            "on": FnRole("on", FnKind.CONSTANT, None),
+        }
+        pred_roles: dict[str, PredRole] = {}
+        t = var("t", "Temp")
+        # obs(ctor(t)) = on — this is a cell axiom, not a definition
+        # But _has_observer_on_variable only checks if first arg is Var
+        # The ctor check is handled by _is_conclusion_definition calling _find_obs_ctor first
+        f = eq(app("get_status", app("create", t)), const("on"))
+        # get_status's first arg is FnApp("create",...), not Var → False
+        assert _has_observer_on_variable(f, fn_roles, pred_roles) is False
+
+    def test_negated_pred_observer(self):
+        from alspec import var, pred_app, negation
+        from alspec.obligation import FnRole, PredRole, PredKind
+        from alspec.axiom_match import _has_observer_on_variable
+
+        fn_roles: dict[str, FnRole] = {}
+        pred_roles = {"is_active": PredRole("is_active", PredKind.OBSERVER, "Device")}
+        d = var("d", "Device")
+        f = negation(pred_app("is_active", d))
+        assert _has_observer_on_variable(f, fn_roles, pred_roles) is True
+
+    def test_non_observer_pred_is_false(self):
+        from alspec import var, pred_app
+        from alspec.obligation import FnRole, PredRole, PredKind
+        from alspec.axiom_match import _has_observer_on_variable
+
+        fn_roles: dict[str, FnRole] = {}
+        pred_roles = {"lt": PredRole("lt", PredKind.OTHER, None)}
+        t = var("t", "Temp")
+        f = pred_app("lt", t, t)
+        assert _has_observer_on_variable(f, fn_roles, pred_roles) is False
+
+
+class TestImplicationFormDefinitions:
+    """Implication-form definitions should be classified as DEFINITION, not UNMATCHED."""
+
+    def test_guarded_equation_definition(self):
+        """is_heating(th) → get_status(th) = on should be DEFINITION."""
+        from alspec import (
+            Axiom, Signature, Spec, atomic, fn, pred, var, app, const,
+            forall, implication, eq, pred_app, GeneratedSortInfo,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={
+                "Thermostat": atomic("Thermostat"),
+                "Temp": atomic("Temp"),
+                "Status": atomic("Status"),
+            },
+            functions={
+                "on": fn("on", [], "Status"),
+                "off": fn("off", [], "Status"),
+                "create": fn("create", [("t", "Temp")], "Thermostat"),
+                "set_target": fn("set_target", [("th", "Thermostat"), ("t", "Temp")], "Thermostat"),
+                "get_target": fn("get_target", [("th", "Thermostat")], "Temp"),
+                "get_current": fn("get_current", [("th", "Thermostat")], "Temp"),
+                "get_status": fn("get_status", [("th", "Thermostat")], "Status"),
+            },
+            predicates={
+                "lt": pred("lt", [("a", "Temp"), ("b", "Temp")]),
+                "is_heating": pred("is_heating", [("th", "Thermostat")]),
+            },
+            generated_sorts={
+                "Thermostat": GeneratedSortInfo(
+                    constructors=("create", "set_target"),
+                    selectors={"create": {"get_target": "Temp", "get_current": "Temp"},
+                               "set_target": {"get_target": "Temp"}},
+                ),
+                "Status": GeneratedSortInfo(constructors=("on", "off"), selectors={}),
+            },
+        )
+
+        th = var("th", "Thermostat")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                # Implication-form definition: guard → obs(var) = val
+                Axiom("get_status_def_on", forall([th],
+                    implication(
+                        pred_app("is_heating", th),
+                        eq(app("get_status", th), const("on")),
+                    ))),
+                Axiom("get_status_def_off", forall([th],
+                    implication(
+                        negation(pred_app("is_heating", th)),
+                        eq(app("get_status", th), const("off")),
+                    ))),
+            ),
+        )
+
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+
+        for m in report.matches:
+            assert m.kind == MatchKind.DEFINITION, (
+                f"Axiom {m.axiom_label!r} expected DEFINITION, got {m.kind.value}: {m.reason}"
+            )
+        assert len(report.unmatched_axioms) == 0
+
+    def test_guarded_predicate_definition(self):
+        """guard → pred_app(obs, var) should be DEFINITION."""
+        from alspec import (
+            Axiom, Signature, Spec, atomic, fn, pred, var, app, const,
+            forall, implication, pred_app, negation, GeneratedSortInfo,
+        )
+        from alspec.obligation import build_obligation_table
+        from alspec.axiom_match import match_spec_sync, MatchKind
+
+        sig = Signature(
+            sorts={
+                "Device": atomic("Device"),
+                "Temp": atomic("Temp"),
+            },
+            functions={
+                "power_on": fn("power_on", [], "Device"),
+                "cycle": fn("cycle", [("d", "Device"), ("t", "Temp")], "Device"),
+                "get_temp": fn("get_temp", [("d", "Device")], "Temp"),
+            },
+            predicates={
+                "is_active": pred("is_active", [("d", "Device")]),
+                "has_reading": pred("has_reading", [("d", "Device")]),
+            },
+            generated_sorts={
+                "Device": GeneratedSortInfo(
+                    constructors=("power_on", "cycle"), selectors={},
+                ),
+            },
+        )
+
+        d = var("d", "Device")
+        spec = Spec(
+            name="Test",
+            signature=sig,
+            axioms=(
+                # guard → pred observer on variable
+                Axiom("has_reading_from_active", forall([d],
+                    implication(
+                        pred_app("is_active", d),
+                        pred_app("has_reading", d),
+                    ))),
+            ),
+        )
+
+        table = build_obligation_table(sig)
+        report = match_spec_sync(spec, table, sig)
+
+        m = report.matches[0]
+        assert m.kind == MatchKind.DEFINITION, (
+            f"Expected DEFINITION, got {m.kind.value}: {m.reason}"
+        )

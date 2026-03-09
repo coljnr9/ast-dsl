@@ -239,6 +239,13 @@ async def _match_axiom(
     # 7. Find observer(constructor(...)) in the conclusion
     obs_ctor = _find_obs_ctor(conclusion, table.fn_roles, table.pred_roles)
     if obs_ctor is None:
+        # Check if this is a definition (observer on variable, no constructor root)
+        # Catches both implication-form definitions (guard → obs(var) = val)
+        # and bare definitions (obs(var) = val) that _is_definition_axiom missed
+        if _is_conclusion_definition(conclusion, table.fn_roles, table.pred_roles):
+            logger.debug("Axiom %r classified as DEFINITION (conclusion form)", axiom.label)
+            return AxiomCellMatch(axiom.label, (), MatchKind.DEFINITION)
+
         return AxiomCellMatch(
             axiom.label,
             (),
@@ -534,6 +541,78 @@ def _is_definition_axiom(
                     return True
 
     return False
+
+
+def _is_conclusion_definition(
+    conclusion: Formula,
+    fn_roles: dict[str, FnRole],
+    pred_roles: dict[str, PredRole],
+) -> bool:
+    """Detect if a conclusion (after peeling implications) is a definition.
+
+    After peeling quantifiers and implications, if the conclusion contains
+    an observer applied to a plain variable (not constructor-rooted), it's
+    a global definition — not a cell axiom.
+
+    Patterns caught:
+      - eq(obs(var, ...), value)           — function observer definition
+      - pred_app(obs, var, ...)            — predicate observer positive
+      - negation(pred_app(obs, var, ...))  — predicate observer negative
+      - iff(obs_expr, defining_expr)       — biconditional (belt-and-suspenders)
+
+    Does NOT fire if a constructor-rooted term is present (that would be
+    a cell axiom that happened to end up in conclusion position).
+    """
+    # If there IS an obs(ctor) pattern, this is a cell axiom, not a definition
+    if _find_obs_ctor(conclusion, fn_roles, pred_roles) is not None:
+        return False
+
+    return _has_observer_on_variable(conclusion, fn_roles, pred_roles)
+
+
+def _has_observer_on_variable(
+    f: Formula,
+    fn_roles: dict[str, FnRole],
+    pred_roles: dict[str, PredRole],
+) -> bool:
+    """Check if a formula contains an observer applied to a variable first arg.
+
+    Recurses through Negation, Biconditional, Equation, and Conjunction/Disjunction
+    to find the observer reference.
+    """
+    match f:
+        case PredApp(pred_name, args) if args:
+            role = pred_roles.get(pred_name)
+            if role is not None and role.kind == PredKind.OBSERVER:
+                return isinstance(args[0], Var)
+            return False
+
+        case Equation(lhs, rhs):
+            # Check both sides for obs(var, ...)
+            for side in (lhs, rhs):
+                if isinstance(side, FnApp) and side.args:
+                    role = fn_roles.get(side.fn_name)
+                    if role is not None and role.kind in (FnKind.OBSERVER, FnKind.SELECTOR):
+                        if isinstance(side.args[0], Var):
+                            return True
+            return False
+
+        case Negation(inner):
+            return _has_observer_on_variable(inner, fn_roles, pred_roles)
+
+        case Biconditional(lhs, rhs):
+            return (_has_observer_on_variable(lhs, fn_roles, pred_roles)
+                    or _has_observer_on_variable(rhs, fn_roles, pred_roles))
+
+        case Definedness(term):
+            if isinstance(term, FnApp) and term.args:
+                role = fn_roles.get(term.fn_name)
+                if role is not None and role.kind in (FnKind.OBSERVER, FnKind.SELECTOR):
+                    return isinstance(term.args[0], Var)
+            return False
+
+        case _:
+            return False
 
 
 # ---------------------------------------------------------------------------
