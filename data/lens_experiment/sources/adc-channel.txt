@@ -1,0 +1,2117 @@
+ADS1115
+ADS111516-Bit
+ADC
+DS I C
+Interface
+2
+Voltage
+Reference
+Oscillator
+SCL
+SDA
+ADDR
+ADS1113
+AIN1
+AIN0
+16-Bit
+ADC
+DS I C
+Interface
+2
+Voltage
+Reference
+Oscillator
+ALERT/RDY
+SCL
+SDA
+ADDR
+PGA
+ComparatorADS1115
+ADS1114
+MUX
+AIN1
+AIN2
+AIN0
+AIN3
+ADS1115
+Only
+VDD
+GND
+VDD
+GNDADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+Ultra-Small, Low-Power, 16-Bit
+Analog-to-Digital Converter with Internal Reference
+Check for Samples: ADS1113 ADS1114 ADS1115
+1FEATURES DESCRIPTION
+23• ULTRA-SMALL QFN PACKAGE: The ADS1113, ADS1114, and ADS1115 are
+2mm × 1,5mm × 0,4mm precision analog-to-digital converters (ADCs) with 16
+bits of resolution offered in an ultra-small, leadless• WIDE SUPPLY RANGE: 2.0V to 5.5V QFN-10 package or an MSOP-10 package. The
+• LOW CURRENT CONSUMPTION: ADS1113/4/5 are designed with precision, power, and
+Continuous Mode: Only 150μA ease of implementation in mind. The ADS1113/4/5
+Single-Shot Mode: Auto Shut-Down feature an onboard reference and oscillator. Data are
+• PROGRAMMABLE DATA RATE: transferred via an I2C-compatible serial interface; four
+I2C slave addresses can be selected. The8SPS to 860SPS
+ADS1113/4/5 operate from a single power supply• INTERNAL LOW-DRIFT ranging from 2.0V to 5.5V.VOLTAGE REFERENCE
+The ADS1113/4/5 can perform conversions at rates• INTERNAL OSCILLATOR up to 860 samples per second (SPS). An onboard
+• INTERNAL PGA PGA is available on the ADS1114 and ADS1115 that
+• I2C™ INTERFACE: Pin-Selectable Addresses offers input ranges from the supply to as low as
+±256mV, allowing both large and small signals to be• FOUR SINGLE-ENDED OR TWO measured with high resolution. The ADS1115 alsoDIFFERENTIAL INPUTS (ADS1115) features an input multiplexer (MUX) that provides two
+• PROGRAMMABLE COMPARATOR differential or four single-ended inputs.
+(ADS1114 and ADS1115) The ADS1113/4/5 operate either in continuous
+conversion mode or a single-shot mode thatAPPLICATIONS automatically powers down after a conversion and
+• PORTABLE INSTRUMENTATION greatly reduces current consumption during idle
+• CONSUMER GOODS periods. The ADS1113/4/5 are specified from –40°C
+• BATTERY MONITORING to +125°C.
+• TEMPERATURE MEASUREMENT
+• FACTORY AUTOMATION AND PROCESS
+CONTROLS
+1
+Please be aware that an important notice concerning availability, standard warranty, and use in critical applications of Texas
+Instruments semiconductor products and disclaimers thereto appears at the end of this data sheet.
+2I2C is a trademark of NXP Semiconductors.
+3All other trademarks are the property of their respective owners.
+PRODUCTION DATA information is current as of publication date. Copyright © 2009, Texas Instruments Incorporated
+Products conform to specifications per the terms of the Texas
+Instruments standard warranty. Production processing does not
+necessarily include testing of all parameters.
+ADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+This integrated circuit can be damaged by ESD. Texas Instruments recommends that all integrated circuits be handled with
+appropriate precautions. Failure to observe proper handling and installation procedures can cause damage.
+ESD damage can range from subtle performance degradation to complete device failure. Precision integrated circuits may be more
+susceptible to damage because very small parametric changes could cause the device not to meet its published specifications.
+ORDERING INFORMATION
+For the most current package and ordering information, see the Package Option Addendum at the end of this
+document, or see the TI web site at www.ti.com.
+ABSOLUTE MAXIMUM RATINGS(1)
+ADS1113, ADS1114, ADS1115 UNIT
+VDD to GND –0.3 to +5.5 V
+Analog input current 100, momentary mA
+Analog input current 10, continuous mA
+Analog input voltage to GND –0.3 to VDD + 0.3 V
+SDA, SCL, ADDR, ALERT/RDY voltage to GND –0.5 to +5.5 V
+Maximum junction temperature +150 °C
+Storage temperature range –60 to +150 °C
+(1) Stresses above those listed under Absolute Maximum Ratings may cause permanent damage to the device. Exposure to absolute
+maximum conditions for extended periods may affect device reliability.
+PRODUCT FAMILY
+PACKAGE INPUT CHANNELS
+DESIGNATOR RESOLUTION MAXIMUM SAMPLE (Differential/
+DEVICE MSOP/QFN (Bits) RATE (SPS) COMPARATOR PGA Single-Ended)
+ADS1113 BROI/N6J 16 860 No No 1/1
+ADS1114 BRNI/N5J 16 860 Yes Yes 1/1
+ADS1115 BOGI/N4J 16 860 Yes Yes 2/4
+ADS1013 BRMI/N9J 12 3300 No No 1/1
+ADS1014 BRQI/N8J 12 3300 Yes Yes 1/1
+ADS1015 BRPI/N7J 12 3300 Yes Yes 2/4
+2 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+ADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+ELECTRICAL CHARACTERISTICS
+All specifications at –40°C to +125°C, VDD = 3.3V, and Full-Scale (FS) = ±2.048V, unless otherwise noted.
+Typical values are at +25°C.
+ADS1113, ADS1114, ADS1115
+PARAMETER TEST CONDITIONS MIN TYP MAX UNIT
+ANALOG INPUT
+Full-scale input voltage(1) VIN = (AINP) – (AINN) ±4.096/PGA V
+Analog input voltage AINP or AINN to GND GND VDD V
+Differential input impedance See Table 2
+FS = ±6.144V(1) 10 MΩ
+FS = ±4.096V(1), ±2.048V 6 MΩ
+Common-mode input impedance FS = ±1.024V 3 MΩ
+FS = ±0.512V, ±0.256V 100 MΩ
+SYSTEM PERFORMANCE
+Resolution No missing codes 16 Bits
+8, 16, 32,
+64, 128,
+Data rate (DR) SPS
+250, 475,
+860
+Data rate variation All data rates –10 10 %
+Output noise See Typical Characteristics
+Integral nonlinearity DR = 8SPS, FS = ±2.048V, best fit(2) 1 LSB
+FS = ±2.048V, differential inputs ±1 ±3 LSB
+Offset error FS = ±2.048V, single-ended inputs ±3 LSB
+Offset drift FS = ±2.048V 0.005 LSB/°C
+Offset power-supply rejection FS = ±2.048V 1 LSB/V
+Gain error(3) FS = ±2.048V at 25°C 0.01 0.15 %
+FS = ±0.256V 7 ppm/°C
+Gain drift(3) FS = ±2.048V 5 40 ppm/°C
+FS = ±6.144V(1) 5 ppm/°C
+Gain power-supply rejection 80 ppm/V
+PGA gain match(3) Match between any two PGA gains 0.02 0.1 %
+Gain match Match between any two inputs 0.05 0.1 %
+Offset match Match between any two inputs 3 LSB
+At dc and FS = ±0.256V 105 dB
+At dc and FS = ±2.048V 100 dB
+Common-mode rejection At dc and FS = ±6.144V(1) 90 dB
+fCM = 60Hz, DR = 8SPS 105 dB
+fCM = 50Hz, DR = 8SPS 105 dB
+DIGITAL INPUT/OUTPUT
+Logic level
+VIH 0.7VDD 5.5 V
+VIL GND – 0.5 0.3VDD V
+VOL IOL = 3mA GND 0.15 0.4 V
+Input leakage
+IH VIH = 5.5V 10 μA
+IL VIL = GND 10 μA
+(1) This parameter expresses the full-scale range of the ADC scaling. In no event should more than VDD + 0.3V be applied to this device.
+(2) 99% of full-scale.
+(3) Includes all errors from onboard PGA and reference.
+Copyright © 2009, Texas Instruments Incorporated Submit Documentation Feedback 3
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+1
+2
+3
+4
+5
+10
+9
+8
+7
+6
+ADDR
+ALERT/RDY (ADS1114/5 Only)
+GND
+AIN0
+AIN1
+SCL
+SDA
+VDD
+AIN3 (ADS1115 Only)
+AIN2 (ADS1115 Only)
+ADS1113
+ADS1114
+ADS1115
+DGS PACKAGE
+MSOP-10
+(TOP VIEW)
+5
+10
+1
+2
+3
+4
+ADDR
+ALERT/RDY (ADS1114/5 Only)
+GND
+AIN0
+AIN1
+SCL
+9
+8
+7
+6
+SDA
+VDD
+AIN3 (ADS1115 Only)
+AIN2 (ADS1115 Only)
+ADS1113
+ADS1114
+ADS1115
+RUG PACKAGE
+QFN-10
+(TOP VIEW)ADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+ELECTRICAL CHARACTERISTICS (continued)
+All specifications at –40°C to +125°C, VDD = 3.3V, and Full-Scale (FS) = ±2.048V, unless otherwise noted.
+Typical values are at +25°C.
+ADS1113, ADS1114, ADS1115
+PARAMETER TEST CONDITIONS MIN TYP MAX UNIT
+POWER-SUPPLY REQUIREMENTS
+Power-supply voltage 2 5.5 V
+Power-down current at 25°C 0.5 2 μA
+Power-down current up to 125°C 5 μA
+Supply current Operating current at 25°C 150 200 μA
+Operating current up to 125°C 300 μA
+VDD = 5.0V 0.9 mW
+Power dissipation VDD = 3.3V 0.5 mW
+VDD = 2.0V 0.3 mW
+TEMPERATURE
+Storage temperature –60 +150 °C
+Specified temperature –40 +125 °C
+PIN CONFIGURATIONS
+PIN DESCRIPTIONS
+DEVICE ANALOG/
+DIGITAL
+INPUT/
+PIN # ADS1113 ADS1114 ADS1115 OUTPUT DESCRIPTION
+1 ADDR ADDR ADDR Digital Input I2C slave address select
+2 NC(1) ALERT/RDY ALERT/RDY Digital Output Digital comparator output or conversion ready (NC for ADS1113)
+3 GND GND GND Analog Ground
+4 AIN0 AIN0 AIN0 Analog Input Differential channel 1: Positive input or single-ended channel 1 input
+5 AIN1 AIN1 AIN1 Analog Input Differential channel 1: Negative input or single-ended channel 2 input
+6 NC NC AIN2 Analog Input Differential channel 2: Positive input or single-ended channel 3 input (NC for ADS1113/4)
+Differential channel 2: Negative input or single-ended channel 4 input
+7 NC NC AIN3 Analog Input (NC for ADS1113/4)
+8 VDD VDD VDD Analog Power supply: 2.0V to 5.5V
+9 SDA SDA SDA Digital I/O Serial data: Transmits and receives data
+10 SCL SCL SCL Digital Input Serial clock input: Clocks data on SDA
+(1) NC pins may be left floating or tied to ground.
+4 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+SCL
+SDA
+tLOW
+tR tF tHDSTA
+tHDSTA
+tHDDAT
+tBUF
+tSUDAT
+tHIGH tSUSTA tSUSTO
+P S S PADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+TIMING REQUIREMENTS
+Figure 1. I2C Timing Diagram
+Table 1. I2C Timing Definitions
+FAST MODE HIGH-SPEED MODE
+PARAMETER MIN MAX MIN MAX UNIT
+SCL operating frequency fSCL 0.01 0.4 0.01 3.4 MHz
+Bus free time between START and STOP tBUF 600 160 ns
+condition
+Hold time after repeated START condition. tHDSTA 600 160 ns
+After this period, the first clock is generated.
+Repeated START condition setup time tSUSTA 600 160 ns
+Stop condition setup time tSUSTO 600 160 ns
+Data hold time tHDDAT 0 0 ns
+Data setup time tSUDAT 100 10 ns
+SCL clock low period tLOW 1300 160 ns
+SCL clock high period tHIGH 600 60 ns
+Clock/data fall time tF 300 160 ns
+Clock/data rise time tR 300 160 ns
+Copyright © 2009, Texas Instruments Incorporated Submit Documentation Feedback 5
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+300
+250
+200
+150
+100
+50
+0
+Operating Current ( A)m
+-40 -20 0 20 40 60 80 100 120 140
+Temperature (°C)
+VDD = 5V
+VDD = 2V VDD = 3.3V5.0
+4.5
+4.0
+3.5
+3.0
+2.5
+2.0
+1.5
+1.0
+0.5
+0
+Shutdown Current ( A)m
+-40 -20 0 20 40 60 80 100 120 140
+Temperature (°C)
+VDD = 5V
+VDD = 2V
+VDD = 3.3V150
+100
+50
+0
+50
+100
+150
+200
+250
+300
+-
+-
+-
+-
+-
+-
+Offset Error ( V)m
+-40 -20 0 20 40 60 80 100 120 140
+Temperature ( C)°
+VDD = 2V
+FS = 4.096V± (1)
+FS = 2.048V±
+FS = 1.024V±
+FS = 0.512V±
+VDD = 5V60
+50
+40
+30
+20
+10
+0
+10
+20
+-
+-
+Offset Voltage ( V)m
+-40 -20 0 20 40 60 80 100 120 140
+Temperature (°C)
+VDD = 3V
+VDD = 2V
+VDD = 5V
+VDD = 4V0.05
+0.04
+0.03
+0.02
+0.01
+0
+0.01
+0.02
+0.03
+0.04
+-
+-
+-
+-
+Gain Error (%)
+-40 -20 0 20 40 60 80 100 120 140
+Temperature (°C)
+FS = 0.512V±
+FS = 0.256V±
+FS = 1.024V, 2.048V,
+4.096V , and 6.144V
+± ±
+± ±
+(1) (1)0.15
+0.10
+0.05
+0
+0.05
+0.10
+0.15
+-
+-
+-
+Gain Error (%)
+2.0 2.5 3.0 3.5 4.0 4.5 5.0 5.5
+Supply Voltage (V)
+FS = 256mV±
+FS = 2.048V±ADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+TYPICAL CHARACTERISTICS
+At TA = +25°C and VDD = 3.3V, unless otherwise noted.
+OPERATING CURRENT vs TEMPERATURE SHUTDOWN CURRENT vs TEMPERATURE
+Figure 2. Figure 3.
+SINGLE-ENDED OFFSET ERROR vs TEMPERATURE(1) DIFFERENTIAL OFFSET vs TEMPERATURE
+Figure 4. Figure 5.
+GAIN ERROR vs TEMPERATURE GAIN ERROR vs SUPPLY
+Figure 6. Figure 7.
+(1) This parameter expresses the full-scale range of the ADC scaling. In no event should more than VDD + 0.3V be applied to this device.
+6 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+60
+50
+40
+30
+20
+10
+0
+Integral Nonlinearity ( V)m
+2.0 3.0 3.5 4.0 4.5 5.0 5.5
+Supply Voltage (V)
+2.5
+FS = 6.144V± (1)
+FS = 2.048V± FS = 0.512, 0.256V± ±60
+40
+20
+0
+20
+40
+60
+-
+-
+-
+Integral Nonlinearity ( V)m
+-2.0 -1.0 -0.5 0 0.5 1.0 2.0
+Input Signal (V)
+-1.5
++125°C
++25°C
+- °40 C
+1.5
+FS = 2.048V
+VDD = 3.3V
+DR = 8SPS
+Best Fit
+±60
+40
+20
+0
+20
+40
+60
+-
+-
+-
+Integral Nonlinearity ( V)m
+-0.5 -0.250 -0.125 0 0.125 0.250 0.5
+Input Signal (V)
+-0.375
++125°C
++25°C
+- °40 C
+0.375
+FS = 0.512V
+VDD = 3.3V
+DR = 8SPS
+Best Fit
+±60
+40
+20
+0
+20
+40
+60
+-
+-
+-
+Integral Nonlinearity ( V)m
+-2.0 -1.0 -0.5 0 0.5 1.0 2.0
+Input Voltage (V)
+-1.5 1.5
+FS = 2.048V
+VDD = 5V
+DR = 8SPS
+Best Fit
+±
+T = 40 C- °A
+T = +25 C°A
+T = +125 C°A60
+40
+20
+0
+20
+40
+60
+-
+-
+-
+Integral Nonlinearity ( V)m
+-0.5 -0.3 -0.2 -0.1 0 0.1 0.5
+Input Voltage (V)
+-0.4 0.4
+FS = 0.512V
+VDD = 5V
+DR = 8SPS
+Best Fit
+±
+0.2 0.3
+T = +25 C°A
+T = +125 C°A
+T = 40 C- °AVDD = 2V
+VDD = 5V
+140
+120
+100
+80
+60
+40
+20
+0
+Integral Nonlinearity ( V)m
+-60 -40 -20 0 20 40 60 80 100 120 140
+Temperature ( C)°
+VDD = 3.3V
+DR = 8SPSADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+TYPICAL CHARACTERISTICS (continued)
+At TA = +25°C and VDD = 3.3V, unless otherwise noted.
+INL vs SUPPLY VOLTAGE(2) INL vs INPUT SIGNAL
+Figure 8. Figure 9.
+INL vs INPUT SIGNAL INL vs INPUT SIGNAL
+Figure 10. Figure 11.
+INL vs INPUT SIGNAL INL vs TEMPERATURE
+Figure 12. Figure 13.
+(2) This parameter expresses the full-scale range of the ADC scaling. In no event should more than VDD + 0.3V be applied to this device.
+Copyright © 2009, Texas Instruments Incorporated Submit Documentation Feedback 7
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+-0.5 -0.4 -0.3 -0.2 -0.1 0 0.1 0.2 0.3 0.4 0.5
+12
+10
+8
+6
+4
+2
+0
+RMS Noise ( V)m
+Input Voltage (V)
+DR = 860SPS
+DR = 8SPS
+DR = 128SPS
+FS = 0.512V±35
+30
+25
+20
+15
+10
+5
+0
+RMS Noise ( V)m
+2.0 3.0 3.5 4.0 4.5 5.0 5.5
+Supply Voltage (V)
+2.5
+FS = 2.048V±
+860SPS
+128SPS
+8SPS10
+9
+8
+7
+6
+5
+4
+3
+2
+1
+0
+RMS Noise ( V)m
+-40 -20 0 20 40 60 80 100 120 140
+Temperature ( C)°
+FS = 2.048V
+Data Rate = 8SPS
+±30
+25
+20
+15
+10
+5
+0
+Number of Occurrences
+-0.010
+Gain Error (%)
+0.010
+0.040
+-0.005
+0.015
+0.035
+0.090
+0
+0.020
+0.030
+0.050
+0.005
+0.025
+0.045
+185 Units From a Production Lot
+FS = 2.048V±
+0.055
+0.065
+0.075
+0.085
+0.060
+0.070
+0.080160
+140
+120
+100
+80
+60
+40
+20
+0
+Number of Occurrences
+-3 3
+Offset (LSBs)
+-1 10 2-2
+185 Units From a
+Production Lot
+FS = 2.048V±Total Error (mV)
+4
+3
+2
+1
+0
+1
+2
+3
+4
+-
+-
+-
+-
+-2.048 -1.024 0 1.024 2.048
+Input Signal (V)
+Includes noise, offset, and gain error.
+FS = 2.048V
+Data Rate = 860SPS
+Differential Inputs
+±ADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+TYPICAL CHARACTERISTICS (continued)
+At TA = +25°C and VDD = 3.3V, unless otherwise noted.
+NOISE vs INPUT SIGNAL NOISE vs SUPPLY VOLTAGE
+Figure 14. Figure 15.
+NOISE vs TEMPERATURE GAIN ERROR HISTOGRAM
+Figure 16. Figure 17.
+OFFSET HISTOGRAM TOTAL ERROR vs INPUT SIGNAL
+Figure 18. Figure 19.
+8 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+0
+10
+20
+30
+40
+50
+60
+70
+80
+-
+-
+-
+-
+-
+-
+-
+-
+Gain (dB)
+1 10 100 1k 10k
+Input Frequency (Hz)
+Data Rate = 8SPS4
+3
+2
+1
+0
+1
+2
+3
+4
+-
+-
+-
+-
+Data Rate Error (%)
+-40 -20 0 20 40 60 80 100 120 140
+Temperature ( C)°
+VDD = 2V
+VDD = 5V
+VDD = 3.3VADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+TYPICAL CHARACTERISTICS (continued)
+At TA = +25°C and VDD = 3.3V, unless otherwise noted.
+DATA RATE vs TEMPERATURE FREQUENCY RESPONSE
+Figure 20. Figure 21.
+Copyright © 2009, Texas Instruments Incorporated Submit Documentation Feedback 9
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+16-Bit
+ADC
+DS I C
+Interface
+2
+Voltage
+Reference
+Oscillator
+ALERT/RDY
+SCL
+SDA
+ADDR
+Gain = 2/3, 1,
+2, 4, 8, or 16
+PGA
+ComparatorADS1115
+AIN1
+AIN2
+GND
+AIN0
+AIN3
+VDD
+MUXADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+OVERVIEW
+of a differential, switched-capacitor ΔΣ modulator
+The ADS1113/4/5 are very small, low-power, 16-bit, followed by a digital filter. Input signals are compared
+delta-sigma (ΔΣ) analog-to-digital converters (ADCs). to the internal voltage reference. The digital filter
+The ADS1113/4/5 are extremely easy to configure receives a high-speed bitstream from the modulator
+and design into a wide variety of applications, and and outputs a code proportional to the input voltage.
+allow precise measurements to be obtained with very
+little effort. Both experienced and novice users of The ADS1113/4/5 have two available conversion
+data converters find designing with the ADS1113/4/5 modes: single-shot mode and continuous conversion
+family to be intuitive and problem-free. mode. In single-shot mode, the ADC performs one
+conversion of the input signal upon request and
+The ADS1113/4/5 consist of a ΔΣ analog-to-digital stores the value to an internal result register. The
+(A/D) core with adjustable gain (excludes the device then enters a low-power shutdown mode. This
+ADS1113), an internal voltage reference, a clock mode is intended to provide significant power savings
+oscillator, and an I2C interface. An additional feature in systems that only require periodic conversions or
+available on the ADS1114/5 is a programmable digital when there are long idle periods between
+comparator that provides an alert on a dedicated pin. conversions. In continuous conversion mode, the
+All of these features are intended to reduce required ADC automatically begins a conversion of the input
+external circuitry and improve performance. Figure 22 signal as soon as the previous conversion is
+shows the ADS1115 functional block diagram. completed. The rate of continuous conversion is
+equal to the programmed data rate. Data can be readThe ADS1113/4/5 A/D core measures a differential at any time and always reflect the most recentsignal, VIN, that is the difference of AINP and AINN. A completed conversion.MUX is available on the ADS1115. This architecture
+results in a very strong attenuation in any
+common-mode signals. The converter core consists
+Figure 22. ADS1115 Functional Block Diagram
+10 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+VDD
+GND
+SCL
+SDA
+ADDR
+A T
+(ADS1114/5 Only)
+LER
+AIN0
+AIN1
+AIN2 (ADS1115 Only)
+AIN3 (ADS1115 Only) SCL (P1.6)
+SDA (P1.7)
+1 F00n
+I C-Capabl Mastere
+( )MSP430F2002
+2
+ADS1 13/4/1 5
++3.3V
+VDD
+GND
+1 F00n
++3.3V
+JTAG Serial AR/U T
++3.3V
+10kW 10kWADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+QUICKSTART GUIDE For example, to write to the configuration register to
+set the ADS1113/4/5 to continuous conversion mode
+This section provides a brief example of ADS1113/4/5 and then read the conversion result, send the
+communications. Refer to subsequent sections of this following bytes in this order:
+data sheet for more detailed explanations. Hardware
+for this design includes: one ADS1113/4/5 configured Write to Config register:
+with an I2C address of 1001000; a microcontroller First byte: 0b10010000 (first 7-bit I2C addresswith an I2C interface (TI recommends the followed by a low read/write bit)MSP430F2002); discrete components such as
+resistors, capacitors, and serial connectors; and a 2V Second byte: 0b00000001 (points to Config register)
+to 5V power supply. Figure 23 shows the basic Third byte: 0b10000100 (MSB of the Config registerhardware configuration. to be written)
+The ADS1113/4/5 communicate with the master Fourth byte: 0b10000011 (LSB of the Config register(microcontroller) through an I2C interface. The master to be written)provides a clock signal on the SCL pin and data are
+transferred via the SDA pin. The ADS1113/4/5 never Write to Pointer register:
+drive the SCL pin. For information on programming First byte: 0b10010000 (first 7-bit I2C addressand debugging the microcontroller being used, refer followed by a low read/write bit)to the device-specific product data sheet.
+Second byte: 0b00000000 (points to ConversionThe first byte sent by the master should be the register)ADS1113/4/5 address followed by a bit that instructs
+the ADS1113/4/5 to listen for a subsequent byte. The Read Conversion register:
+second byte is the register pointer. Refer to Table 9 First byte: 0b10010001 (first 7-bit I2C addressfor a register map. The third and fourth bytes sent followed by a high read/write bit)from the master are written to the register indicated in
+the second byte. Refer to Figure 30 and Figure 31 for Second byte: the ADS1113/4/5 response with the
+read and write operation timing diagrams, MSB of the Conversion register
+respectively. All read and write transactions with the Third byte: the ADS1113/4/5 response with the LSBADS1113/4/5 must be preceded by a start condition of the Conversion registerand followed by a stop condition.
+Figure 23. Basic Hardware Configuration
+Copyright © 2009, Texas Instruments Incorporated Submit Documentation Feedback 11
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+VDD
+GND
+AIN0
+VDD
+GND
+AIN1 VDD
+GND
+AIN2
+VDD
+GND
+AIN3
+AINP
+AINN
+GND
+ADS1115tSAMPLE
+ON
+OFF
+S1
+S2
+OFF
+ONADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+MULTIPLEXER If it is possible that the voltages on the input pins may
+violate these conditions, external Schottky clamp
+The ADS1115 contains an input multiplexer, as diodes and/or series resistors may be required to limit
+shown in Figure 24. Either four single-ended or two the input current to safe values (see the Absolute
+differential signals can be measured. Additionally, Maximum Ratings table).
+AIN0 and AIN1 may be measured differentially to
+AIN3. The multiplexer is configured by three bits in Also, overdriving one unused input on the ADS1115
+the Config register. When single-ended signals are may affect conversions taking place on other input
+measured, the negative input of the ADC is internally pins. If overdrive on unused inputs is possible, again
+connected to GND by a switch within the multiplexer. it is recommended to clamp the signal with external
+Schottky diodes.
+ANALOG INPUTS
+The ADS1113/4/5 use a switched-capacitor input
+stage where capacitors are continuously charged and
+then discharged to measure the voltage between
+AINP and AINN. The capacitors used are small, and to
+external circuitry the average loading appears
+resistive. This structure is shown in Figure 26. The
+resistance is set by the capacitor values and the rate
+at which they are switched. Figure 25 shows the
+on/off setting of the switches illustrated in Figure 26.
+During the sampling phase, S1 switches are closed.
+This event charges CA1 to AINP, CA2 to AINN, and CB
+to (AINP – AINN). During the discharge phase, S1 is
+first opened and then S2 is closed. Both CA1 and CA2
+then discharge to approximately 0.7V and CB
+discharges to 0V. This charging draws a very small
+transient current from the source driving the
+Figure 24. ADS1115 MUX ADS1113/4/5 analog inputs. The average value of
+this current can be used to calculate the effective
+The ADS1113 and ADS1114 do not have a impedance (Reff) where Reff = VIN/IAVERAGE.
+multiplexer. Either one differential or one
+single-ended signal may be measured with these
+devices. For single-ended measurements, connect
+the AIN1 pin to GND. Note that in subsequent
+sections of this data sheet, AINP refers to AIN0 and
+AINN refers to AIN1 for the ADS1113 and ADS1114.
+When measuring single-ended inputs it is important to
+note that the negative range of the output codes are
+not used. These codes are for measuring negative Figure 25. S1 and S2 Switch Timing for Figure 26differential signals such as (AINP – AINN) < 0. ESD
+diodes to VDD and GND protect the inputs on all
+three devices (ADS1113, ADS1114, and ADS1115).
+To prevent the ESD diodes from turning on, the
+absolute voltage on any input must stay within the
+following range:
+GND – 0.3V < AINx < VDD + 0.3V
+12 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+Equivalent
+Circuit
+f = 250kHzCLK
+ZCM
+ZDIFF
+ZCM
+AINN
+AINP
+0.7V
+0.7V
+S1
+S1
+CA1
+CB
+CA2
+S2
+S2
+0.7V
+0.7VAINN
+AINPADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+Figure 26. Simplified Analog Input Circuit
+The common-mode input impedance is measured by The typical value of the input impedance cannot be
+applying a common-mode signal to shorted AINP and neglected. Unless the input source has a low
+AINN inputs and measuring the average current impedance, the ADS1113/4/5 input impedance may
+consumed by each pin. The common-mode input affect the measurement accuracy. For sources with
+impedance changes depending on the PGA gain high output impedance, buffering may be necessary.
+setting, but is approximately 6MΩ for the default PGA Active buffers introduce noise, and also introduce
+gain setting. In Figure 26, the common-mode input offset and gain errors. All of these factors should be
+impedance is ZCM. considered in high-accuracy applications.
+The differential input impedance is measured by Because the clock oscillator frequency drifts slightly
+applying a differential signal to AINP and AINN inputs with temperature, the input impedances also drift. For
+where one input is held at 0.7V. The current that many applications, this input impedance drift can be
+flows through the pin connected to 0.7V is the ignored, and the values given in Table 2 for typical
+differential current and scales with the PGA gain input impedance are valid.
+setting. In Figure 26, the differential input impedance
+is ZDIFF. Table 2 describes the typical differential input FULL-SCALE INPUT
+impedance. A programmable gain amplifier (PGA) is implemented
+before the ΔΣ core of the ADS1114/5. The PGA canTable 2. Differential Input Impedance be set to gains of 2/3, 1, 2, 4, 8, and 16. Table 3
+FS (V) DIFFERENTIAL INPUT IMPEDANCE shows the corresponding full-scale (FS) ranges. The
+±6.144V(1) 22MΩ PGA is configured by three bits in the Config register.
+The ADS1113 has a fixed full-scale input range of±4.096V(1) 15MΩ
+±2.048V. The PGA = 2/3 setting allows input±2.048V 4.9MΩ measurement to extend up to the supply voltage
+±1.024V 2.4MΩ when VDD is larger than 4V. Note though that in this
+±0.512V 710kΩ case (as well as for PGA = 1 and VDD < 4V), it is not
+±0.256V 710kΩ possible to reach a full-scale output code on the
+ADC. Analog input voltages may never exceed the
+1. This parameter expresses the full-scale range of analog input voltage limits given in the Electrical
+the ADC scaling. In no event should more than Characteristics table.
+VDD + 0.3V be applied to this device.
+Table 3. PGA Gain Full-Scale Range
+PGA SETTING FS (V)
+2/3 ±6.144V(1)
+1 ±4.096V(1)
+2 ±2.048V
+4 ±1.024V
+8 ±0.512V
+16 ±0.256V
+1. This parameter expresses the full-scale range of
+the ADC scaling. In no event should more than
+VDD + 0.3V be applied to this device.
+Copyright © 2009, Texas Instruments Incorporated Submit Documentation Feedback 13
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+0x7FFF
+Output Code
+-FS ¼ 0 ¼ FS
+Input Voltage (AIN AIN )-P N
+0x7FFE
+0x0001
+¼
+0x0000
+0x8000
+0xFFFF
+0x8001
+¼
+-FS 2 - 1
+15
+215 FS 2 - 1
+15
+215ADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+DATA FORMAT The ADS1113/4/5 digital filter provides some
+attenuation of high-frequency noise, but the digital
+The ADS1113/4/5 provide 16 bits of data in binary Sinc filter frequency response cannot completely
+twos complement format. The positive full-scale input replace an anti-aliasing filter. For a few applications,
+produces an output code of 7FFFh and the negative some external filtering may be needed; in such
+full-scale input produces an output code of 8000h. instances, a simple RC filter is adequate.
+The output clips at these codes for signals that
+exceed full-scale. Table 4 summarizes the ideal When designing an input filter circuit, be sure to take
+output codes for different input signals. Figure 27 into account the interaction between the filter network
+shows code transitions versus input voltage. and the input impedance of the ADS1113/4/5.
+Table 4. Input Signal versus Ideal Output Code OPERATING MODES
+INPUT SIGNAL, VIN The ADS1113/4/5 operate in one of two modes:
+(AINP – AINN) IDEAL OUTPUT CODE(1)
+continuous conversion or single-shot. In continuous
+≥ FS (215 – 1)/215 7FFFh conversion mode, the ADS1113/4/5 continuously
++FS/215 0001h perform conversions. Once a conversion has been
+completed, the ADS1113/4/5 place the result in the0 0
+Conversion register and immediately begins another–FS/215 FFFFh conversion. In single-shot mode, the ADS1113/4/5
+≤ –FS 8000h wait until the OS bit is set high. Once asserted, the bit
+is set to '0', indicating that a conversion is currently in1. Excludes the effects of noise, INL, offset, and progress. Once conversion data are ready, the OS bitgain errors. reasserts and the device powers down. Writing a '1'
+to the OS bit during a conversion has no effect.
+RESET AND POWER-UP
+When the ADS1113/4/5 powers up, a reset is
+performed. As part of the reset process, the
+ADS1113/4/5 set all of the bits in the Config register
+to the respective default settings.
+The ADS1113/4/5 respond to the I2C general call
+reset command. When the ADS1113/4/5 receive a
+general call reset, an internal reset is performed as if
+the device had been powered on.
+DUTY CYCLING FOR LOW POWER
+For many applications, the improved performance at
+low data rates may not be required. For these
+applications, the ADS1113/4/5 support duty cycling
+Figure 27. ADS1113/4/5 Code Transition Diagram that can yield significant power savings by
+periodically requesting high data rate readings at an
+effectively lower data rate. For example, anALIASING ADS1113/4/5 in power-down mode with a data rate
+As with any data converter, if the input signal set to 860SPS could be operated by a microcontroller
+contains frequencies greater than half the data rate, that instructs a single-shot conversion every 125ms
+aliasing occurs. To prevent aliasing, the input signal (8SPS). Because a conversion at 860SPS only
+must be bandlimited. Some signals are inherently requires about 1.2ms, the ADS1113/4/5 enter
+bandlimited. For example, the output of a power-down mode for the remaining 123.8ms. In this
+thermocouple, which has a limited rate of change. configuration, the ADS1113/4/5 consume about
+Nevertheless, they can contain noise and interference 1/100th the power of the ADS1113/4/5 operated in
+components. These components can fold back into continuous conversion mode. The rate of duty cycling
+the sampling band in the same way as with any other is completely arbitrary and is defined by the master
+signal. controller. The ADS1113/4/5 offer lower data rates
+that do not implement duty cycling and offer improved
+noise performance if it is needed.
+14 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+TH_H
+TH_L
+Time
+Time
+Time
+Successful
+SMBus Alert
+Response
+Latching
+Comparator
+Output
+Non-Latching
+Comparator
+Output
+Input SignalTH_H
+TH_L
+Time
+Time
+Time
+Successful
+SMBus Alert
+Response
+Successful
+SMBus Alert
+Response
+Latching
+Comparator
+Output
+Non-Latching
+Comparator
+Output
+Input SignalADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+COMPARATOR (ADS1114/15 ONLY)
+The ADS1114/5 are each equipped with a
+customizable comparator that can issue an alert on
+the ALERT/RDY pin. This feature can significantly
+reduce external circuitry for many applications. The
+comparator can be implemented as either a
+traditional comparator or a window comparator via the
+COMP_MODE bit in the Config register. When
+implemented as a traditional comparator, the
+ALERT/RDY pin asserts (active low by default) when
+conversion data exceed the limit set in the high
+threshold register. The comparator then deasserts
+when the input signal falls below the low threshold
+register value. In window comparator mode, the
+ALERT/RDY pin asserts if conversion data exceed
+the high threshold register or fall below the low
+threshold register.
+In either window or traditional comparator mode, the
+comparator can be configured to latch once asserted
+by the COMP_LAT bit in the Config register. This
+setting causes the assertion to remain even if the
+input signal is not beyond the bounds of the threshold
+registers. This latched assertion can be cleared by
+issuing an SMBus alert response or by reading the
+Conversion register. The COMP_POL bit in the
+Config register configures the ALERT/RDY pin as Figure 28. Alert Pin Timing Diagram When
+active high or active low. Operational diagrams for Configured as a Traditional Comparator
+the comparator modes are shown in Figure 28 and
+Figure 29.
+The comparator can be configured to activate the
+ALERT/RDY pin after a set number of successive
+readings exceed the threshold. The comparator can
+be configured to wait for one, two, or four readings
+beyond the threshold before activating the
+ALERT/RDY pin by changing the COMP_QUE bits in
+the Config register. The COMP_QUE bits can also
+disable the comparator function.
+CONVERSION READY PIN (ADS1114/5 ONLY)
+The ALERT/RDY pin can also be configured as a
+conversion ready pin. This mode of operation can be
+realized if the MSB of the high threshold register is
+set to '1' and the MSB of the low threshold register is
+set to '0'. The COMP_POL bit continues to function
+and the COMP_QUE bits can disable the pin;
+however, the COMP_MODE and COMP_LAT bits no
+longer control any function. When configured as a
+conversion ready pin, ALERT/RDY continues to
+require a pull-up resistor. When in continuous
+conversion mode, the ADS1113/4/5 provide a brief
+(~8μs) pulse on the ALERT/RDY pin at the end of
+each conversion. When in single-shot shutdown
+mode, the ALERT/RDY pin asserts low at the end of
+a conversion if the COMP_POL bit is set to '0'. Figure 29. Alert Pin Timing Diagram When
+Configured as a Window Comparator
+Copyright © 2009, Texas Instruments Incorporated Submit Documentation Feedback 15
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+ADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+SMBus ALERT RESPONSE An I2C bus consists of two lines, SDA and SCL. SDA
+carries data; SCL provides the clock. All data are
+When configured in latching mode (COMP_LAT = '1' transmitted across the I2C bus in groups of eight bits.
+in the Config register), the ALERT/RDY pin can be To send a bit on the I2C bus, the SDA line is driven to
+implemented with an SMBus alert. The pin asserts if the appropriate level while SCL is low (a low on SDA
+the comparator detects a conversion that exceeds an indicates the bit is zero; a high indicates the bit is
+upper or lower threshold. This interrupt is latched and one). Once the SDA line settles, the SCL line is
+can be cleared only by reading conversion data, or by brought high, then low. This pulse on SCL clocks the
+issuing a successful SMBus alert response and SDA bit into the receiver shift register. If the I2C bus
+reading the asserting device I2C address. If is held idle for more than 25ms, the bus times out.
+conversion data exceed the upper or lower thresholds
+after being cleared, the pin reasserts. This assertion The I2C bus is bidirectional: the SDA line is used for
+does not affect conversions that are already in both transmitting and receiving data. When the
+progress. The ALERT/RDY pin, as with the SDA pin, master reads from a slave, the slave drives the data
+is an open-drain pin. This architecture allows several line; when the master sends to a slave, the master
+devices to share the same interface bus. When drives the data line. The master always drives the
+disabled, the pin holds a high state so that it does not clock line. The ADS1113/4/5 never drive SCL,
+interfere with other devices on the same bus line. because they cannot act as a master. On the
+ADS1113/4/5, SCL is an input only.
+When the master senses that the ALERT/RDY pin
+has latched, it issues an SMBus alert command Most of the time the bus is idle; no communication
+(00011001) to the I2C bus. Any ADS1114/5 data occurs, and both lines are high. When communication
+converters on the I2C bus with the ALERT/RDY pins is taking place, the bus is active. Only master devices
+asserted respond to the command with the slave can start a communication and initiate a START
+address. In the event that two or more ADS1114/5 condition on the bus. Normally, the data line is only
+data converters present on the bus assert the latched allowed to change state while the clock line is low. If
+ALERT/RDY pin, arbitration during the address the data line changes state while the clock line is
+response portion of the SMBus alert decides which high, it is either a START condition or a STOP
+device clears its assertion. The device with the lowest condition. A START condition occurs when the clock
+I2C address always wins arbitration. If a device loses line is high and the data line goes from high to low. A
+arbitration, it does not clear the comparator output pin STOP condition occurs when the clock line is high
+assertion. The master then repeats the SMBus alert and the data line goes from low to high.
+response until all devices have had the respective After the master issues a START condition, it sends aassertions cleared. In window comparator mode, the byte that indicates which slave device it wants toSMBus alert status bit indicates a '1' if signals exceed communicate with. This byte is called the addressthe high threshold and a '0' if signals exceed the low byte. Each device on an I2C bus has a unique 7-bitthreshold. address to which it responds. The master sends an
+address in the address byte, together with a bit that
+I2C INTERFACE indicates whether it wishes to read from or write to
+the slave device.The ADS1113/4/5 communicate through an I2C
+interface. I2C is a two-wire open-drain interface that Every byte transmitted on the I2C bus, whether it is
+supports multiple devices and masters on a single address or data, is acknowledged with an
+bus. Devices on the I2C bus only drive the bus lines acknowledge bit. When the master has finished
+low by connecting them to ground; they never drive sending a byte (eight data bits) to a slave, it stops
+the bus lines high. Instead, the bus wires are pulled driving SDA and waits for the slave to acknowledge
+high by pull-up resistors, so the bus wires are high the byte. The slave acknowledges the byte by pulling
+when no device is driving them low. This way, two SDA low. The master then sends a clock pulse to
+devices cannot conflict; if two devices drive the bus clock the acknowledge bit. Similarly, when the master
+simultaneously, there is no driver contention. has finished reading a byte, it pulls SDA low to
+acknowledge this to the slave. It then sends a clockCommunication on the I2C bus always takes place pulse to clock the bit. (The master always drives thebetween two devices, one acting as the master and clock line.)the other as the slave. Both masters and slaves can
+read and write, but slaves can only do so under the A not-acknowledge is performed by simply leaving
+direction of the master. Some I2C devices can act as SDA high during an acknowledge cycle. If a device is
+masters or slaves, but the ADS1113/4/5 can only act not present on the bus, and the master attempts to
+as slave devices. address it, it receives a not-acknowledge because no
+device is present at that address to pull the line low.
+16 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+ADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+When the master has finished communicating with a byte; the I2C specification prohibits acknowledgment
+slave, it may issue a STOP condition. When a STOP of the Hs master code. Upon receiving a master
+condition is issued, the bus becomes idle again. The code, the ADS1113/4/5 switch on Hs mode filters,
+master may also issue another START condition. and communicate at up to 3.4MHz. The ADS1113/4/5
+When a START condition is issued while the bus is switch out of Hs mode with the next STOP condition.
+active, it is called a repeated START condition. For more information on high-speed mode, consult
+See the Timing Requirements section for a timing the I2C specification.
+diagram showing the ADS1113/4/5 I2C transaction.
+SLAVE MODE OPERATIONS
+I2C ADDRESS SELECTION The ADS1113/4/5 can act as either slave receivers or
+The ADS1113/4/5 have one address pin, ADDR, that slave transmitters. As a slave device, the
+sets the I2C address. This pin can be connected to ADS1113/4/5 cannot drive the SCL line.
+ground, VDD, SDA, or SCL, allowing four addresses
+to be selected with one pin as shown in Table 5. The Receive Mode:
+state of the address pin ADDR is sampled In slave receive mode the first byte transmitted fromcontinuously. the master to the slave is the address with the R/W
+bit low. This byte allows the slave to be written to.Table 5. ADDR Pin Connection and The next byte transmitted by the master is theCorresponding Slave Address register pointer byte. The ADS1113/4/5 then
+ADDR PIN SLAVE ADDRESS acknowledge receipt of the register pointer byte. The
+Ground 1001000 next two bytes are written to the address given by the
+register pointer. The ADS1113/4/5 acknowledge eachVDD 1001001
+byte sent. Register bytes are sent with the mostSDA 1001010 significant byte first, followed by the least significant
+SCL 1001011 byte.
+I2C GENERAL CALL Transmit Mode:
+The ADS1113/4/5 respond to the I2C general call In slave transmit mode, the first byte transmitted by
+address (0000000) if the eighth bit is '0'. The devices the master is the 7-bit slave address followed by the
+acknowledge the general call address and respond to high R/W bit. This byte places the slave into transmit
+commands in the second byte. If the second byte is mode and indicates that the ADS1113/4/5 are being
+00000110 (06h), the ADS1113/4/5 reset the internal read from. The next byte transmitted by the slave is
+registers and enter power-down mode. the most significant byte of the register that is
+indicated by the register pointer. This byte is followed
+by an acknowledgment from the master. TheI2C SPEED MODES remaining least significant byte is then sent by the
+The I2C bus operates at one of three speeds. slave and is followed by an acknowledgment from the
+Standard mode allows a clock frequency of up to master. The master may terminate transmission after
+100kHz; fast mode permits a clock frequency of up to any byte by not acknowledging or issuing a START or
+400kHz; and high-speed mode (also called Hs mode) STOP condition.
+allows a clock frequency of up to 3.4MHz. The
+ADS1113/4/5 are fully compatible with all three WRITING/READING THE REGISTERSmodes.
+To access a specific register from the ADS1113/4/5,
+No special action is required to use the ADS1113/4/5 the master must first write an appropriate value to the
+in standard or fast mode, but high-speed mode must Pointer register. The Pointer register is written directly
+be activated. To activate high-speed mode, send a after the slave address byte, low R/W bit, and a
+special address byte of 00001xxx following the successful slave acknowledgment. After the Pointer
+START condition, where xxx are bits unique to the register is written, the slave acknowledges and the
+Hs-capable master. This byte is called the Hs master master issues a STOP or a repeated START
+code. (Note that this is different from normal address condition.
+bytes; the eighth bit does not indicate read/write
+status.) The ADS1113/4/5 do not acknowledge this
+Copyright © 2009, Texas Instruments Incorporated Submit Documentation Feedback 17
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+ADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+When reading from the ADS1113/4/5, the previous POINTER REGISTER
+value written to the Pointer register determines the The four registers are accessed by writing to theregister that is read from. To change which register is Pointer register byte; see Figure 30. Table 6 andread, a new value must be written to the Pointer Table 7 indicate the Pointer register byte map.register. To write a new value to the Pointer register,
+the master issues a slave address byte with the R/W Table 6. Register Addressbit low, followed by the Pointer register byte. No BIT 1 BIT 0 REGISTERadditional data need to be transmitted, and a STOP
+condition can be issued by the master. The master 0 0 Conversion register
+may now issue a START condition and send the 0 1 Config register
+slave address byte with the R/W bit high to begin the 1 0 Lo_thresh register
+read. Table 10 details this sequence. If repeated 1 1 Hi_thresh registerreads from the same register are desired, there is no
+need to continually send Pointer register bytes,
+because the ADS1113/4/5 store the value of the CONVERSION REGISTER
+Pointer register until it is modified by a write The 16-bit register contains the result of the lastoperation. However, every write operation requires conversion in binary twos complement format.the Pointer register to be written. Following reset or power-up, the Conversion register
+is cleared to '0', and remains '0' until the first
+REGISTERS conversion is completed.
+The ADS1113/4/5 have four registers that are The register format is shown in Table 8.
+accessible via the I2C port. The Conversion register
+contains the result of the last conversion. The Config CONFIG REGISTER
+register allows the user to change the ADS1113/4/5
+operating modes and query the status of the devices. The 16-bit register can be used to control the
+Two registers, Lo_thresh and Hi_thresh, set the ADS1113/4/5 operating mode, input selection, data
+threshold values used for the comparator function. rate, PGA settings, and comparator modes. The
+register format is shown in Table 9.
+Table 7. Pointer Register Byte (Write-Only)
+BIT 7 BIT 6 BIT 5 BIT 4 BIT 3 BIT 2 BIT 1 BIT 0
+0 0 0 0 0 0 Register address
+Table 8. Conversion Register (Read-Only)
+BIT 15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
+NAME D15 D14 D13 D12 D11 D10 D9 D8 D7 D6 D5 D4 D3 D2 D1 D0
+Table 9. Config Register (Read/Write)
+BIT 15 14 13 12 11 10 9 8
+NAME OS MUX2 MUX1 MUX0 PGA2 PGA1 PGA0 MODE
+blank
+BIT 7 6 5 4 3 2 1 0
+NAME DR2 DR1 DR0 COMP_MODE COMP_POL COMP_LAT COMP_QUE1 COMP_QUE0
+Default = 8583h.
+Bit [15] OS: Operational status/single-shot conversion start
+This bit determines the operational status of the device.
+This bit can only be written when in power-down mode.
+For a write status:
+0 : No effect
+1 : Begin a single conversion (when in power-down mode)
+For a read status:
+0 : Device is currently performing a conversion
+1 : Device is not currently performing a conversion
+18 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+ADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+Bits [14:12] MUX[2:0]: Input multiplexer configuration (ADS1115 only)
+These bits configure the input multiplexer. They serve no function on the ADS1113/4.
+000 : AINP = AIN0 and AINN = AIN1 (default) 100 : AINP = AIN0 and AINN = GND
+001 : AINP = AIN0 and AINN = AIN3 101 : AINP = AIN1 and AINN = GND
+010 : AINP = AIN1 and AINN = AIN3 110 : AINP = AIN2 and AINN = GND
+011 : AINP = AIN2 and AINN = AIN3 111 : AINP = AIN3 and AINN = GND
+Bits [11:9] PGA[2:0]: Programmable gain amplifier configuration (ADS1114 and ADS1115 only)
+These bits configure the programmable gain amplifier. They serve no function on the ADS1113.
+000 : FS = ±6.144V(1) 100 : FS = ±0.512V
+001 : FS = ±4.096V(1) 101 : FS = ±0.256V
+010 : FS = ±2.048V (default) 110 : FS = ±0.256V
+011 : FS = ±1.024V 111 : FS = ±0.256V
+Bit [8] MODE: Device operating mode
+This bit controls the current operational mode of the ADS1113/4/5.
+0 : Continuous conversion mode
+1 : Power-down single-shot mode (default)
+Bits [7:5] DR[2:0]: Data rate
+These bits control the data rate setting.
+000 : 8SPS 100 : 128SPS (default)
+001 : 16SPS 101 : 250SPS
+010 : 32SPS 110 : 475SPS
+011 : 64SPS 111 : 860SPS
+Bit [4] COMP_MODE: Comparator mode (ADS1114 and ADS1115 only)
+This bit controls the comparator mode of operation. It changes whether the comparator is implemented as a
+traditional comparator (COMP_MODE = '0') or as a window comparator (COMP_MODE = '1'). It serves no
+function on the ADS1113.
+0 : Traditional comparator with hysteresis (default)
+1 : Window comparator
+Bit [3] COMP_POL: Comparator polarity (ADS1114 and ADS1115 only)
+This bit controls the polarity of the ALERT/RDY pin. When COMP_POL = '0' the comparator output is active
+low. When COMP_POL='1' the ALERT/RDY pin is active high. It serves no function on the ADS1113.
+0 : Active low (default)
+1 : Active high
+Bit [2] COMP_LAT: Latching comparator (ADS1114 and ADS1115 only)
+This bit controls whether the ALERT/RDY pin latches once asserted or clears once conversions are within the
+margin of the upper and lower threshold values. When COMP_LAT = '0', the ALERT/RDY pin does not latch
+when asserted. When COMP_LAT = '1', the asserted ALERT/RDY pin remains latched until conversion data
+are read by the master or an appropriate SMBus alert response is sent by the master, the device responds with
+its address, and it is the lowest address currently asserting the ALERT/RDY bus line. This bit serves no
+function on the ADS1113.
+0 : Non-latching comparator (default)
+1 : Latching comparator
+Bits [1:0] COMP_QUE: Comparator queue and disable (ADS1114 and ADS1115 only)
+These bits perform two functions. When set to '11', they disable the comparator function and put the
+ALERT/RDY pin into a high state. When set to any other value, they control the number of successive
+conversions exceeding the upper or lower thresholds required before asserting the ALERT/RDY pin. They
+serve no function on the ADS1113.
+00 : Assert after one conversion
+01 : Assert after two conversions
+10 : Assert after four conversions
+11 : Disable comparator (default)
+(1) This parameter expresses the full-scale range of the ADC scaling. In no event should more than VDD + 0.3V be applied to this device.
+Copyright © 2009, Texas Instruments Incorporated Submit Documentation Feedback 19
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+ADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+Lo_thresh AND Hi_thresh REGISTERS A secondary conversion ready function of the
+comparator output pin can be realized by setting the
+The upper and lower threshold values used by the Hi_thresh register MSB to '1' and the Lo_thresh
+comparator are stored in two 16-bit registers. These register MSB to ‘0’. However, in all other cases, the
+registers store values in the same format that the Hi_thresh register must be larger than the Lo_thresh
+output register displays values; that is, they are register. The threshold register formats are shown in
+stored in twos complement format. Because it is Table 10. When set to RDY mode, the ALERT/RDY
+implemented as a digital comparator, special pin outputs the OS bit when in single-shot mode and
+attention should be taken to readjust values pulses when in continuous conversion mode.
+whenever PGA settings are changed.
+Table 10. Lo_thresh and Hi_thresh Registers
+REGISTER Lo_thresh (Read/Write)
+BIT 15 14 13 12 11 10 9 8
+NAME Lo_thresh15 Lo_thresh14 Lo_thresh13 Lo_thresh12 Lo_thresh11 Lo_thresh10 Lo_thresh9 Lo_thresh8
+blank
+BIT 7 6 5 4 3 2 1 0
+NAME Lo_thresh7 Lo_thresh6 Lo_thresh5 Lo_thresh4 Lo_thresh3 Lo_thresh2 Lo_thresh1 Lo_thresh0
+REGISTER Hi_thresh (Read/Write)
+BIT 15 14 13 12 11 10 9 8
+NAME Hi_thresh15 Hi_thresh14 Hi_thresh13 Hi_thresh12 Hi_thresh11 Hi_thresh10 Hi_thresh9 Hi_thresh8
+blank
+BIT 7 6 5 4 3 2 1 0
+NAME Hi_thresh7 Hi_thresh6 Hi_thresh5 Hi_thresh4 Hi_thresh3 Hi_thresh2 Hi_thresh1 Hi_thresh0
+Lo_thresh default = 8000h.
+Hi_thresh default = 7FFFh.
+20 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+Frame 1 Two-Wire Slave Address Byte Frame 2 Pointer Register Byte
+1
+Start By
+Master
+ACK By
+ADS1113/4/5
+ACK By
+ADS1113/4/5
+Frame 3 Two-Wire Slave Address Byte Frame 4 Data Byte 1 Read Register
+Start By
+Master
+ACK By
+ADS1113/4/5
+ACK By
+Master(2)
+From
+ADS1113/4/5
+1 9 1 9
+1 9 1 9
+SDA
+SCL
+0 0 1 R/W 0 0 0 0 0 0 P1 P0
+¼
+¼
+¼
+SDA
+(Continued)
+SCL
+(Continued)
+SDA
+(Continued)
+SCL
+(Continued)
+1 0 0 1
+0 A1(1) A0(1)
+0 A1(1) A0(1) R/W D15 D14 D13 D12 D11 D10 D9 D8
+Frame 5 Data Byte 2 Read Register
+Stop By
+Master
+ACK By
+Master(3)
+From
+ADS1113/4/5
+1 9
+D7 D6 D5 D4 D3 D2 D1 D0
+Stop By
+MasterADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+(1) The values of A0 and A1 are determined by the ADDR pin.
+(2) Master can leave SDA high to terminate a single-byte read operation.
+(3) Master can leave SDA high to terminate a two-byte read operation.
+Figure 30. Two-Wire Timing Diagram for Read Word Format
+Copyright © 2009, Texas Instruments Incorporated Submit Documentation Feedback 21
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+Frame 1 Two-Wire Slave Address Byte Frame 2 Pointer Register Byte
+Frame 4 Data Byte 2
+1
+Start By
+Master
+ACK By
+ADS1113/4/5
+ACK By
+ADS1113/4/5
+ACK By
+ADS1113/4/5
+Stop By
+Master
+1 9 1
+1
+D7 D6 D5 D4 D3 D2 D1 D0
+9
+Frame 3 Data Byte 1
+ACK By
+ADS1113/4/5
+1
+D15
+SDA
+(Continued)
+SCL
+(Continued)
+D14 D13 D12 D11 D10 D9 D8
+9
+9
+SDA
+SCL
+0 0 1 0 A1(1) A0(1) R/W 0 0 0 0 0 0 P1 P0 ¼
+¼Frame 1 SMBus ALERT Response Address Byte Frame 2 Slave Address From ADS1115
+Start By
+Master
+ACK By
+ADS1113/4/5
+From
+ADS1113/4/5
+NACK By
+Master
+Stop By
+Master
+1 9 1 9
+SDA
+SCL
+ALERT
+0 0 0 1 1 0 0 R/W 1 0 0 1 A1 A0 StatusADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+(1) The values of A0 and A1 are determined by the ADDR pin.
+Figure 31. Two-Wire Timing Diagram for Write Word Format
+(1) The values of A0 and A1 are determined by the ADDR pin.
+Figure 32. Timing Diagram for SMBus ALERT Response
+22 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+0.1 F (typ)m
+VDD
+VDD
+SDA
+SCL
+GPIO
+Microcontroller or
+Microprocessor
+with I C Port
+2
+Pull-Up Resistors
+1k to 10k (typ)W W
+5
+10
+1
+2
+3
+4
+ADDR
+ALERT/RDY
+GND
+AIN0
+AIN1
+SCL
+9
+8
+7
+6
+SDA
+VDD
+AIN3
+AIN2
+ADS1115
+Inputs Selected
+from Configuration
+RegisterADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+APPLICATION INFORMATION
+The following sections give example circuits and The ADS1113/4/5 interface directly to standard mode,
+suggestions for using the ADS1113/4/5 in various fast mode, and high-speed mode I2C controllers. Any
+situations. microcontroller I2C peripheral, including master-only
+and non-multiple-master I2C peripherals, can operate
+with the ADS1113/4/5. The ADS1113/4/5 do notBASIC CONNECTIONS perform clock-stretching (that is, they never pull the
+For many applications, connecting the ADS1113/4/5 clock line low), so it is not necessary to provide for
+is simple. A basic connection diagram for the this function unless other clock-stretching devices are
+ADS1115 is shown in Figure 33. on the same I2C bus.
+The fully differential voltage input of the ADS1113/4/5 Pull-up resistors are required on both the SDA and
+is ideal for connection to differential sources with SCL lines because I2C bus drivers are open-drain.
+moderately low source impedance, such as The size of these resistors depends on the bus
+thermocouples and thermistors. Although the operating speed and capacitance of the bus lines.
+ADS1113/4/5 can read bipolar differential signals, Higher-value resistors consume less power, but
+they cannot accept negative voltages on either input. increase the transition times on the bus, limiting the
+It may be helpful to think of the ADS1113/4/5 positive bus speed. Lower-value resistors allow higher speed
+voltage input as noninverting, and of the negative at the expense of higher power consumption. Long
+input as inverting. bus lines have higher capacitance and require
+smaller pull-up resistors to compensate. The resistorsWhen the ADS1113/4/5 are converting data, they should not be too small; if they are, the bus driversdraw current in short spikes. The 0.1μF bypass may not be able to pull the bus lines low.capacitor supplies the momentary bursts of extra
+current needed from the supply.
+Figure 33. Typical Connections of the ADS1115
+Copyright © 2009, Texas Instruments Incorporated Submit Documentation Feedback 23
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+VDD
+GPIO_0
+GPIO_1
+Microcontroller or
+Microprocessor
+with GPIO Ports
+5
+10
+1
+2
+3
+4
+ADDR
+ALERT/RDY
+GND
+AIN0
+AIN1
+SCL
+9
+8
+7
+6
+SDA
+VDD
+AIN3
+AIN2
+ADS1115ADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+CONNECTING MULTIPLE DEVICES states. To drive the line low, the pin is set to output
+'0'; to let the line go high, the pin is set to input. When
+Connecting multiple ADS1113/4/5s to a single bus is the pin is set to input, the state of the pin can be
+simple. Using the address pin, the ADS1113/4/5 can read; if another device is pulling the line low, this
+be set to one of four different I2C addresses. An configuration reads as a '0' in the port input register.
+example showing three ADS1113/4/5 devices is given
+in Figure 35. Up to four ADS1113/4/5s (using Note that no pull-up resistor is shown on the SCL
+different address pin configurations) can be line. In this simple case, the resistor is not needed;
+connected to a single bus. the microcontroller can simply leave the line on
+output, and set it to '1' or '0' as appropriate. This
+Note that only one set of pull-up resistors is needed action is possible because the ADS1113/4/5 never
+per bus. The pull-up resistor values may need to be drive the clock line low. This technique can also be
+lowered slightly to compensate for the additional bus used with multiple devices, and has the advantage of
+capacitance presented by multiple devices and lower current consumption as a result of the absence
+increased line length. of a resistive pull-up.
+The TMP421 and DAC8574 devices detect the If there are any devices on the bus that may drive the
+respective I2C bus addresses based on the states of clock lines low, this method should not be used; the
+pins. In the example, the TMP421 has the address SCL line should be high-Z or '0' and a pull-up resistor
+0101010, and the DAC8574 has the address provided as usual.
+1001100. Consult the DAC8574 and TMP421 data
+sheets, available at www.ti.com, for further details. Some microcontrollers have selectable strong pull-up
+circuits built in to the GPIO ports. In some cases,
+these circuits can be switched on and used in placeUSING GPIO PORTS FOR COMMUNICATION of an external pull-up resistor. Weak pull-ups are also
+Most microcontrollers have programmable provided on some microcontrollers, but usually these
+input/output (I/O) pins that can be set in software to are too weak for I2C communication. If there is any
+act as inputs or outputs. If an I2C controller is not doubt about the matter, test the circuit before
+available, the ADS1113/4/5 can be connected to committing it to production.
+GPIO pins and the I2C bus protocol simulated, or
+bit-banged, in software. An example of this
+configuration for a single ADS1113/4/5 is shown in
+Figure 34.
+Bit-banging I2C with GPIO pins can be done by
+setting the GPIO line to '0' and toggling it between
+input and output modes to apply the proper bus
+NOTE: ADS1113/4/5 power and input connections omitted for clarity.
+Figure 34. Using GPIO with a Single ADS1115
+24 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+VDD
+SDA
+SCL
+Microcontroller or
+Microprocessor
+with I C Port
+2
+I C Pull-Up Resistors
+1k to 10k (typ.)W W
+2
+VDDGND
+5
+10
+1
+2
+3
+4
+ADDR
+ALERT/RDY
+GND
+AIN0
+AIN1
+SCL
+9
+8
+7
+6
+SDA
+VDD
+AIN3
+AIN2
+ADS1115
+5
+10
+1
+2
+3
+4
+ADDR
+ALERT/RDY
+GND
+AIN0
+AIN1
+SCL
+9
+8
+7
+6
+SDA
+VDD
+AIN3
+AIN2
+ADS1115
+1
+2
+3
+8
+7
+6
+DXP
+DXN
+A1
+V+
+SCL
+SDA
+TMP421
+1
+2
+3
+16
+15
+14
+4
+5
+6
+13
+12
+11
+7
+8
+10
+9
+V AOUT
+V BOUT
+V HREF
+A3
+A2
+A1
+VDD
+V LREF
+GND
+A0
+IOVDD
+SDA
+V COUT
+V DOUT
+SCL
+LDAC
+DAC8574
+Leave
+Floating
+4 5A0 GNDVDD
+SDA
+SCL
+Microcontroller or
+Microprocessor
+with I C Port
+2
+I C Pull-Up Resistors
+1k to 10k (typ.)W W
+2
+VDDGND
+5
+10
+1
+2
+3
+4
+ADDR
+ALERT/RDY
+GND
+AIN0
+AIN1
+SCL
+9
+8
+7
+6
+SDA
+VDD
+AIN3
+AIN2
+ADS1115
+5
+10
+1
+2
+3
+4
+ADDR
+ALERT/RDY
+GND
+AIN0
+AIN1
+SCL
+9
+8
+7
+6
+SDA
+VDD
+AIN3
+AIN2
+ADS1115
+5
+10
+1
+2
+3
+4
+ADDR
+ALERT/RDY
+GND
+AIN0
+AIN1
+SCL
+9
+8
+7
+6
+SDA
+VDD
+AIN3
+AIN2
+ADS1115
+5
+10
+1
+2
+3
+4
+ADDR
+ALERT/RDY
+GND
+AIN0
+AIN1
+SCL
+9
+8
+7
+6
+SDA
+VDD
+AIN3
+AIN2
+ADS1115ADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+NOTE: ADS1113/4/5 power and input connections omitted for
+clarity. ADDR, A3, A2, A1, and A0 select the I2C addresses.
+NOTE: ADS1113/4/5 power and input connections omitted for Figure 36. Connecting Multiple Device Typesclarity. The ADDR pin selects the I2C address.
+Figure 35. Connecting Multiple ADS1113/4/5s
+Copyright © 2009, Texas Instruments Incorporated Submit Documentation Feedback 25
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+0.1 F (typ)m
+VDD
+5
+10
+1
+2
+3
+4
+ADDR
+ALERT/RDY
+GND
+AIN0
+AIN1
+SCL
+9
+8
+7
+6
+SDA
+VDD
+AIN3
+AIN2
+ADS1115
+Inputs Selected
+from Configuration
+Register
+Output Codes
+0 32767-ADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+SINGLE-ENDED INPUTS The ADS1115 input range is bipolar differential with
+respect to the reference. The single-ended circuit
+Although the ADS1115 has two differential inputs, the shown in Figure 37 covers only half the ADS1115
+device can easily measure four single-ended signals. input scale because it does not produce differentially
+Figure 37 shows a single-ended connection scheme. negative inputs; therefore, one bit of resolution is lost.
+The ADS1115 is configured for single-ended
+measurement by configuring the MUX to measure
+each channel with respect to ground. Data are then
+read out of one input based on the selection on the
+configuration register. The single-ended signal can
+range from 0V to supply. The ADS1115 loses no
+linearity anywhere within the input range. Negative
+voltages cannot be applied to this circuit because the
+ADS1115 can only accept positive voltages.
+NOTE: Digital and address pin connections omitted for clarity.
+Figure 37. Measuring Single-Ended Inputs
+26 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+ADS1114
+2.0V to 5V
+V
+3kW
+I C
+2
+1kWR (2)
+S
+Load
+(PGA Gain = 16)
+256mV FS
+FS = 0.2V
+G = 4 -5V
+R (1)
+49.9kW
+3
+5V
+OPA335
+0.1 F TypmADS1113
+ADS1114
+ADS1115
+www.ti.com SBAS444B – MAY 2009 – REVISED OCTOBER 2009
+LOW-SIDE CURRENT MONITOR The ADS1113/4/5 are fabricated in a small-geometry,
+low-voltage process. The analog inputs feature
+Figure 38 shows a circuit for a low-side shunt-type protection diodes to the supply rails. However, the
+current monitor. The circuit monitors the voltage current-handling ability of these diodes is limited, and
+across a shunt resistor, which is sized as small as the ADS1113/4/5 can be permanently damaged by
+possible while giving a measurable output voltage. analog input voltages that remain more than
+This voltage is amplified by an OPA335 low-drift op approximately 300mV beyond the rails for extended
+amp, and the result is read by the ADS1114/5. periods. One way to protect against overvoltage is to
+place current-limiting resistors on the input lines. TheIt is suggested that the ADS1114/5 be operated at a ADS1113/4/5 analog inputs can withstand momentarygain of 8. The gain of the OPA335 can then be set currents as large as 100mA.lower. For a gain of 16, the op amp should be set up
+to give a maximum output voltage no greater than If the ADS1113/4/5 are driven by an op amp with
+0.256V. If the shunt resistor is sized to provide a high-voltage supplies, such as ±12V, protection
+maximum voltage drop of 50mV at full-scale current, should be provided, even if the op amp is configured
+the full-scale input to the ADS1114/5 is 0.2V. so that it does not output out-of-range voltages. Many
+op amps drift to one of the supply rails immediately
+when power is applied, usually before the input has
+stabilized; this momentary spike can damage the
+ADS1113/4/5. This incremental damage results in
+slow, long-term failure, which can be disastrous for
+permanently installed, low-maintenance systems.
+If an op amp or other front-end circuitry is used with
+an ADS1113/4/5, performance characteristics must
+be taken into account when designing the application.
+(1) Pull-down resistor to allow accurate swing
+to 0V.
+(2) RS is sized for a 50mV drop at full-scale
+current.
+Figure 38. Low-Side Current Measurement
+Copyright © 2009, Texas Instruments Incorporated Submit Documentation Feedback 27
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+ADS1113
+ADS1114
+ADS1115
+SBAS444B – MAY 2009 – REVISED OCTOBER 2009 www.ti.com
+REVISION HISTORY
+NOTE: Page numbers for previous revisions may differ from page numbers in the current version.
+Changes from Revision A (August 2009) to Revision B Page
+• Deleted Operating Temperature bullet from Features section ............................................................................................. 1
+• Deleted Operating temperature range parameter from Absolute Maximum Ratings table .................................................. 2
+• Deleted Operating temperature parameter from Temperature section of Electrical Characteristics table ........................... 4
+• Changed Figure 2 to reflect maximum operating temperature ............................................................................................. 6
+• Changed Figure 3 to reflect maximum operating temperature ............................................................................................. 6
+• Changed Figure 4 to reflect maximum operating temperature ............................................................................................. 6
+• Changed Figure 5 to reflect maximum operating temperature ............................................................................................. 6
+• Changed Figure 6 to reflect maximum operating temperature ............................................................................................. 6
+• Changed +140°C to +125°C in Figure 9 ............................................................................................................................... 7
+• Changed +140°C to +125°C in Figure 10 ............................................................................................................................. 7
+• Changed +140°C to +125°C in Figure 11 ............................................................................................................................. 7
+• Changed +140°C to +125°C in Figure 12 ............................................................................................................................. 7
+• Changed Figure 13 to reflect maximum operating temperature ........................................................................................... 7
+• Changed Figure 16 to reflect maximum operating temperature ........................................................................................... 8
+• Changed Figure 20 to reflect maximum operating temperature ........................................................................................... 9
+28 Submit Documentation Feedback Copyright © 2009, Texas Instruments Incorporated
+Product Folder Link(s): ADS1113 ADS1114 ADS1115
+PACKAGE OPTION ADDENDUM
+www.ti.com 8-Sep-2011
+Addendum-Page 1
+PACKAGING INFORMATION
+Orderable Device Status (1) Package Type Package
+Drawing
+Pins Package Qty Eco Plan (2) Lead/
+Ball Finish MSL Peak Temp (3) Samples
+(Requires Login)
+ADS1113IDGSR ACTIVE MSOP DGS 10 2500 Green (RoHS
+& no Sb/Br)
+CU NIPDAU Level-2-260C-1 YEAR Add to cart
+ADS1113IDGST ACTIVE MSOP DGS 10 250 Green (RoHS
+& no Sb/Br)
+CU NIPDAU Level-2-260C-1 YEAR Add to cart
+ADS1113IRUGR ACTIVE X2QFN RUG 10 3000 Green (RoHS
+& no Sb/Br)
+CU NIPDAU Level-1-260C-UNLIM Add to cart
+ADS1113IRUGT ACTIVE X2QFN RUG 10 250 Green (RoHS
+& no Sb/Br)
+CU NIPDAU Level-1-260C-UNLIM Add to cart
+ADS1114IDGSR ACTIVE MSOP DGS 10 2500 Green (RoHS
+& no Sb/Br)
+CU NIPDAU Level-2-260C-1 YEAR Add to cart
+ADS1114IDGST ACTIVE MSOP DGS 10 250 Green (RoHS
+& no Sb/Br)
+CU NIPDAU Level-2-260C-1 YEAR Add to cart
+ADS1114IRUGR ACTIVE X2QFN RUG 10 3000 Green (RoHS
+& no Sb/Br)
+CU NIPDAU Level-1-260C-UNLIM Add to cart
+ADS1114IRUGT ACTIVE X2QFN RUG 10 250 Green (RoHS
+& no Sb/Br)
+CU NIPDAU Level-1-260C-UNLIM Add to cart
+ADS1115IDGSR ACTIVE MSOP DGS 10 2500 Green (RoHS
+& no Sb/Br)
+CU NIPDAU Level-2-260C-1 YEAR Add to cart
+ADS1115IDGST ACTIVE MSOP DGS 10 250 Green (RoHS
+& no Sb/Br)
+CU NIPDAU Level-2-260C-1 YEAR Add to cart
+ADS1115IRUGR ACTIVE X2QFN RUG 10 3000 Green (RoHS
+& no Sb/Br)
+CU NIPDAU Level-1-260C-UNLIM Add to cart
+ADS1115IRUGT ACTIVE X2QFN RUG 10 250 Green (RoHS
+& no Sb/Br)
+CU NIPDAU Level-1-260C-UNLIM Add to cart
+(1) The marketing status values are defined as follows:
+ACTIVE: Product device recommended for new designs.
+LIFEBUY: TI has announced that the device will be discontinued, and a lifetime-buy period is in effect.
+NRND: Not recommended for new designs. Device is in production to support existing customers, but TI does not recommend using this part in a new design.
+PREVIEW: Device has been announced but is not in production. Samples may or may not be available.
+OBSOLETE: TI has discontinued the production of the device.
+(2) Eco Plan - The planned eco-friendly classification: Pb-Free (RoHS), Pb-Free (RoHS Exempt), or Green (RoHS & no Sb/Br) - please check http://www.ti.com/productcontent for the latest availability
+information and additional product content details.
+TBD: The Pb-Free/Green conversion plan has not been defined.
+PACKAGE OPTION ADDENDUM
+www.ti.com 8-Sep-2011
+Addendum-Page 2
+Pb-Free (RoHS): TI's terms "Lead-Free" or "Pb-Free" mean semiconductor products that are compatible with the current RoHS requirements for all 6 substances, including the requirement that
+lead not exceed 0.1% by weight in homogeneous materials. Where designed to be soldered at high temperatures, TI Pb-Free products are suitable for use in specified lead-free processes.
+Pb-Free (RoHS Exempt): This component has a RoHS exemption for either 1) lead-based flip-chip solder bumps used between the die and package, or 2) lead-based die adhesive used between
+the die and leadframe. The component is otherwise considered Pb-Free (RoHS compatible) as defined above.
+Green (RoHS & no Sb/Br): TI defines "Green" to mean Pb-Free (RoHS compatible), and free of Bromine (Br) and Antimony (Sb) based flame retardants (Br or Sb do not exceed 0.1% by weight
+in homogeneous material)
+(3) MSL, Peak Temp. -- The Moisture Sensitivity Level rating according to the JEDEC industry standard classifications, and peak solder temperature.
+Important Information and Disclaimer:The information provided on this page represents TI's knowledge and belief as of the date that it is provided. TI bases its knowledge and belief on information
+provided by third parties, and makes no representation or warranty as to the accuracy of such information. Efforts are underway to better integrate information from third parties. TI has taken and
+continues to take reasonable steps to provide representative and accurate information but may not have conducted destructive testing or chemical analysis on incoming materials and chemicals.
+TI and TI suppliers consider certain information to be proprietary, and thus CAS numbers and other limited information may not be available for release.
+In no event shall TI's liability arising out of such information exceed the total purchase price of the TI part(s) at issue in this document sold by TI to Customer on an annual basis.
+TAPE AND REEL INFORMATION
+*All dimensions are nominal
+Device Package
+Type
+Package
+Drawing
+Pins SPQ Reel
+Diameter
+(mm)
+Reel
+Width
+W1 (mm)
+A0
+(mm)
+B0
+(mm)
+K0
+(mm)
+P1
+(mm)
+W
+(mm)
+Pin1
+Quadrant
+ADS1113IDGSR MSOP DGS 10 2500 330.0 12.4 5.3 3.3 1.3 8.0 12.0 Q1
+ADS1113IDGST MSOP DGS 10 250 180.0 12.4 5.3 3.3 1.3 8.0 12.0 Q1
+ADS1113IRUGR X2QFN RUG 10 3000 179.0 8.4 1.75 2.25 0.65 4.0 8.0 Q1
+ADS1113IRUGT X2QFN RUG 10 250 179.0 8.4 1.75 2.25 0.65 4.0 8.0 Q1
+ADS1114IDGSR MSOP DGS 10 2500 330.0 12.4 5.3 3.3 1.3 8.0 12.0 Q1
+ADS1114IDGST MSOP DGS 10 250 180.0 12.4 5.3 3.3 1.3 8.0 12.0 Q1
+ADS1114IRUGR X2QFN RUG 10 3000 179.0 8.4 1.75 2.25 0.65 4.0 8.0 Q1
+ADS1114IRUGT X2QFN RUG 10 250 179.0 8.4 1.75 2.25 0.65 4.0 8.0 Q1
+ADS1115IDGSR MSOP DGS 10 2500 330.0 12.4 5.3 3.3 1.3 8.0 12.0 Q1
+ADS1115IDGST MSOP DGS 10 250 180.0 12.4 5.3 3.3 1.3 8.0 12.0 Q1
+ADS1115IRUGR X2QFN RUG 10 3000 179.0 8.4 1.75 2.25 0.65 4.0 8.0 Q1
+ADS1115IRUGT X2QFN RUG 10 250 179.0 8.4 1.75 2.25 0.65 4.0 8.0 Q1
+PACKAGE MATERIALS INFORMATION
+www.ti.com 17-Dec-2010
+Pack Materials-Page 1
+*All dimensions are nominal
+Device Package Type Package Drawing Pins SPQ Length (mm) Width (mm) Height (mm)
+ADS1113IDGSR MSOP DGS 10 2500 370.0 355.0 55.0
+ADS1113IDGST MSOP DGS 10 250 195.0 200.0 45.0
+ADS1113IRUGR X2QFN RUG 10 3000 203.0 203.0 35.0
+ADS1113IRUGT X2QFN RUG 10 250 203.0 203.0 35.0
+ADS1114IDGSR MSOP DGS 10 2500 370.0 355.0 55.0
+ADS1114IDGST MSOP DGS 10 250 195.0 200.0 45.0
+ADS1114IRUGR X2QFN RUG 10 3000 203.0 203.0 35.0
+ADS1114IRUGT X2QFN RUG 10 250 203.0 203.0 35.0
+ADS1115IDGSR MSOP DGS 10 2500 370.0 355.0 55.0
+ADS1115IDGST MSOP DGS 10 250 195.0 200.0 45.0
+ADS1115IRUGR X2QFN RUG 10 3000 203.0 203.0 35.0
+ADS1115IRUGT X2QFN RUG 10 250 203.0 203.0 35.0
+PACKAGE MATERIALS INFORMATION
+www.ti.com 17-Dec-2010
+Pack Materials-Page 2
+
+
+
+IMPORTANT NOTICE
+Texas Instruments Incorporated and its subsidiaries (TI) reserve the right to make corrections, modifications, enhancements, improvements,
+and other changes to its products and services at any time and to discontinue any product or service without notice. Customers should
+obtain the latest relevant information before placing orders and should verify that such information is current and complete. All products are
+sold subject to TI’s terms and conditions of sale supplied at the time of order acknowledgment.
+TI warrants performance of its hardware products to the specifications applicable at the time of sale in accordance with TI’s standard
+warranty. Testing and other quality control techniques are used to the extent TI deems necessary to support this warranty. Except where
+mandated by government requirements, testing of all parameters of each product is not necessarily performed.
+TI assumes no liability for applications assistance or customer product design. Customers are responsible for their products and
+applications using TI components. To minimize the risks associated with customer products and applications, customers should provide
+adequate design and operating safeguards.
+TI does not warrant or represent that any license, either express or implied, is granted under any TI patent right, copyright, mask work right,
+or other TI intellectual property right relating to any combination, machine, or process in which TI products or services are used. Information
+published by TI regarding third-party products or services does not constitute a license from TI to use such products or services or a
+warranty or endorsement thereof. Use of such information may require a license from a third party under the patents or other intellectual
+property of the third party, or a license from TI under the patents or other intellectual property of TI.
+Reproduction of TI information in TI data books or data sheets is permissible only if reproduction is without alteration and is accompanied
+by all associated warranties, conditions, limitations, and notices. Reproduction of this information with alteration is an unfair and deceptive
+business practice. TI is not responsible or liable for such altered documentation. Information of third parties may be subject to additional
+restrictions.
+Resale of TI products or services with statements different from or beyond the parameters stated by TI for that product or service voids all
+express and any implied warranties for the associated TI product or service and is an unfair and deceptive business practice. TI is not
+responsible or liable for any such statements.
+TI products are not authorized for use in safety-critical applications (such as life support) where a failure of the TI product would reasonably
+be expected to cause severe personal injury or death, unless officers of the parties have executed an agreement specifically governing
+such use. Buyers represent that they have all necessary expertise in the safety and regulatory ramifications of their applications, and
+acknowledge and agree that they are solely responsible for all legal, regulatory and safety-related requirements concerning their products
+and any use of TI products in such safety-critical applications, notwithstanding any applications-related information or support that may be
+provided by TI. Further, Buyers must fully indemnify TI and its representatives against any damages arising out of the use of TI products in
+such safety-critical applications.
+TI products are neither designed nor intended for use in military/aerospace applications or environments unless the TI products are
+specifically designated by TI as military-grade or "enhanced plastic." Only products designated by TI as military-grade meet military
+specifications. Buyers acknowledge and agree that any such use of TI products which TI has not designated as military-grade is solely at
+the Buyer's risk, and that they are solely responsible for compliance with all legal and regulatory requirements in connection with such use.
+TI products are neither designed nor intended for use in automotive applications or environments unless the specific TI products are
+designated by TI as compliant with ISO/TS 16949 requirements. Buyers acknowledge and agree that, if they use any non-designated
+products in automotive applications, TI will not be responsible for any failure to meet such requirements.
+Following are URLs where you can obtain information on other Texas Instruments products and application solutions:
+Products Applications
+Audio www.ti.com/audio Communications and Telecom www.ti.com/communications
+Amplifiers amplifier.ti.com Computers and Peripherals www.ti.com/computers
+Data Converters dataconverter.ti.com Consumer Electronics www.ti.com/consumer-apps
+DLP® Products www.dlp.com Energy and Lighting www.ti.com/energy
+DSP dsp.ti.com Industrial www.ti.com/industrial
+Clocks and Timers www.ti.com/clocks Medical www.ti.com/medical
+Interface interface.ti.com Security www.ti.com/security
+Logic logic.ti.com Space, Avionics and Defense www.ti.com/space-avionics-defense
+Power Mgmt power.ti.com Transportation and Automotive www.ti.com/automotive
+Microcontrollers microcontroller.ti.com Video and Imaging www.ti.com/video
+RFID www.ti-rfid.com
+OMAP Mobile Processors www.ti.com/omap
+Wireless Connctivity www.ti.com/wirelessconnectivity
+TI E2E Community Home Page e2e.ti.com
+Mailing Address: Texas Instruments, Post Office Box 655303, Dallas, Texas 75265
+Copyright © 2011, Texas Instruments Incorporated

@@ -1,0 +1,77 @@
+### 1. Entities
+
+#### **Sensor (The Core Device)**
+- **Data**: 
+    - `OperatingMode`: Current state (Sleep, Forced, Normal).
+    - `Status`: Current activity (Measuring, Updating).
+    - `ChipID`: Hardcoded unique identifier.
+- **Lifecycle**: Conceptualized as a persistent hardware state. Created on power-on. Undergoes "Soft Reset" to return to defaults.
+- **States**: 
+    - `Sleep`: Lowest power, no measurements taken.
+    - `Forced`: Single measurement cycle performed, then returns to `Sleep`.
+    - `Normal`: Perpetual cycles of measurement and standby.
+
+#### **Configuration (Control Settings)**
+- **Data**:
+    - `TemperatureOversampling`: (Off, 1x, 2x, 4x, 8x, 16x).
+    - `PressureOversampling`: (Off, 1x, 2x, 4x, 8x, 16x).
+    - `HumidityOversampling`: (Off, 1x, 2x, 4x, 8x, 16x).
+    - `IIRFilterCoefficient`: Filter strength for pressure/temp.
+    - `StandbyTime`: Interval between measurements in `Normal` mode.
+- **Lifecycle**: Modified via register writes. Only takes effect for the next measurement cycle.
+
+#### **Measurement Data (Buffer/Registers)**
+- **Data**:
+    - `RawPressure`: Uncompensated digits.
+    - `RawTemperature`: Uncompensated digits.
+    - `RawHumidity`: Uncompensated digits.
+- **Lifecycle**: Overwritten whenever a new measurement cycle completes.
+
+#### **Calibration Coefficients (ROM)**
+- **Data**: Factory-set constants (e.g., dig_T1, dig_P1).
+- **Lifecycle**: Read-only. Never modified. Used to transform Raw Data into engineering units (Celsius, hPa, etc.).
+
+---
+
+### 2. Operations
+
+#### **WriteConfiguration**
+- **Involved**: Configuration.
+- **Preconditions**: Device must be reachable via bus (I2C/SPI).
+- **Postconditions**: Oversampling or filter settings updated.
+- **Preserves**: Calibration Coefficients and existing Measurement Data.
+
+#### **SetOperatingMode**
+- **Involved**: Sensor, Configuration.
+- **Preconditions**: Valid mode passed (Sleep, Forced, Normal).
+- **Postconditions**: `OperatingMode` updated. If `Forced`, a measurement cycle is triggered.
+- **Preserves**: Oversampling settings.
+
+#### **ReadMeasurements**
+- **Involved**: Measurement Data, Calibration Coefficients.
+- **Preconditions**: `Status.Measuring` is false (ensures data is not "torn").
+- **Postconditions**: Returns compensated (human-readable) values.
+- **Preserves**: All internal states and register values.
+
+#### **SoftReset**
+- **Involved**: Sensor, Configuration, Measurement Data.
+- **Preconditions**: None.
+- **Postconditions**: Mode = `Sleep`, Oversampling = `Off`, Measurement Data = `0`.
+- **Preserves**: Calibration Coefficients (ROM).
+
+---
+
+### 3. Relationships
+
+- **Ownership**: The **Sensor** owns the **Configuration** and the **Measurement Data**.
+- **Reference**: **ReadMeasurements** uses **Calibration Coefficients** as a lookup table to calculate real-world values from the **Measurement Data**.
+- **Constraint**: **OperatingMode** dictates the lifecycle of the **Measurement Data** update frequency.
+
+---
+
+### 4. Invariants
+
+- **Mode Logic**: If the mode is `Forced`, the Sensor must return to `Sleep` automatically after the measurement and data update are finished.
+- **Data Integrity**: Measurement registers must not be updated while a burst-read operation is in progress (shadowing/locking).
+- **Sampling Constraint**: If Oversampling for a specific channel is set to `Off`, the corresponding `RawData` for that channel remains at its previous value or a default "null" value during cycles.
+- **Calibration Permanence**: Factory calibration coefficients are immutable and unique to the specific `ChipID`.

@@ -1,0 +1,141 @@
+
+
+CODESYS GmbH
+Menu
+Search
+
+    Bistable Function Blocks
+    Counter
+        CTD (FunctionBlock)
+        CTU (FunctionBlock)
+        CTUD (FunctionBlock)
+    Miscellaneous
+    String Functions
+    Timer
+    Trigger
+
+    File and Project Information
+    Library Reference
+
+    Docs Counter 
+
+CTUD (FB)
+
+FUNCTION_BLOCK CTUD
+
+Increments and decrements a given value
+
+Note
+
+Datatype WORD, which is used for PV in CODESYS, does not match the IEC standard, which for PV defines datatype INT.
+
+(* Example declaration *)
+CTUDInst : CUTD ;
+
+(* Example in ST *)
+CTUDInst(CU := VarBOOL1, CD:= VarBOOL2, RESET := VarBOOL3, LOAD:=VarBOOL4 , PV:= VarWORD1);
+
+VarBOOL5 := CTUDInst.QU ;
+VarBOOL6 := CTUDInst.QD ;
+VarWORD2 := CTUDInst.CV ;
+
+InOut:
+
+    Scope
+    	
+
+    Name
+    	
+
+    Type
+    	
+
+    Comment
+
+    Input
+    	
+
+    CU
+    	
+
+    BOOL
+    	
+
+    Rising edge: Incrementing CV by one
+
+    CD
+    	
+
+    BOOL
+    	
+
+    Rising edge: Decrementing CV by one
+
+    RESET
+    	
+
+    BOOL
+    	
+
+    TRUE: Reset CV to 0
+
+    LOAD
+    	
+
+    BOOL
+    	
+
+    TRUE: Set CV to the start value PV
+
+    PV
+    	
+
+    WORD
+    	
+
+    Start value for decrementing / upper limit for incrementing
+
+    Output
+    	
+
+    QU
+    	
+
+    BOOL
+    	
+
+    TRUE if CV >= PV
+
+    QD
+    	
+
+    BOOL
+    	
+
+    TRUE if CV = 0
+
+    CV
+    	
+
+    WORD
+    	
+
+    Current counter value
+
+top
+
+CODESYS Group | We software Automation.
+
+The CODESYS Group is the manufacturer of CODESYS, the leading hardware-independent IEC 61131-3 automation software for developing and engineering controller applications.
+CODESYS® is a registered trademark.
+CODESYS GmbH
+A member of the CODESYS Group
+Memminger Straße 151, 87439 Kempten
+Germany
+Tel.: +49-831-54031-0
+info@codesys.com
+
+    Legal Notice Privacy Policy 
+
+LinkedIn Youtube RSS Downloads Login CODESYS Store
+© 2022 CODESYS GmbH | A member of the CODESYS Group

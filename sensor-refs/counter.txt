@@ -1,0 +1,111 @@
+
+
+CODESYS GmbH
+Menu
+Search
+
+    Bistable Function Blocks
+    Counter
+        CTD (FunctionBlock)
+        CTU (FunctionBlock)
+        CTUD (FunctionBlock)
+    Miscellaneous
+    String Functions
+    Timer
+    Trigger
+
+    File and Project Information
+    Library Reference
+
+    Docs Counter 
+
+CTU (FB)
+
+FUNCTION_BLOCK CTU
+
+Increments a given value
+
+(* Example declaration *)
+CTUInst : CTU ;
+
+(* Example in ST *)
+CTUInst(CU:= VarBOOL1, RESET:=VarBOOL2 , PV:= VarWORD1);
+VarBOOL3 := CTUInst.Q ;
+VarWORD2 := CTUInst.CV;
+
+InOut:
+
+    Scope
+    	
+
+    Name
+    	
+
+    Type
+    	
+
+    Comment
+
+    Input
+    	
+
+    CU
+    	
+
+    BOOL
+    	
+
+    Rising edge: Incrementing CV by one
+
+    RESET
+    	
+
+    BOOL
+    	
+
+    TRUE: Reset CV to 0
+
+    PV
+    	
+
+    WORD
+    	
+
+    Upper limit for incrementing
+
+    Output
+    	
+
+    Q
+    	
+
+    BOOL
+    	
+
+    TRUE if CV >= PV
+
+    CV
+    	
+
+    WORD
+    	
+
+    Current counter value
+
+top
+
+CODESYS Group | We software Automation.
+
+The CODESYS Group is the manufacturer of CODESYS, the leading hardware-independent IEC 61131-3 automation software for developing and engineering controller applications.
+CODESYS® is a registered trademark.
+CODESYS GmbH
+A member of the CODESYS Group
+Memminger Straße 151, 87439 Kempten
+Germany
+Tel.: +49-831-54031-0
+info@codesys.com
+
+    Legal Notice Privacy Policy 
+
+LinkedIn Youtube RSS Downloads Login CODESYS Store
+© 2022 CODESYS GmbH | A member of the CODESYS Group

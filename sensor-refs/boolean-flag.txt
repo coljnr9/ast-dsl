@@ -1,0 +1,792 @@
+
+
+site logo
+Skip to main content
+
+    About
+    Products
+    For Teams
+
+        Home
+        Questions
+        AI Assist
+        Tags
+        Challenges
+        Chat
+        Articles
+        Users
+        Jobs
+        Companies
+        Collectives
+
+        Communities for your favorite technologies. Explore all Collectives
+    Stack Internal
+
+    Stack Overflow for Teams is now called Stack Internal. Bring the best of human thought and AI automation together at your work.
+
+What is a semaphore?
+Asked 17 years, 6 months ago
+Modified 4 months ago
+Viewed 320k times
+463
+
+A semaphore is a programming concept that is frequently used to solve multi-threading problems. My question to the community:
+
+What is a semaphore and how do you use it?
+
+    multithreadingconcurrencysemaphore
+
+Share
+Improve this question
+Follow
+asked Aug 29, 2008 at 15:58
+bmurphy1976's user avatar
+bmurphy1976
+31.7k1212 gold badges3535 silver badges2424 bronze badges
+
+    31
+    a boolean flag whose value is based on whether an integer counter has reached its designated upper limit. Obfuscation to the max! – 
+    Sam
+    Commented Sep 19, 2011 at 1:02
+
+Add a comment
+15 Answers
+Sorted by:
+465
+
+Think of semaphores as bouncers at a nightclub. There are a dedicated number of people that are allowed in the club at once. If the club is full no one is allowed to enter, but as soon as one person leaves another person might enter.
+
+It's simply a way to limit the number of consumers for a specific resource. For example, to limit the number of simultaneous calls to a database in an application.
+
+Here is a very pedagogic example in C# :-)
+
+using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Threading;
+
+namespace TheNightclub
+{
+    public class Program
+    {
+        public static Semaphore Bouncer { get; set; }
+
+        public static void Main(string[] args)
+        {
+            // Create the semaphore with 3 slots, where 3 are available.
+            Bouncer = new Semaphore(3, 3);
+
+            // Open the nightclub.
+            OpenNightclub();
+        }
+
+        public static void OpenNightclub()
+        {
+            for (int i = 1; i <= 50; i++)
+            {
+                // Let each guest enter on an own thread.
+                Thread thread = new Thread(new ParameterizedThreadStart(Guest));
+                thread.Start(i);
+            }
+        }
+
+        public static void Guest(object args)
+        {
+            // Wait to enter the nightclub (a semaphore to be released).
+            Console.WriteLine("Guest {0} is waiting to entering nightclub.", args);
+            Bouncer.WaitOne();          
+
+            // Do some dancing.
+            Console.WriteLine("Guest {0} is doing some dancing.", args);
+            Thread.Sleep(500);
+
+            // Let one guest out (release one semaphore).
+            Console.WriteLine("Guest {0} is leaving the nightclub.", args);
+            Bouncer.Release(1);
+        }
+    }
+}
+
+Share
+Improve this answer
+Follow
+edited Jan 27, 2012 at 3:44
+Cody Gray's user avatar
+Cody Gray♦
+246k5353 gold badges514514 silver badges591591 bronze badges
+answered Sep 2, 2008 at 20:13
+Patrik Svensson's user avatar
+Patrik Svensson
+14k88 gold badges5959 silver badges7777 bronze badges
+Sign up to request clarification or add additional context in comments.
+6 Comments
+TNA
+Over a year ago
+if it's like bouncers at a night club, it should let the guests go in sequentially, but when i tried it out, it's random. Eg. Guest 40 came in first before Guest 39. Is there anything we could do to control this?
+Patrik Svensson
+Over a year ago
+@TNA: Yes, that has to do with the way new threads are started in this example, and not really in the scope of the answer.
+Igor Brejc
+Over a year ago
+Bouncer analogy is epic indeed, but interestingly it has already been used: albahari.com/threading/part2.aspx#_Semaphore
+csandreas1
+Over a year ago
+What value do semaphores offer in distributed systems?
+RonTLV
+Over a year ago
+Is it limited to threads only or can it work with processes as well ?
+Add a comment
+|
+Show 1 more comment
+284
+
+The article Mutexes and Semaphores Demystified by Michael Barr is a great short introduction into what makes mutexes and semaphores different, and when they should and should not be used. I've excerpted several key paragraphs here.
+
+The key point is that mutexes should be used to protect shared resources, while semaphores should be used for signaling. You should generally not use semaphores to protect shared resources, nor mutexes for signaling. There are issues, for instance, with the bouncer analogy in terms of using semaphores to protect shared resources - you can use them that way, but it may cause hard to diagnose bugs.
+
+    While mutexes and semaphores have some similarities in their implementation, they should always be used differently.
+
+    The most common (but nonetheless incorrect) answer to the question posed at the top is that mutexes and semaphores are very similar, with the only significant difference being that semaphores can count higher than one. Nearly all engineers seem to properly understand that a mutex is a binary flag used to protect a shared resource by ensuring mutual exclusion inside critical sections of code. But when asked to expand on how to use a "counting semaphore," most engineers—varying only in their degree of confidence—express some flavor of the textbook opinion that these are used to protect several equivalent resources.
+
+...
+
+At this point an interesting analogy is made using the idea of bathroom keys as protecting shared resources - the bathroom. If a shop has a single bathroom, then a single key will be sufficient to protect that resource and prevent multiple people from using it simultaneously.
+
+If there are multiple bathrooms, one might be tempted to key them alike and make multiple keys - this is similar to a semaphore being mis-used. Once you have a key you don't actually know which bathroom is available, and if you go down this path you're probably going to end up using mutexes to provide that information and make sure you don't take a bathroom that's already occupied.
+
+A semaphore is the wrong tool to protect several of the essentially same resource, but this is how many people think of it and use it. The bouncer analogy is distinctly different - there aren't several of the same type of resource, instead there is one resource which can accept multiple simultaneous users. I suppose a semaphore can be used in such situations, but rarely are there real-world situations where the analogy actually holds - it's more often that there are several of the same type, but still individual resources, like the bathrooms, which cannot be used this way.
+
+...
+
+    The correct use of a semaphore is for signaling from one task to another. A mutex is meant to be taken and released, always in that order, by each task that uses the shared resource it protects. By contrast, tasks that use semaphores either signal or wait—not both. For example, Task 1 may contain code to post (i.e., signal or increment) a particular semaphore when the "power" button is pressed and Task 2, which wakes the display, pends on that same semaphore. In this scenario, one task is the producer of the event signal; the other the consumer.
+
+...
+
+Here an important point is made that mutexes interfere with real time operating systems in a bad way, causing priority inversion where a less important task may be executed before a more important task because of resource sharing. In short, this happens when a lower priority task uses a mutex to grab a resource, A, then tries to grab B, but is paused because B is unavailable. While it's waiting, a higher priority task comes along and needs A, but it's already tied up, and by a process that isn't even running because it's waiting for B. There are many ways to resolve this, but it most often is fixed by altering the mutex and task manager. The mutex is much more complex in these cases than a binary semaphore, and using a semaphore in such an instance will cause priority inversions because the task manager is unaware of the priority inversion and cannot act to correct it.
+
+...
+
+    The cause of the widespread modern confusion between mutexes and semaphores is historical, as it dates all the way back to the 1974 invention of the Semaphore (capital "S", in this article) by Edsger Dijkstra. Prior to that date, none of the interrupt-safe task synchronization and signaling mechanisms known to computer scientists was efficiently scalable for use by more than two tasks. Dijkstra's revolutionary, safe-and-scalable Semaphore was applied in both critical section protection and signaling. And thus the confusion began.
+
+    However, it later became obvious to operating system developers, after the appearance of the priority-based preemptive RTOS (e.g., VRTX, ca. 1980), publication of academic papers establishing RMA and the problems caused by priority inversion, and a paper on priority inheritance protocols in 1990, 3 it became apparent that mutexes must be more than just semaphores with a binary counter.
+
+Mutex: resource sharing
+
+Semaphore: signaling
+
+Don't use one for the other without careful consideration of the side effects.
+Share
+Improve this answer
+Follow
+edited Jun 18, 2024 at 9:13
+Hummeling Engineering BV's user avatar
+Hummeling Engineering BV
+40122 silver badges1010 bronze badges
+answered Sep 2, 2008 at 18:37
+Adam Davis's user avatar
+Adam Davis
+94k6161 gold badges273273 silver badges334334 bronze badges
+5 Comments
+Kris Subramanian
+Over a year ago
+Look at this Stanford concurrency PDF document. Look at pages 8. The above explanation will make more sense then.. see.stanford.edu/materials/icsppcs107/…
+G. Bach
+Over a year ago
+The little book of semaphores is a valuable read about these issues.
+talekeDskobeDa
+Over a year ago
+@KrisSubramanian Thanks for the link. But, the document discusses about semaphores and nothing on Mutexes. However, Do you mean the shared buffer in the example could be protected using Mutex? instead of having 2 semaphores emptyBuffers and fullBuffers
+Kris Subramanian
+Over a year ago
+@Pramod True. The link does not add any Mutex related notes. I added the link so that the Semaphore side of things become clear to SO readers. :) Interestingly in this case the buffer is being used without any locks since it being accessed sequentially and in a circular format. i.e Writer will write to 0 and signal the reader to read from 0. If the reader does not read from 0 and signal the writer, then the writer will block. So there is no need to use a mutex to lock the common resource. This is different from the bathroom analogy given above.
+Rustam A.
+Over a year ago
+@Kris Subramanian : nice doc, but include small misguidenses: 3rd page starts stating that "each thread that locks the semaphore should be carefull to unlock it" - they can be unlocked by any thread. If you do it in the same thread you are just using it as "brocken mutex". "Brocken" because it still can be unlocked from other thread unintentionally - mistakes happen - and break your logic. Still nice doc, thought.
+Add a comment
+82
+
+Mutex: exclusive-member access to a resource
+
+Semaphore: n-member access to a resource
+
+That is, a mutex can be used to syncronize access to a counter, file, database, etc.
+
+A semaphore can do the same thing but supports a fixed number of simultaneous callers. For example, I can wrap my database calls in a semaphore(3) so that my multithreaded app will hit the database with at most 3 simultaneous connections. All attempts will block until one of the three slots opens up. They make things like doing naive throttling really, really easy.
+Share
+Improve this answer
+Follow
+edited Oct 9, 2025 at 13:27
+wovano's user avatar
+wovano
+5,19855 gold badges3333 silver badges5858 bronze badges
+answered Sep 2, 2008 at 18:49
+Michael Haren's user avatar
+Michael Haren
+109k4141 gold badges172172 silver badges209209 bronze badges
+4 Comments
+Qiang Xu
+Over a year ago
+According to Richard W. Stevens, a mutex is actually a binary semaphore, with only two possible values: 0 and 1.
+Electric Coffee
+Over a year ago
+@QiangXu in Operating Systems Internals and Design Principles by William Stallings, a binary semaphore is different from a mutex in one very important way, and I quote: "A key difference between a mutex and a binary semaphore is that the process that locks the mutex must be the one to unlock it. In contrast, it is possible for one process to lock a binary semaphore and for another to unlock it.".
+cspider
+Over a year ago
+At the risk of commenting on a stale thread, this is not correct. As @AdamDavis has mentioned above, Semaphore should(must?) not be used for n-member access to a resource - that should still be done by using a Mutex. Consider the bathroom analogy in the Coffeeshop with multiple people waiting to access or otherwise multiple bathrooms with similar keys to the bathrooms. Rather Semaphore should be used for signaling between tasks.
+R. Navega
+May 17, 2025 at 2:38
+@cspider in practical terms, a 1-slot Semaphore is no different than a mutex for controlling access to a shared resource. So I'd predicate that should not be used for n-member access with as long as n > 1.
+Add a comment
+38
+
+Consider, a taxi that can accommodate a total of 3(rear)+2(front) persons including the driver. So, a semaphore allows only 5 persons inside a car at a time. And a mutex allows only 1 person on a single seat of the car.
+
+Therefore, Mutex is to allow exclusive access for a resource (like an OS thread) while a Semaphore is to allow access for n number of resources at a time.
+Share
+Improve this answer
+Follow
+edited Jun 11, 2018 at 15:46
+Sushant Rajbanshi's user avatar
+Sushant Rajbanshi
+2,00811 gold badge2222 silver badges2222 bronze badges
+answered Jul 7, 2017 at 13:18
+NKumar's user avatar
+NKumar
+63677 silver badges1616 bronze badges
+1 Comment
+Ladage Abhishek
+Aug 7, 2025 at 7:21
+Thanks for the analogy — it's a creative way to explain mutex vs semaphore! Just one suggestion: it might be clearer to mention that the mutex analogy refers to exclusive access to a single seat (resource), while the semaphore analogy reflects limited shared access (like total seats in the car). Also, perhaps clarify that mutexes usually have ownership semantics, whereas semaphores typically don't. Overall, a helpful illustration!
+19
+
+Semaphore can also be used as a ... semaphore. For example if you have multiple process enqueuing data to a queue, and only one task consuming data from the queue. If you don't want your consuming task to constantly poll the queue for available data, you can use semaphore.
+
+Here the semaphore is not used as an exclusion mechanism, but as a signaling mechanism. The consuming task is waiting on the semaphore The producing task are posting on the semaphore.
+
+This way the consuming task is running when and only when there is data to be dequeued
+Share
+Improve this answer
+Follow
+answered Sep 16, 2008 at 15:10
+shodanex's user avatar
+shodanex
+15.6k1111 gold badges6464 silver badges9393 bronze badges
+Comments
+18
+
+@Craig:
+
+    A semaphore is a way to lock a resource so that it is guaranteed that while a piece of code is executed, only this piece of code has access to that resource. This keeps two threads from concurrently accesing a resource, which can cause problems.
+
+This is not restricted to only one thread. A semaphore can be configured to allow a fixed number of threads to access a resource.
+Share
+Improve this answer
+Follow
+answered Aug 29, 2008 at 16:07
+Mats Fredriksson's user avatar
+Mats Fredriksson
+20.2k66 gold badges3939 silver badges5757 bronze badges
+2 Comments
+kaspersky
+Over a year ago
+This is a commentary, not an answer.
+Mats Fredriksson
+Over a year ago
+Yeah, but I think I wrote this before comments got added to Stack Overflow. Or I didn't, don't really remember. This time I answered in a comment though. :-)
+13
+
+There are two essential concepts to building concurrent programs - synchronization and mutual exclusion. We will see how these two types of locks (semaphores are more generally a kind of locking mechanism) help us achieve synchronization and mutual exclusion.
+
+A semaphore is a programming construct that helps us achieve concurrency, by implementing both synchronization and mutual exclusion. Semaphores are of two types, Binary and Counting.
+
+A semaphore has two parts : a counter, and a list of tasks waiting to access a particular resource. A semaphore performs two operations : wait (P) [this is like acquiring a lock], and release (V)[ similar to releasing a lock] - these are the only two operations that one can perform on a semaphore. In a binary semaphore, the counter logically goes between 0 and 1. You can think of it as being similar to a lock with two values : open/closed. A counting semaphore has multiple values for count.
+
+What is important to understand is that the semaphore counter keeps track of the number of tasks that do not have to block, i.e., they can make progress. Tasks block, and add themselves to the semaphore's list only when the counter is zero. Therefore, a task gets added to the list in the P() routine if it cannot progress, and "freed" using the V() routine.
+
+Now, it is fairly obvious to see how binary semaphores can be used to solve synchronization and mutual exclusion - they are essentially locks.
+
+ex. Synchronization:
+
+thread A{
+semaphore &s; //locks/semaphores are passed by reference! think about why this is so.
+A(semaphore &s): s(s){} //constructor
+foo(){
+...
+s.P();
+;// some block of code B2
+...
+}
+
+//thread B{
+semaphore &s;
+B(semaphore &s): s(s){} //constructor
+foo(){
+...
+...
+// some block of code B1
+s.V();
+..
+}
+
+main(){
+semaphore s(0); // we start the semaphore at 0 (closed)
+A a(s);
+B b(s);
+}
+
+In the above example, B2 can only execute after B1 has finished execution. Let's say thread A comes executes first - gets to sem.P(), and waits, since the counter is 0 (closed). Thread B comes along, finishes B1, and then frees thread A - which then completes B2. So we achieve synchronization.
+
+Now let's look at mutual exclusion with a binary semaphore:
+
+thread mutual_ex{
+semaphore &s;
+mutual_ex(semaphore &s): s(s){} //constructor
+foo(){
+...
+s.P();
+//critical section
+s.V();
+...
+...
+s.P();
+//critical section
+s.V();
+...
+
+}
+
+main(){
+semaphore s(1);
+mutual_ex m1(s);
+mutual_ex m2(s);
+}
+
+The mutual exclusion is quite simple as well - m1 and m2 cannot enter the critical section at the same time. So each thread is using the same semaphore to provide mutual exclusion for its two critical sections. Now, is it possible to have greater concurrency? Depends on the critical sections. (Think about how else one could use semaphores to achieve mutual exclusion.. hint hint : do i necessarily only need to use one semaphore?)
+
+Counting semaphore: A semaphore with more than one value. Let's look at what this is implying - a lock with more than one value?? So open, closed, and ...hmm. Of what use is a multi-stage-lock in mutual exclusion or synchronization?
+
+Let's take the easier of the two:
+
+Synchronization using a counting semaphore: Let's say you have 3 tasks - #1 and 2 you want executed after 3. How would you design your synchronization?
+
+thread t1{
+...
+s.P();
+//block of code B1
+
+thread t2{
+...
+s.P();
+//block of code B2
+
+thread t3{
+...
+//block of code B3
+s.V();
+s.V();
+}
+
+So if your semaphore starts off closed, you ensure that t1 and t2 block, get added to the semaphore's list. Then along comes all important t3, finishes its business and frees t1 and t2. What order are they freed in? Depends on the implementation of the semaphore's list. Could be FIFO, could be based some particular priority,etc. (Note : think about how you would arrange your P's and V;s if you wanted t1 and t2 to be executed in some particular order, and if you weren't aware of the implementation of the semaphore)
+
+(Find out : What happens if the number of V's is greater than the number of P's?)
+
+Mutual Exclusion Using counting semaphores: I'd like you to construct your own pseudocode for this (makes you understand things better!) - but the fundamental concept is this : a counting semaphore of counter = N allows N tasks to enter the critical section freely. What this means is you have N tasks (or threads, if you like) enter the critical section, but the N+1th task gets blocked (goes on our favorite blocked-task list), and only is let through when somebody V's the semaphore at least once. So the semaphore counter, instead of swinging between 0 and 1, now goes between 0 and N, allowing N tasks to freely enter and exit, blocking nobody!
+
+Now gosh, why would you need such a stupid thing? Isn't the whole point of mutual exclusion to not let more than one guy access a resource?? (Hint Hint...You don't always only have one drive in your computer, do you...?)
+
+To think about : Is mutual exclusion achieved by having a counting semaphore alone? What if you have 10 instances of a resource, and 10 threads come in (through the counting semaphore) and try to use the first instance?
+Share
+Improve this answer
+Follow
+answered May 8, 2014 at 15:23
+aspen100's user avatar
+aspen100
+96511 gold badge1111 silver badges2424 bronze badges
+Comments
+13
+
+I've created the visualization which should help to understand the idea. Semaphore controls access to a common resource in a multithreading environment. enter image description here
+
+ExecutorService executor = Executors.newFixedThreadPool(7);
+
+Semaphore semaphore = new Semaphore(4);
+
+Runnable longRunningTask = () -> {
+    boolean permit = false;
+    try {
+        permit = semaphore.tryAcquire(1, TimeUnit.SECONDS);
+        if (permit) {
+            System.out.println("Semaphore acquired");
+            Thread.sleep(5);
+        } else {
+            System.out.println("Could not acquire semaphore");
+        }
+    } catch (InterruptedException e) {
+        throw new IllegalStateException(e);
+    } finally {
+        if (permit) {
+            semaphore.release();
+        }
+    }
+};
+
+// execute tasks
+for (int j = 0; j < 10; j++) {
+    executor.submit(longRunningTask);
+}
+executor.shutdown();
+
+Output
+
+Semaphore acquired
+Semaphore acquired
+Semaphore acquired
+Semaphore acquired
+Could not acquire semaphore
+Could not acquire semaphore
+Could not acquire semaphore
+
+Sample code from the article
+Share
+Improve this answer
+Follow
+edited Dec 17, 2024 at 14:28
+pochopsp's user avatar
+pochopsp
+1,17022 gold badges1212 silver badges2626 bronze badges
+answered Aug 30, 2018 at 9:47
+Volodymyr's user avatar
+Volodymyr
+6,61455 gold badges5555 silver badges8888 bronze badges
+Comments
+7
+
+A semaphore is an object containing a natural number (i.e. a integer greater or equal to zero) on which two modifying operations are defined. One operation, V, adds 1 to the natural. The other operation, P, decreases the natural number by 1. Both activities are atomic (i.e. no other operation can be executed at the same time as a V or a P).
+
+Because the natural number 0 cannot be decreased, calling P on a semaphore containing a 0 will block the execution of the calling process(/thread) until some moment at which the number is no longer 0 and P can be successfully (and atomically) executed.
+
+As mentioned in other answers, semaphores can be used to restrict access to a certain resource to a maximum (but variable) number of processes.
+Share
+Improve this answer
+Follow
+answered Sep 2, 2008 at 19:46
+mweerden's user avatar
+mweerden
+14.1k55 gold badges3535 silver badges3333 bronze badges
+Comments
+4
+
+Semaphores are act like thread limiters.
+
+Example: If you have a pool of 100 threads and you want to perform some DB operation. If 100 threads access the DB at a given time, then there may be locking issue in DB so we can use semaphore which allow only limited thread at a time.Below Example allow only one thread at a time. When a thread call the acquire() method, it will then get the access and after calling the release() method, it will release the acccess so that next thread will get the access.
+
+    package practice;
+    import java.util.concurrent.Semaphore;
+
+    public class SemaphoreExample {
+        public static void main(String[] args) {
+            Semaphore s = new Semaphore(1);
+            semaphoreTask s1 = new semaphoreTask(s);
+            semaphoreTask s2 = new semaphoreTask(s);
+            semaphoreTask s3 = new semaphoreTask(s);
+            semaphoreTask s4 = new semaphoreTask(s);
+            semaphoreTask s5 = new semaphoreTask(s);
+            s1.start();
+            s2.start();
+            s3.start();
+            s4.start();
+            s5.start();
+        }
+    }
+
+    class semaphoreTask extends Thread {
+        Semaphore s;
+        public semaphoreTask(Semaphore s) {
+            this.s = s;
+        }
+        @Override
+        public void run() {
+            try {
+                s.acquire();
+                Thread.sleep(1000);
+                System.out.println(Thread.currentThread().getName()+" Going to perform some operation");
+                s.release();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        } 
+    }
+
+Share
+Improve this answer
+Follow
+edited Aug 16, 2019 at 8:07
+B--rian's user avatar
+B--rian
+5,9861111 gold badges5151 silver badges102102 bronze badges
+answered Aug 16, 2019 at 7:36
+sumit's user avatar
+sumit
+6144 bronze badges
+Comments
+3
+
+A hardware or software flag. In multi tasking systems , a semaphore is as variable with a value that indicates the status of a common resource.A process needing the resource checks the semaphore to determine the resources status and then decides how to proceed.
+Share
+Improve this answer
+Follow
+answered May 12, 2011 at 8:40
+MABUTOBRIGHTON's user avatar
+MABUTOBRIGHTON
+3111 bronze badge
+Comments
+2
+
+So imagine everyone is trying to go to the bathroom and there's only a certain number of keys to the bathroom. Now if there's not enough keys left, that person needs to wait. So think of semaphore as representing those set of keys available for bathrooms (the system resources) that different processes (bathroom goers) can request access to.
+
+Now imagine two processes trying to go to the bathroom at the same time. That's not a good situation and semaphores are used to prevent this. Unfortunately, the semaphore is a voluntary mechanism and processes (our bathroom goers) can ignore it (i.e. even if there are keys, someone can still just kick the door open).
+
+There are also differences between binary/mutex & counting semaphores.
+
+Check out the lecture notes at http://www.cs.columbia.edu/~jae/4118/lect/L05-ipc.html.
+Share
+Improve this answer
+Follow
+answered Feb 13, 2014 at 17:44
+Columbia Student in Jae Class's user avatar
+Columbia Student in Jae Class
+3111 bronze badge
+1 Comment
+Ladage Abhishek
+Aug 7, 2025 at 7:23
+unny and relatable analogy — helps in visualizing the concept! One clarification though: semaphores themselves enforce limits, but it's up to the developer to use them correctly, which is why you mentioned it’s “voluntary.” Also, you might want to note that unlike mutexes, semaphores don’t usually enforce ownership — so any thread can release them. Great link to the lecture notes too!
+1
+
+Mutex is just a boolean while semaphore is a counter.
+
+Both are used to lock part of code so it's not accessed by too many threads.
+
+Example
+
+lock.set()
+a += 1
+lock.unset()
+
+Now if lock was a mutex, it means that it will always be locked or unlocked (a boolean under the surface) regardless how many threads try access the protected snippet of code. While locked, any other thread would just wait until it's unlocked/unset by the previous thread.
+
+Now imagine if instead lock was under the hood a counter with a predefined MAX value (say 2 for our example). Then if 2 threads try to access the resource, then lock would get its value increased to 2. If a 3rd thread then tried to access it, it would simply wait for the counter to go below 2 and so on.
+
+If lock as a semaphore had a max of 1, then it would be acting exactly as a mutex.
+Share
+Improve this answer
+Follow
+answered Feb 14, 2022 at 14:03
+Pithikos's user avatar
+Pithikos
+20.6k2020 gold badges125125 silver badges148148 bronze badges
+Comments
+0
+
+This is an old question but one of the most interesting uses of semaphore is a read/write lock and it has not been explicitly mentioned.
+
+The r/w locks works in simple fashion: consume one permit for a reader and all permits for writers. Indeed, a trivial implementation of a r/w lock but requires metadata modification on read (actually twice) that can become a bottle neck, still significantly better than a mutex or lock.
+
+Another downside is that writers can be started rather easily as well unless the semaphore is a fair one or the writes acquire permits in multiple requests, in such case they need an explicit mutex between themselves.
+
+Further read:
+Share
+Improve this answer
+Follow
+answered Feb 1, 2012 at 21:58
+bestsss's user avatar
+bestsss
+12.1k33 gold badges5757 silver badges6565 bronze badges
+1 Comment
+Grantly
+Over a year ago
+Did you mean "all permits for readers and only one permit for writers" or exactly "one permit for a reader and all permits for writers"? I'm confused
+-6
+
+A semaphore is a way to lock a resource so that it is guaranteed that while a piece of code is executed, only this piece of code has access to that resource. This keeps two threads from concurrently accesing a resource, which can cause problems.
+Share
+Improve this answer
+Follow
+answered Aug 29, 2008 at 16:01
+Craig H's user avatar
+Craig H
+7,9991616 gold badges5252 silver badges6161 bronze badges
+2 Comments
+Sam
+Over a year ago
+sounds like a mutex not a semaphore
+Dmitry Zaitsev
+Jan 18 at 12:17
+Actually, P and V primitives of Dijkstra are implemented in an OS kernel, say Linux POSIX. System V semop() operates on a set of semaphores and allows us to avoid simple deadlocks. Recently I generalized Dijkstra semaphores and showed their intrinsic connection to place-transition (Petri) nets: System_V_Semaphores = PNs = VASs = Multiset_Rewriting_Systems. In the 60s many people came to the same concept from different sides using different words and even graphs. Please have a look at "Computing on semaphores of Dijkstra with place-transition nets" doi.org/10.1080/17445760.2026.2615010
+Protected question. To answer this question, you need to have at least 10 reputation on this site (not counting the association bonus). The reputation requirement helps protect this question from spam and non-answer activity.
+
+Start asking to get answers
+
+Find the answer to your question by asking.
+
+Explore related questions
+
+    multithreadingconcurrencysemaphore
+
+See similar questions with these tags.
+
+    The Overflow Blog
+    Your sneak peek at the redesigned Stack Overflow
+    To live in an AI world, knowing is half the battle
+    Featured on Meta
+    Logo updates to Stack Overflow's visual identity
+    Policy: Generative AI (e.g., ChatGPT) is banned
+    New site design and philosophy for Stack Overflow: Starting February 24, 2026...
+    I’m Jody, the Chief Product and Technology Officer at Stack Overflow. Let’s...
+    What’s Next for Curation
+
+Community activity
+Last 1 hr
+
+    Users online activity
+    3616 users online
+    6 questions
+    7 answers
+    21 comments
+    88 upvotes
+
+Popular tags
+python
+c#
+c
+c++
+cmake
+windows
+
+Popular unanswered question
+Print the failed test output right after and not only at the end when using pytest
+python
+python-3.x
+testing
+pytest
+User avatar
+Dave
+
+    145
+
+1,385 days ago
+Linked
+1037
+What is a mutex?
+724
+What is the difference between lock, mutex and semaphore?
+194
+What are the differences between various threading synchronization options in C#?
+55
+WPF Single Instance Best Practices
+7
+Is it better to synchronize with semaphores or with monitors?
+3
+Understanding semaphores
+3
+Wait for free thread slot before proceeding with code
+3
+How to signal only one thread to wake up per event
+4
+Threadpool + Polling C# .Net 3.5
+2
+Using semaphores to prevent race conditions (in C)
+See more linked questions
+Related
+0
+Question about semaphore
+15
+How does semaphore work?
+4
+Regarding Semaphore Class in .Net
+2
+the little book of semaphores
+6
+What is a non blocking semaphore?
+2
+Semaphore implementation in Java
+0
+Semaphores & threads - what is the point?
+1
+Java multithreading concepts in Semaphores
+1
+Not able to understand or implement Semaphore
+3
+Understanding Semaphores in C#
+Hot Network Questions
+
+    How to fix LaTeX: You have requested package `../package_name', but the package provides `package_name'. for git submodule usage self-contained
+    Special Flatten in ragged arrays
+    DIY 40m Antenna tuning: RLC and SWR
+    Risk of traveling from Croatia to Cuba given flight cancellations and embargo-related issues?
+    Limit audio output frequency
+    Book where a mob mobilizes after a child predator, but is targeting the wrong person
+    The ruling body has decided to combine the yearly census with a head-tax, how can i avoid rampant tax avoidance and wrong data?
+    What do you think about teaching the multiplication rule as an alternative to the quotient rule in calculus?
+    Understanding VIRT, RES and SHR in htop
+    How can the same opera production differ so much with different casts?
+    Why does the frequency spectrum "fill in" under an existing envelope when you increase the period to go from Fourier Series to Fourier Transform?
+    Visualizing Hyperelliptic Curves
+    About English speaking linking
+    Did the US attack Iran while US-Iran diplomatic negotiations were ongoing?
+    Was the spider scene in the original short story?
+    Histogram of numeric data
+    Why is the point at infinity so natural in complex analysis but not in real analysis?
+    Automatic italic for foreign words
+    Can you put the missing stickers back on?
+    Find intersection points of lines in the same shapefile where no vertices exists in QGIS
+    How can you connect LEGO 12V train tracks with RC/9V tracks?
+    Reading Wittgenstein's Logisch-Philosophische Abhandlung
+    How did Haman escape being killed post-Vashti's execution?
+    Why does my wired Magegee keyboard (MK-STORM) keeps typing a bunch of keys?
+
+Question feed
+
+Illustration of upvote icon after it is clicked
+
+Stack Overflow
+
+    Questions
+    Help
+    Chat
+
+Business
+
+    Stack Internal
+    Stack Data Licensing
+    Stack Ads
+
+Company
+
+    About
+    Press
+    Work Here
+    Legal
+    Privacy Policy
+    Terms of Service
+    Contact Us
+    Your Privacy Choices
+    Cookie Policy
+
+Stack Exchange Network
+
+    Technology
+    Culture & recreation
+    Life & arts
+    Science
+    Professional
+    Business
+    API
+    Data
+
+    Blog
+    Facebook
+    Twitter
+    LinkedIn
+    Instagram
+
+Site design / logo © 2026 Stack Exchange Inc; user contributions licensed under CC BY-SA . rev 2026.2.26.40246

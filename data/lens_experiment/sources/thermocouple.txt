@@ -1,0 +1,706 @@
+General Description
+The MAX31855 performs cold-junction compensation
+and digitizes the signal from a K-, J-, N-, T-, S-, R-, or
+E-type thermocouple. The data is output in a signed
+14-bit, SPI-compatible, read-only format. This converter
+resolves temperatures to 0.25°C, allows readings as
+high as +1800°C and as low as -270°C, and exhibits
+thermocouple accuracy of ±2°C for temperatures ranging
+from -200°C to +700°C for K-type thermocouples. For full
+range accuracies and other thermocouple types, see the
+Thermal Characteristics specifications.
+Applications
+● Industrial
+● Appliances
+● HVAC
+Benefits and Features
+● Integration Reduces Design Time and Lowers
+System Cost
+• 14-Bit, 0.25°C Resolution Converter
+• Integrated Cold-Junction Compensation
+• Versions Available for Most Common Thermocouple
+Types: K-, J-, N-, T-, S-, R-, and E-Type
+• Detects Thermocouple Shorts to GND or VCC
+• Detects Open Thermocouple
+● Interfaces to Most Microcontrollers
+• Simple SPI-Compatible Interface (Read-Only)
+Ordering Information appears at end of data sheet.
+For related parts and recommended products to use with this part, refer
+to www.maximintegrated.com/MAX31855.related.
+19-5793; Rev 5; 1/15
+VCC
+GND
+T+
+T-
+SO
+SCK
+CS
+MICROCONTROLLER
+MISO
+SCK
+SS
+0.1μF
+MAX31855MAX31855 Cold-Junction Compensated
+Thermocouple-to-Digital Converter
+Typical Application Circuit
+Supply Voltage Range (VCC to GND)...................-0.3V to +4.0V
+All Other Pins............................................. -0.3V to (VCC + 0.3V)
+Continuous Power Dissipation (TA = +70°C)
+SO (derate 5.9mW/°C above +70°C).......................470.6mW
+ESD Protection (All Pins, Human Body Model)....................±2kV
+Operating Temperature Range......................... -40°C to +125°C
+Junction Temperature......................................................+150°C
+Storage Temperature Range ........................... -65°C to +150°C
+Lead Temperature (soldering, 10s).................................+300°C
+Soldering Temperature (reflow) ......................................+260°C
+SO
+Junction-to-Ambient Thermal Resistance (θJA) ........170°C/W
+Junction-to-Case Thermal Resistance (θJC) ...............40°C/W
+(Note 1)
+(TA = -40°C to +125°C, unless otherwise noted.)
+(3.0V ≤ VCC P 3.6V, TA = -40°C to +125°C, unless otherwise noted.)
+PARAMETER SYMBOL CONDITIONS MIN TYP MAX UNITS
+Power-Supply Voltage VCC (Note 2) 3.0 3.3 3.6 V
+Input Logic 0 VIL -0.3 +0.8 V
+Input Logic 1 VIH 2.1 VCC +
+0.3 V
+PARAMETER SYMBOL CONDITIONS MIN TYP MAX UNITS
+Power-Supply Current ICC 900 1500 μA
+Thermocouple Input Bias Current TA = -40°C to +125°C, 100mV across the
+thermocouple inputs -100 +100 nA
+Power-Supply Rejection -0.3 °C/V
+Power-On Reset Voltage
+Threshold VPOR (Note 3) 2 2.5 V
+Power-On Reset Voltage
+Hysteresis 0.2 V
+Output High Voltage VOH IOUT = -1.6mA VCC -
+0.4 V
+Output Low Voltage VOL IOUT = 1.6mA 0.4 VMAX31855 Cold-Junction Compensated
+Thermocouple-to-Digital Converter
+www.maximintegrated.com
+Maxim Integrated │ 2
+Note 1: Package thermal resistances were obtained using the method described in JEDEC specification JESD51-7, using a four-layer
+board. For detailed information on package thermal considerations, refer to www.maximintegrated.com/thermal-tutorial.
+Absolute Maximum Ratings
+Stresses beyond those listed under “Absolute Maximum Ratings” may cause permanent damage to the device. These are stress ratings only, and functional operation of the device at these
+or any other conditions beyond those indicated in the operational sections of the specifications is not implied. Exposure to absolute maximum rating conditions for extended periods may affect
+device reliability.
+Package Thermal Characteristics
+Recommended Operating Conditions
+DC Electrical Characteristics
+(3.0V ≤ VCC P 3.6V, TA = -40°C to +125°C, unless otherwise noted.) (Note 4)
+PARAMETER SYMBOL CONDITIONS MIN TYP MAX UNITS
+MAX31855K Thermocouple
+Temperature Gain and Offset
+Error (41.276μV/°C nominal
+sensitivity) (Note 4)
+TTHERMOCOUPLE = -200°C to +700°C,
+TA = -20°C to +85°C (Note 3) -2 +2
+°C
+TTHERMOCOUPLE = +700°C to +1350°C,
+TA = -20°C to +85°C (Note 3) -4 +4
+TTHERMOCOUPLE = -270°C to +1372°C,
+TA = -40°C to +125°C (Note 3) -6 +6
+MAX31855J Thermocouple
+Temperature Gain and Offset
+Error (57.953μV/°C nominal
+sensitivity) (Note 4)
+TTHERMOCOUPLE = -210°C to +750°C,
+TA = -20°C to +85°C (Note 3) -2 +2
+°C
+TTHERMOCOUPLE = -210°C to +1200°C,
+TA = -40°C to +125°C (Note 3) -4 +4
+MAX31855N Thermocouple
+Temperature Gain and Offset
+Error (36.256μV/°C nominal
+sensitivity) (Note 4)
+TTHERMOCOUPLE = -200°C to +700°C,
+TA = -20°C to +85°C (Note 3) -2 +2
+°C
+TTHERMOCOUPLE = +700°C to +1300°C,
+TA = -20°C to +85°C (Note 3) -4 +4
+TTHERMOCOUPLE = -270°C to +1300°C,
+TA = -40°C to +125°C (Note 3) -6 +6
+MAX31855T Thermocouple
+Temperature Gain and Offset
+Error (52.18μV/°C nominal
+sensitivity) (Note 4)
+TTHERMOCOUPLE = -270°C to +400°C,
+TA = -20°C to +85°C (Note 3) -2 +2
+°C
+TTHERMOCOUPLE = -270°C to +400°C,
+TA = -40°C to +125°C (Note 3) -4 +4
+MAX31855E Thermocouple
+Temperature Gain and Offset
+Error (76.373μV/°C nominal
+sensitivity) (Note 4)
+TTHERMOCOUPLE = -200°C to +700°C,
+TA = -20°C to +85°C (Note 3) -2 +2
+°C
+TTHERMOCOUPLE = +700°C to +1000°C,
+TA = -20°C to +85°C (Note 3) -3 +3
+TTHERMOCOUPLE = -270°C to +1000°C,
+TA = -40°C to +125°C (Note 3) -5 +5
+MAX31855R Thermocouple
+Temperature Gain and Offset
+Error (10.506μV/°C nominal
+sensitivity) (Note 4)
+TTHERMOCOUPLE = -50°C to +700°C,
+TA = -20°C to +85°C (Note 3) -2 +2
+°C
+TTHERMOCOUPLE = +700°C to +1768°C,
+TA = -20°C to +85°C (Note 3) -4 +4
+TTHERMOCOUPLE = -50°C to +1768°C,
+TA = -40°C to +125°C (Note 3) -6 +6
+MAX31855S Thermocouple
+Temperature Gain and Offset
+Error (9.587μV/°C nominal
+sensitivity) (Note 4)
+TTHERMOCOUPLE = -50°C to +700°C,
+TA = -20°C to +85°C (Note 3) -2 +2
+°C
+TTHERMOCOUPLE = +700°C to +1768°C,
+TA = -20°C to +85°C (Note 3) -4 +4
+TTHERMOCOUPLE = -50°C to +1768°C,
+TA = -40°C to +125°C (Note 3) -6 +6MAX31855 Cold-Junction Compensated
+Thermocouple-to-Digital Converter
+www.maximintegrated.com
+Maxim Integrated │ 3
+Thermal Characteristics
+(3.0V ≤ VCC P 3.6V, TA = -40°C to +125°C, unless otherwise noted.) (Note 4)
+(See Figure 1 and Figure 2.)
+Note 2: All voltages are referenced to GND. Currents entering the IC are specified positive, and currents exiting the IC are negative.
+Note 3: Guaranteed by design; not production tested.
+Note 4: Not including cold-junction temperature error or thermocouple nonlinearity.
+Note 5: Specification is 100% tested at TA = +25°C. Specification limits over temperature (TA = TMIN to TMAX) are guaranteed by
+design and characterization; not production tested.
+Note 6: Because the thermocouple temperature conversions begin at VPOR, depending on VCC slew rates, the first thermocouple
+temperature conversion may not produce an accurate result. Therefore, the tCONV_PU specification is required after VCC is
+greater than VCCMIN to guarantee a valid thermocouple temperature conversion result.
+Note 7: For all pins except T+ and T- (see the Thermocouple Input Bias Current parameter in the DC Electrical Characteristics
+table).
+PARAMETER SYMBOL CONDITIONS MIN TYP MAX UNITS
+Thermocouple Temperature Data
+Resolution 0.25 °C
+Internal Cold-Junction
+Temperature Error
+TA = -20°C to +85°C (Note 3) -2 +2 °C
+TA = -40°C to +125°C (Note 3) -3 +3
+Cold-Junction Temperature Data
+Resolution TA = -40°C to +125°C 0.0625 °C
+Temperature Conversion Time
+(Thermocouple, Cold Junction,
+Fault Detection)
+tCONV (Note 5) 70 100 ms
+Thermocouple Conversion
+Power-Up Time tCONV_PU (Note 6) 200 ms
+PARAMETER SYMBOL CONDITIONS MIN TYP MAX UNITS
+Input Leakage Current ILEAK (Note 7) -1 +1 μA
+Input Capacitance CIN 8 pF
+Serial-Clock Frequency fSCL 5 MHz
+SCK Pulse-High Width tCH 100 ns
+SCK Pulse-Low Width tCL 100 ns
+SCK Rise and Fall Time 200 ns
+CS Fall to SCK Rise tCSS 100 ns
+SCK to CS Hold 100 ns
+CS Fall to Output Enable tDV 100 ns
+CS Rise to Output Disable tTR 40 ns
+SCK Fall to Output Data Valid tDO 40 ns
+CS Inactive Time (Note 3) 200 nsMAX31855 Cold-Junction Compensated
+Thermocouple-to-Digital Converter
+www.maximintegrated.com
+Maxim Integrated │ 4
+Thermal Characteristics (continued)
+Serial-Interface Timing Characteristics
+Figure 1. Serial-Interface Protocol
+Figure 2. Serial-Interface Timing
+CS
+SCK
+SO D31 D8 D7 D6 D5 D4 D3 D2 D1 D0
+D31 D0D1D2D3
+SCK
+SO
+tDV
+t CSS
+t DO
+CS
+t TR
+t CH t CLMAX31855 Cold-Junction Compensated
+Thermocouple-to-Digital Converter
+www.maximintegrated.com
+Maxim Integrated │ 5
+Serial-Interface Diagrams
+(VCC = +3.3V, TA = +25°C, unless otherwise noted.)
+INTERNAL TEMPERATURE SENSOR
+ACCURACY
+MAX31855 toc02
+TEMPERATURE (°C)
+MEASUREMENT ERROR (°C)
+806020 400-20
+-0.1
+0
+0.1
+0.2
+0.3
+0.4
+0.5
+0.6
+0.7
+-0.2
+-40 100
+VCC = 3.3V
+NOTE: THIS DATA WAS TAKEN
+IN PRECISION BATH SO HIGH
+TEMPERATURE LIMIT IS 90°C
+ADC ACCURACY vs. ADC INPUT VOLTAGE
+ACROSS TEMPERATURE
+MAX31855 toc03
+ADC INPUT VOLTAGE (mV)
+ADC ACCURACY (°C)
+4020
+-0.6
+-0.5
+-0.4
+-0.3
+-0.2
+-0.1
+0
+0.1
+0.2
+0.3
+-0.7
+0 60
+AT -40°C
+VCC = 3.3V
+AT +85°C
+AT +25°C
+ADC ACCURACY vs. ADC INPUT VOLTAGE
+ACROSS VCC
+MAX31855 toc04
+ADC INPUT VOLTAGE (mV)
+ADC ACCURACY (°C)
+4020
+-0.9
+-0.8
+-0.7
+-0.6
+-0.5
+-0.4
+-0.3
+-0.2
+-0.1
+0
+-1.0
+0 60
+V CC = 3.6V
+V CC = 3.3V
+VCC = 3.0V
+INTERNAL TEMPERATURE = +25°C
+SUPPLY CURRENT vs. TEMPERATURE
+MAX31855 toc01
+TEMPERATURE (°C)
+SUPPLY CURRENT (mA)
+100 120806040200-20
+0.2
+0.4
+0.6
+0.8
+1.0
+1.2
+1.4
+0
+-40
+V CC = 3.6V
+V CC = 3.3V
+V CC = 3.0V
+Maxim Integrated │ 6www.maximintegrated.com
+MAX31855 Cold-Junction Compensated
+Thermocouple-to-Digital Converter
+Typical Operating Characteristics
+PIN NAME FUNCTION
+1 GND Ground
+2 T- Thermocouple Input. See Table 1. Do not
+connect to GND.
+3 T+ Thermocouple Input. See Table 1.
+4 VCC Power-Supply Voltage
+5 SCK Serial-Clock Input
+6 CS Active-Low Chip Select. Set CS low to
+enable the serial interface.
+7 SO Serial-Data Output
+8 DNC Do Not Connect
+CS
+SCKVCC
+1
++
+2
+8
+7
+DNC
+SOT-
+T+
+GND
+SO
+TOP VIEW
+3
+4
+6
+5
+MAX31855
+MAX31855
+ADC
+DIGITAL
+CONTROL
+COLD-JUNCTION
+COMPENSATION
+FAULT
+DETECTION
+REFERENCE
+VOLTAGE
+S4
+S1
+S2
+S3
+S5 SCK
+VCC
+VCC
+SO
+CS
+GND
+T+
+T-MAX31855 Cold-Junction Compensated
+Thermocouple-to-Digital Converter
+www.maximintegrated.com
+Maxim Integrated │ 7
+Pin DescriptionPin Configuration
+Block Diagram
+Detailed Description
+The MAX31855 is a sophisticated thermocouple-to-digital
+converter with a built-in 14-bit analog-to-digital converter
+(ADC). The device also contains cold-junction compensa-
+tion sensing and correction, a digital controller, an SPI-
+compatible interface, and associated control logic. The
+device is designed to work in conjunction with an external
+microcontroller (μC) in thermostatic, process-control, or
+monitoring applications. The device is available in several
+versions, each optimized and trimmed for a specific thermo-
+couple type (K, J, N, T, S, R, or E.). The thermocouple type is
+indicated in the suffix of the part number (e.g., MAX31855K).
+See the Ordering Information table for all options.
+Temperature Conversion
+The device includes signal-conditioning hardware to con-
+vert the thermocouple’s signal into a voltage compatible
+with the input channels of the ADC. The T+ and T- inputs
+connect to internal circuitry that reduces the introduction
+of noise errors from the thermocouple wires.
+Before converting the thermoelectric voltages into equiva-
+lent temperature values, it is necessary to compensate
+for the difference between the thermocouple coldjunction
+side (device ambient temperature) and a 0°C virtual ref-
+erence. For a K-type thermocouple, the voltage changes
+by about 41μV/°C, which approximates the thermocouple
+characteristic with the following linear equation:
+VOUT = (41.276μV/°C) x (TR - TAMB)
+where VOUT is the thermocouple output voltage (μV), TR
+is the temperature of the remote thermocouple junction
+(°C), and TAMB is the temperature of the device (°C).
+Other thermocouple types use a similar straight-line
+approximation but with different gain terms. Note that the
+MAX31855 assumes a linear relationship between tem-
+perature and voltage. Because all thermocouples exhibit
+some level of nonlinearity, apply appropriate correction to
+the device’s output data.
+Cold-Junction Compensation
+The function of the thermocouple is to sense a difference
+in temperature between two ends of the thermocouple
+wires. The thermocouple’s “hot” junction can be read
+across the operating temperature range (Table 1). The
+reference junction, or “cold” end (which should be at the
+Table 1. Thermocouple Wire Connections and Nominal Sensitivities
+TYPE T- WIRE T+ WIRE TEMP RANGE (°C) SENSITIVITY (μV/°C)
+COLD-JUNCTION
+SENSITIVITY (μV/°C)
+(0°C TO +70°C)
+K Alumel Chromel -270 to +1372 41.276
+(0°C to +1000°C) 40.73
+J Constantan Iron -210 to +1200 57.953
+(0°C to +750°C) 52.136
+N Nisil Nicrosil -270 to + 1300 36.256
+(0°C to +1000°C) 27.171
+S Platinum Platinum/Rhodium -50 to +1768 9.587
+(0°C to +1000°C) 6.181
+T Constantan Copper -270 to +400 52.18
+(0°C to +400°C) 41.56
+E Constantan Chromel -270 to +1000 76.373
+(0°C to +1000°C) 44.123
+R Platinum Platinum/Rhodium -50 to +1768 10.506
+(0°C to +1000°C) 6.158MAX31855 Cold-Junction Compensated
+Thermocouple-to-Digital Converter
+www.maximintegrated.com
+Maxim Integrated │ 8
+same temperature as the board on which the device is
+mounted) can range from -55°C to +125°C. While the
+temperature at the cold end fluctuates, the device contin-
+ues to accurately sense the temperature difference at the
+opposite end.
+The device senses and corrects for the changes in the
+reference junction temperature with cold-junction com-
+pensation. It does this by first measuring its internal die
+temperature, which should be held at the same tem-
+perature as the reference junction. It then measures the
+voltage from the thermocouple’s output at the reference
+junction and converts this to the noncompensated ther-
+mocouple temperature value. This value is then added
+to the device’s die temperature to calculate the thermo-
+couple’s “hot junction” temperature. Note that the “hot
+junction” temperature can be lower than the cold junction
+(or reference junction) temperature.
+Optimal performance from the device is achieved when
+the thermocouple cold junction and the device are at the
+same temperature. Avoid placing heat-generating devices
+or components near the MAX31855 because this could
+produce cold-junction-related errors.
+Conversion Functions
+During the conversion time, tCONV, three functions are
+performed: the temperature conversion of the internal
+cold-junction temperature, the temperature conversion of
+the external thermocouple, and the detection of thermo-
+couple faults.
+When executing the temperature conversion for the inter-
+nal cold-junction compensation circuit, the connection to
+signal from the external thermocouple is opened (switch
+S4) and the connection to the cold-junction compensa-
+tion circuit is closed (switch S5). The internal T- reference
+to ground is still maintained (switch S3 is closed) and
+the connections to the fault-detection circuit are open
+(switches S1 and S2).
+When executing the temperature conversion of the
+external thermocouple, the connections to the internal
+fault-detection circuit are opened (switches S1 and S2 in
+the Block Diagram) and the switch connecting the cold-
+junction compensation circuit is opened (switch S5). The
+internal ground reference connection (switch S3) and the
+connection to the ADC (switch S4) are closed. This allows
+the ADC to process the voltage detected across the T+
+and T- terminals.
+During fault detection, the connections from the external
+thermocouple and cold-junction compensation circuit to
+the ADC are opened (switches S4 and S5). The internal
+ground reference on T- is also opened (switch S3). The
+connections to the internal fault-detection circuit are
+closed (switch S1 and S2). The fault-detection circuit tests
+for shorted connections to VCC or GND on the T+ and T-
+inputs, as well as looking for an open thermocouple condi-
+tion. Bits D0, D1, and D2 of the output data are normally
+low. Bit D2 goes high to indicate a thermocouple short to
+VCC, bit D1 goes high to indicate a thermocouple short
+to GND, and bit D0 goes high to indicate a thermocouple
+open circuit. If any of these conditions exists, bit D16 of
+the SO output data, which is normally low, also goes high
+to indicate that a fault has occurred.
+Serial Interface
+The Typical Application Circuit shows the device inter-
+faced with a microcontroller. In this example, the device
+processes the reading from the thermocouple and trans-
+mits the data through a serial interface. Drive CS low
+and apply a clock signal at SCK to read the results at
+SO. Conversions are always being performed in the
+background. The fault and temperature data are only be
+updated when CS is high.
+Drive CS low to output the first bit on the SO pin. A com-
+plete serial-interface read of the cold-junction compen-
+sated thermocouple temperature requires 14 clock cycles.
+Thirty-two clock cycles are required to read both the
+thermocouple and reference junction temperatures (Table
+2 and Table 3.) The first bit, D31, is the thermocouple
+temperature sign bit, and is presented to the SO pin within
+tDV of the falling edge of CS. Bits D[30:18] contain the
+converted temperature in the order of MSB to LSB, and
+are presented to the SO pin within tD0 of the falling edge
+of SCK. Bit D16 is normally low and goes high when the
+thermocouple input is open or shorted to GND or VCC.
+The reference junction temperature data begins with D15.
+CS can be taken high at any point while clocking out con-
+version data. If T+ and T- are unconnected, the thermo-
+couple temperature sign bit (D31) is 0, and the remainder
+of the thermocouple temperature value (D[30:18]) is 1.
+Figure 1 and Figure 2 show the serial-interface timing and
+order. Table 2 and Table 3 show the SO output bit weights
+and functions.MAX31855 Cold-Junction Compensated
+Thermocouple-to-Digital Converter
+www.maximintegrated.com
+Maxim Integrated │ 9
+Note: The practical temperature ranges vary with the thermo-
+couple type.
+Table 2. Memory Map—Bit Weights and Functions
+Table 3. Memory Map—Descriptions
+Table 4. Thermocouple Temperature Data
+Format
+Table 5. Reference Junction Temperature
+Data Format
+14-BIT THERMOCOUPLE
+TEMPERATURE DATA RES FAULT
+BIT
+12-BIT INTERNAL TEMPERATURE
+DATA RES SCV
+BIT
+SCG
+BIT
+OC
+BIT
+BIT D31 D30 … D18 D17 D16 D15 D14 … D4 D3 D2 D1 D0
+VALUE Sign MSB 210
+(1024°C) … LSB 2-2
+(0.25°C) Reserved 1 =
+Fault Sign
+MSB
+26
+(64°C)
+… LSB 2-4
+(0.0625°C) Reserved
+1 =
+Short
+to
+VCC
+1 =
+Short
+to
+GND
+1 =
+Open
+Circuit
+BIT NAME DESCRIPTION
+D[31:18] 14-Bit Thermocouple
+Temperature Data These bits contain the signed 14-bit thermocouple temperature value. See Table 4.
+D17 Reserved This bit always reads 0.
+D16 Fault This bit reads at 1 when any of the SCV, SCG, or OC faults are active. Default value
+is 0.
+D[15:4] 12-Bit Internal Temperature
+Data
+These bits contain the signed 12-bit value of the reference junction temperature. See
+Table 5.
+D3 Reserved This bit always reads 0.
+D2 SCV Fault This bit is a 1 when the thermocouple is short-circuited to VCC. Default value is 0.
+D1 SCG Fault This bit is a 1 when the thermocouple is short-circuited to GND. Default value is 0.
+D0 OC Fault This bit is a 1 when the thermocouple is open (no connections). Default value is 0.
+TEMPERATURE
+(°C)
+DIGITAL OUTPUT
+(D[31:18])
++1600.00 0110 0100 0000 00
++1000.00 0011 1110 1000 00
++100.75 0000 0110 0100 11
++25.00 0000 0001 1001 00
+0.00 0000 0000 0000 00
+-0.25 1111 1111 1111 11
+-1.00 1111 1111 1111 00
+-250.00 1111 0000 0110 00
+TEMPERATURE
+(°C)
+DIGITAL OUTPUT
+(D[15:4])
++127.0000 0111 1111 0000
++100.5625 0110 0100 1001
++25.0000 0001 1001 0000
+0.0000 0000 0000 0000
+-0.0625 1111 1111 1111
+-1.0000 1111 1111 0000
+-20.0000 1110 1100 0000
+-55.0000 1100 1001 0000MAX31855 Cold-Junction Compensated
+Thermocouple-to-Digital Converter
+www.maximintegrated.com
+Maxim Integrated │ 10
+Applications Information
+Noise Considerations
+Because of the small signal levels involved, thermocouple
+temperature measurement is susceptible to powersupply
+coupled noise. The effects of power-supply noise can be
+minimized by placing a 0.1μF ceramic bypass capacitor
+close to the VCC pin of the device and to GND.
+The input amplifier is a low-noise amplifier designed
+to enable high-precision input sensing. Keep the ther-
+mocouple and connecting wires away from electrical
+noise sources. It is strongly recommended to add a
+10nF ceramic surface-mount differential capacitor, placed
+across the T+ and T- pins, in order to filter noise on the
+thermocouple lines.
+Thermal Considerations
+Self-heating degrades the device’s temperature measure-
+ment accuracy in some applications. The magnitude of
+the temperature errors depends on the thermal conduc-
+tivity of the device package, the mounting technique, and
+the effects of airflow. Use a large ground plane to improve
+the device’s temperature measurement accuracy.
+The thermocouple system’s accuracy can also be
+improved by following these precautions:
+• Use the largest wire possible that does not shunt heat
+away from the measurement area.
+• If a small wire is required, use it only in the region
+of the measurement, and use extension wire for the
+region with no temperature gradient.
+• Avoid mechanical stress and vibration, which could
+strain the wires.
+• When using long thermocouple wires, use a twisted
+pair extension wire.
+• Avoid steep temperature gradients.
+• Try to use the thermocouple wire well within its tem-
+perature rating.
+• Use the proper sheathing material in hostile environ-
+ments to protect the thermocouple wire.
+• Use extension wire only at low temperatures and only
+in regions of small gradients.
+• Keep an event log and a continuous record of thermo-
+couple resistance.MAX31855 Cold-Junction Compensated
+Thermocouple-to-Digital Converter
+www.maximintegrated.com
+Maxim Integrated │ 11
+Note: All devices are specified over the -40°C to +125°C operating temperature range.
++Denotes a lead(Pb)-free/RoHS-compliant package.
+T = Tape and reel.
+PART THERMOCOUPLE TYPE MEASURED TEMP RANGE PIN-PACKAGE
+MAX31855KASA+ K -200°C to +1350°C 8 SO
+MAX31855KASA+T K -200°C to +1350°C 8 SO
+MAX31855JASA+ J -40°C to +750°C 8 SO
+MAX31855JASA+T J -40°C to +750°C 8 SO
+MAX31855NASA+ N -200°C to + 1300°C 8 SO
+MAX31855NASA+T N -200°C to + 1300°C 8 SO
+MAX31855SASA+ S -50°C to +1600°C 8 SO
+MAX31855SASA+T S -50°C to +1600°C 8 SO
+MAX31855TASA+ T -250°C to +400°C 8 SO
+MAX31855TASA+T T -250°C to +400°C 8 SO
+MAX31855EASA+ E -40°C to +900°C 8 SO
+MAX31855EASA+T E -40°C to +900°C 8 SO
+MAX31855RASA+ R -50°C to +1770°C 8 SO
+MAX31855RASA+T R -50°C to +1770°C 8 SO
+PACKAGE TYPE PACKAGE CODE OUTLINE NO. LAND PATTERN NO.
+8 SO S8+4 21-0041 90-0096MAX31855 Cold-Junction Compensated
+Thermocouple-to-Digital Converter
+www.maximintegrated.com
+Maxim Integrated │ 12
+Package Information
+For the latest package outline information and land patterns (footprints), go to www.maximintegrated.com/packages. Note that a “+”,
+“#”, or “-” in the package code indicates RoHS status only. Package drawings may show a different suffix character, but the drawing
+pertains to the package regardless of RoHS status.
+Ordering Information
+REVISION
+NUMBER
+REVISION
+DATE DESCRIPTION PAGES
+CHANGED
+0 3/11 Initial release —
+1 11/11 Corrected ESD protection value; added “S” and “R” type specifications 1, 2, 3, 8, 12
+2 2/12
+Corrected the thermocouple temperature conditions in the Thermal Characteristics
+table and Table 1; added clarification to the Serial Interface section to help users better
+understand how to communicate with the device; added a recommendation to add a
+10nF differential capacitor to the T+/T- pins in the Noise Considerations section
+3, 8, 9, 11
+3 7/14 Change “S” type thermocouple minimum temperature in Table 1 and Ordering
+Information 8, 12
+4 11/14 Removed automotive reference from data sheet 1
+5 1/15 Revised Benefits and Features section 1Maxim Integrated cannot assume responsibility for use of any circuitry other than circuitry entirely embodied in a Maxim Integrated product. No circuit patent licenses
+are implied. Maxim Integrated reserves the right to change the circuitry and specifications without notice at any time. The parametric values (min and max limits)
+shown in the Electrical Characteristics table are guaranteed. Other parametric values quoted in this data sheet are provided for guidance.
+Maxim Integrated and the Maxim Integrated logo are trademarks of Maxim Integrated Products, Inc.
+© 2015 Maxim Integrated Products, Inc. │ 13MAX31855 Cold-Junction Compensated
+Thermocouple-to-Digital Converter
+Revision HistoryFor pricing, delivery, and ordering information, please contact Maxim Direct at 1-888-629-4642, or visit Maxim Integrated’s website at www.maximintegrated.com.

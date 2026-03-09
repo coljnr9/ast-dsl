@@ -1,0 +1,187 @@
+879 Maple Street · Contoocook, NH 03229
+PO Box 50 · Warner, NH 03278 · Phone: (603) 456-2011 · Fax: (603) 456-2012
+Features
+ High accuracy sensor
+ Fast response time
+ Simple soil insertion (vertical or
+horizontal orientation)
+ Programmable start time
+and date
+ Miniature size
+ User calibration through
+MadgeTech software
+ Weatherproof enclosure
+ Probe is powered from data
+recorder’s battery. No external
+power required.
+Applications
+ Irrigation Management
+ Potted plant and greenhouse
+monitoring
+ Soil moisture trends
+ Plant growth studies
+ Peat Moss and organic soil
+studies
+SMR110
+SOIL MOISTURE RECORDER
+The SMR110 is a small,
+battery powered, soil
+moisture data recorder in a
+weatherproof enclosure. It
+p r o v i d e s a c c u r a t e
+volumetric water content
+measurements over a
+complete range from dry to
+saturated. The SMR110
+features a 10-year battery
+for long-term deployments and soil studies, over multiple seasons. With it’s built-in
+memory, the data recorder can monitor and record over 32,767 soil moisture
+measurements. The EC-5, a high accuracy soil moisture probe (pictured above), has a
+response time of 10ms and can be placed in any type of soil. The EC-20* probe (below)
+is designed for use in medium-textured soils. For easy soil moisture analysis and trend
+information, MadgeTech software provides a time and date stamped graph. This data
+may be viewed, printed or exported to third-party programs (Excel, etc…) for more
+detailed analysis and irrigation management. Soil moisture data is essential in
+determining and scheduling irrigation for proper plant growth, care and research. This
+data is also useful in determining the health of the soil and plant root systems.
+The *EC-20 Soil Moisture probe (pictured below) is also available for use with the SMR110
+MadgeTech Data Recorder Software
+displays water per soil content data in an easy to
+use graph.
+The Windows®-based software package allows
+the user to effortlessly collect, display and
+analyze data. A variety of powerful tools allow
+you to examine, export, and print professional
+looking data with just a click of the mouse.
+Click MadgeTech Software for more information or to
+download the software.
+SOFTWARE FEATURES
+879 Maple Street · Contoocook, NH 03229
+PO Box 50 · Warner, NH 03278 · Phone: (603) 456-2011 · Fax: (603) 456-2012
+Data Recorder Soil Moisture Probes
+Measurement Range:
+Accuracy:
++/- 1200mV
++/-0.01% FSR
+Measurement Range:
+Measurement Type:
+(EC-5) 0 to 100% VWC saturation
+(EC-20) 0 to 40% VWC saturation
+VWC (Volumetric Water Content)
+Input range:
+Memory:
+Reading Rate:
+0 to 2.5V DC
+32,767 readings; software
+configurable memory wrap
+1 reading every 2 seconds to 1 every
+12 hours
+Measurement Accuracy: (EC-5) +/- 3% typical, ALL soils
+(EC-20) +/- 4% typical on low EC and medium
+textured soils
+(Both models) +/-1% with soil specific calibration
+Input Connection:
+Operating
+Environment:
+Removable screw terminal plug
+-40 to +80°C (-40 to +176°F), 0-95%
+RH, non-condensing
+Calibration:
+Calibration Date:
+Life Expectancy (probes):
+Digital calibration through software
+Automatically recorded within device
+3-5 years
+Battery Type:
+Battery Life:
+3.6V Lithium Battery included;
+user replaceable
+10 years typical @ 15 min reading rate
+Measurement Time:
+Measurement Resolution:
+Operating Environment:
+10ms
+0.002m3/m3
+-40 to +60 degC (-40 t0 +140 degF), 0-100% RH
+(EC-5 and EC-20 models)
+Dimensions:
+Weight:
+0.8”x1.7”x2.7”(21mmx44mmx69mm)
+2 oz. (56 g)
+Power Requirement:
+(probes)
+Powered from data recorder’s internal battery.
+No external power required.
+Weatherproof
+Enclosure:
+Anodized aluminum case w/mounting
+flange. Communications port plug
+3.5”x2.9”x1.1”(87mmx73mmx27mm)
+7 oz. (198 g)
+Dimensions (probes): (EC-5) 2.1”x0.6”x0.06” (55mm x 15mm x 1.5mm)
+(Cable length) - 16’ (5 m), (tinned, wire leads)
+(EC-20) 10”x1.25”x0.06” (255mmx32mm x1.5mm)
+Cable length) - 16’ (5 m), (tinned, wire leads)
+Multiple Graphs: Simultaneously analyze data from
+several units or deployments; easily
+switch to a single data series
+Statistics: Calculate averages, min, max and standard
+deviation
+Real-Time
+Recording:
+Collect and display data in real-time
+while continuing to log
+Export Data: Export data in a variety of common formats, or
+switch to Excel® with a single click
+Data Table: Instantly access tabular view for
+detailed dates, times, values, and
+annotations
+Calibration: Automatically calculate and store calibration
+parameters
+Scaling Options: Autoscale function fits data to the
+screen, or allows user to manually
+enter their own values
+Logger Configuration: Easy set up and launch of data loggers with
+immediate or delayed start, preferred sample
+rate, and device ID
+Printing: Automatically print graphical or
+tabular data
+Communications: Automatic or user-enabled communications port
+configuration (Baud rate, COM port selection)
+*SPECIFICATIONS ARE SUBJECT TO CHANGE WITHOUT NOTICE.
+SPECIFIC WARRANTY AND REMEDY LIMITATIONS APPLY.
+CALL 1-603-456-2011 OR GO TO WWW.MADGETECH.COM FOR DETAILS.
+BATTERY WARNING: FIRE, EXPLOSION, AND SEVERE BURN HAZARD.
+DO NOT RECHARGE, DISASSEMBLE, HEAT ABOVE 212ºF,
+INCINERATE OR EXPOSE CONTENTS TO WATER.
+SOIL MOISTURE RECORDER SPECIFICATIONS
+DOC-1125009-00 REV C 2009.07.01
+For Quantity Discounts call 603-456-2011 or email sales@madgetech.com
+ORDERING INFORMATION
+Model Description Price (U.S.)
+SMR110-5 Soil Moisture recorder w/EC-5 probe, weatherproof enclosure
+(Software NOT included)
+$299.00
+SMR110-20 Soil moisture recorder w/EC-20 probe, weatherproof enclosure
+(Software NOT included)
+$299.00
+EC-5 Soil moisture probe, ONLY $130.00
+EC-20 Soil moisture probe, ONLY $130.00
+IFC110 Software, manual and serial interface cable $99.00
+IFC200 Software, manual and USB interface cable $119.00
+LTC-7PN Replacement battery for data recorder $10.00
+ASK ABOUT OUR OTHER
+DATA RECORDERS
+Pulse/Event/State
+Low Level Current
+Low Level Voltage
+RF Transmitters
+Intrinsically Safe
+Spectral Vibration
+Temperature
+Humidity
+Pressure
+pH
+Level
+Shock
+LCD Display
