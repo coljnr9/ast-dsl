@@ -182,6 +182,9 @@ def _build_coverage_diagnostics(report: MatchReport) -> tuple[Diagnostic, ...]:
     preservation_count = sum(
         1 for m in report.matches if m.kind == MatchKind.PRESERVATION
     )
+    global_count = sum(
+        1 for m in report.matches if m.kind == MatchKind.GLOBAL
+    )
 
     if total > 0:
         diagnostics.append(
@@ -193,6 +196,7 @@ def _build_coverage_diagnostics(report: MatchReport) -> tuple[Diagnostic, ...]:
                     f"Cell coverage: {covered}/{total} "
                     f"({covered/total:.0%})"
                     f"{f', {preservation_count} preservation axioms' if preservation_count else ''}"
+                    f"{f', {global_count} global axioms' if global_count else ''}"
                 ),
                 path=None,
             )

@@ -64,6 +64,7 @@ class MatchKind(Enum):
     INFRASTRUCTURE = "infrastructure"  # NEW: axioms on non-generated sorts (e.g., geq over Nat)
     DISTINCTNESS = "distinctness"      # NEW: no-confusion axioms (e.g., red ≠ yellow)
     DEFINITION = "definition"          # NEW: derived observer definitions (e.g., is_red ↔ eq_color(get_color(l), red))
+    GLOBAL = "global"  # one axiom → all cells for an observer via ∀ over generated sort
     UNMATCHED = "unmatched"         # could not determine cell
 
 
@@ -135,6 +136,16 @@ async def match_spec(
         elif m.kind == MatchKind.PRESERVATION:
             logger.debug(
                 "PRESERVATION axiom %r covers %d cells: %s",
+                axiom.label,
+                len(m.cells),
+                [
+                    (c.observer_name, c.constructor_name, c.dispatch.value)
+                    for c in m.cells
+                ],
+            )
+        elif m.kind == MatchKind.GLOBAL:
+            logger.debug(
+                "GLOBAL axiom %r covers %d cells: %s",
                 axiom.label,
                 len(m.cells),
                 [
@@ -239,6 +250,28 @@ async def _match_axiom(
     # 7. Find observer(constructor(...)) in the conclusion
     obs_ctor = _find_obs_ctor(conclusion, table.fn_roles, table.pred_roles)
     if obs_ctor is None:
+        # 7a. Check for GLOBAL axiom: unconditional observer on a variable of
+        # a generated sort. Under the generation constraint (no-junk), ∀d:S. φ(obs(d))
+        # entails φ(obs(c(...))) for every constructor c of S.
+        if not guards:
+            gen_sort_names = frozenset(sig.generated_sorts.keys())
+            obs_info = _extract_observer_on_generated_var(
+                conclusion, table.fn_roles, table.pred_roles, gen_sort_names
+            )
+            if obs_info is not None:
+                obs_name, _is_pred = obs_info
+                all_cells = [c for c in table.cells if c.observer_name == obs_name]
+                if all_cells:
+                    logger.debug(
+                        "Axiom %r classified as GLOBAL — covers %d cells for observer %r",
+                        axiom.label,
+                        len(all_cells),
+                        obs_name,
+                    )
+                    return AxiomCellMatch(
+                        axiom.label, tuple(all_cells), MatchKind.GLOBAL
+                    )
+
         # Check if this is a definition (observer on variable, no constructor root)
         # Catches both implication-form definitions (guard → obs(var) = val)
         # and bare definitions (obs(var) = val) that _is_definition_axiom missed
@@ -613,6 +646,65 @@ def _has_observer_on_variable(
 
         case _:
             return False
+
+
+def _extract_observer_on_generated_var(
+    f: Formula,
+    fn_roles: dict[str, FnRole],
+    pred_roles: dict[str, PredRole],
+    generated_sort_names: frozenset[str],
+) -> tuple[str, bool] | None:
+    """Extract (observer_name, is_predicate) if the formula contains an observer
+    applied to a Var whose sort is a generated sort.
+
+    Recurses through Negation, Equation, Biconditional, Definedness to find the
+    observer reference. Returns None if no such pattern exists.
+    """
+    match f:
+        case PredApp(pred_name, args) if args:
+            role = pred_roles.get(pred_name)
+            if role is not None and role.kind == PredKind.OBSERVER:
+                first_arg = args[0]
+                if isinstance(first_arg, Var) and first_arg.sort in generated_sort_names:
+                    return (pred_name, True)
+            return None
+
+        case Equation(lhs, rhs):
+            for side in (lhs, rhs):
+                if isinstance(side, FnApp) and side.args:
+                    role = fn_roles.get(side.fn_name)
+                    if role is not None and role.kind in (FnKind.OBSERVER, FnKind.SELECTOR):
+                        first_arg = side.args[0]
+                        if isinstance(first_arg, Var) and first_arg.sort in generated_sort_names:
+                            return (side.fn_name, False)
+            return None
+
+        case Negation(inner):
+            return _extract_observer_on_generated_var(
+                inner, fn_roles, pred_roles, generated_sort_names
+            )
+
+        case Biconditional(lhs, rhs):
+            result = _extract_observer_on_generated_var(
+                lhs, fn_roles, pred_roles, generated_sort_names
+            )
+            if result is not None:
+                return result
+            return _extract_observer_on_generated_var(
+                rhs, fn_roles, pred_roles, generated_sort_names
+            )
+
+        case Definedness(term):
+            if isinstance(term, FnApp) and term.args:
+                role = fn_roles.get(term.fn_name)
+                if role is not None and role.kind in (FnKind.OBSERVER, FnKind.SELECTOR):
+                    first_arg = term.args[0]
+                    if isinstance(first_arg, Var) and first_arg.sort in generated_sort_names:
+                        return (term.fn_name, False)
+            return None
+
+        case _:
+            return None
 
 
 # ---------------------------------------------------------------------------
