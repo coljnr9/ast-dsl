@@ -325,6 +325,7 @@ class WorkedExample:
     design_decisions: tuple[DesignDecision, ...]
 
     code: str
+    analysis_text: str = ""   # Free-form reasoning monologue
 
     def render(
         self,
@@ -348,6 +349,12 @@ class WorkedExample:
         parts.append(f"_{self.summary}_\n")
 
         if mode in (RenderMode.FULL, RenderMode.ANALYSIS, RenderMode.SIGNATURE, RenderMode.SPEC):
+            if self.analysis_text:
+                parts.append("")
+                parts.append("**Analysis**")
+                parts.append("")
+                parts.append(self.analysis_text)
+                parts.append("")
             parts.append(self._render_analysis(include_table=include_table))
 
         if mode == RenderMode.SIGNATURE:

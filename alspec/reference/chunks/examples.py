@@ -244,3 +244,39 @@ def _example_rate_limiter_spec() -> str:
 )
 def _example_dns_zone_spec() -> str:
     return ALL_EXAMPLES["dns-zone"].render(RenderMode.SPEC)
+
+
+@register(
+    id=ChunkId.EXAMPLE_CONNECTION,
+    stages=SIG_AX,
+    concepts=frozenset({
+        Concept.OBLIGATION_TABLE,
+        Concept.PRESERVATION,
+        Concept.STANDARD_PATTERNS,
+        Concept.COMPLETENESS,
+        Concept.SELECTORS,
+        Concept.SELECTOR_EXTRACT,
+        Concept.GENERATED_SORTS,
+    }),
+    depends_on=(ChunkId.OBLIGATION_PATTERN,),
+)
+def _example_connection() -> str:
+    return ALL_EXAMPLES["connection"].render(RenderMode.SIGNATURE)
+
+
+@register(
+    id=ChunkId.EXAMPLE_CONNECTION_SPEC,
+    stages=AX,
+    concepts=frozenset({
+        Concept.OBLIGATION_TABLE,
+        Concept.PRESERVATION,
+        Concept.STANDARD_PATTERNS,
+        Concept.COMPLETENESS,
+        Concept.SELECTORS,
+        Concept.SELECTOR_EXTRACT,
+        Concept.GENERATED_SORTS,
+    }),
+    depends_on=(ChunkId.OBLIGATION_PATTERN,),
+)
+def _example_connection_spec() -> str:
+    return ALL_EXAMPLES["connection"].render(RenderMode.SPEC)

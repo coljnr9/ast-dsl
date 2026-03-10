@@ -109,10 +109,12 @@ class ChunkId(Enum):
     EXAMPLE_SESSION_STORE = auto()
     EXAMPLE_RATE_LIMITER = auto()
     EXAMPLE_DNS_ZONE = auto()
+    EXAMPLE_CONNECTION = auto()
     # Stage 2 variants — same examples, rendered with RenderMode.SPEC (analysis + full axiom code)
     EXAMPLE_SESSION_STORE_SPEC = auto()
     EXAMPLE_RATE_LIMITER_SPEC = auto()
     EXAMPLE_DNS_ZONE_SPEC = auto()
+    EXAMPLE_CONNECTION_SPEC = auto()
 
     # Stage-specific methodology (output format + analysis steps)
     SIGNATURE_METHODOLOGY = auto()
