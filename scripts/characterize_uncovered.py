@@ -294,6 +294,7 @@ class TrialResult:
     covered_cells: int
     total_cells: int
     error: str
+    spec_code: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -369,6 +370,7 @@ async def _run_trial(
                 covered_cells=0,
                 total_cells=0,
                 error=f"LLM error: {exc}",
+                spec_code=None,
             )
         case Ok((_, code, _)):
             pass
@@ -391,6 +393,7 @@ async def _run_trial(
             covered_cells=0,
             total_cells=0,
             error=f"Exec failed: {e}",
+            spec_code=code,
         )
 
     spec = namespace.get("spec")
@@ -405,6 +408,7 @@ async def _run_trial(
             covered_cells=0,
             total_cells=0,
             error=f"No `spec` variable of type Spec (got {got})",
+            spec_code=code,
         )
 
     # 2. Merge mechanical axioms (Stage 3.5)
@@ -447,6 +451,7 @@ async def _run_trial(
             covered_cells=0,
             total_cells=0,
             error=f"Scoring/matching failed: {e}",
+            spec_code=code,
         )
 
     # 5. Coverage metrics
@@ -484,6 +489,7 @@ async def _run_trial(
         covered_cells=covered_cells,
         total_cells=total_cells,
         error="",
+        spec_code=code,
     )
 
 
@@ -519,6 +525,12 @@ async def main() -> None:
         type=str,
         default=str(OUTPUT_DIR),
         help=f"Output directory (default: {OUTPUT_DIR})",
+    )
+    parser.add_argument(
+        "--save-specs",
+        action="store_true",
+        default=False,
+        help="Save generated spec code to {output-dir}/specs/{domain}-rep{N}.py",
     )
 
     cache_group = parser.add_mutually_exclusive_group()
@@ -722,8 +734,15 @@ async def main() -> None:
                     "covered_cells": trial_result.covered_cells,
                     "total_cells": trial_result.total_cells,
                     "error": trial_result.error,
+                    "code": trial_result.spec_code or "",
                 }
             )
+
+            if args.save_specs and trial_result.spec_code:
+                specs_dir = output_dir / "specs"
+                specs_dir.mkdir(parents=True, exist_ok=True)
+                spec_path = specs_dir / f"{domain}-rep{replicate}.py"
+                spec_path.write_text(trial_result.spec_code)
 
             uncovered_count = trial_result.total_cells - trial_result.covered_cells
             cov_str = (
