@@ -334,7 +334,7 @@ async def _run_trial(
         {"role": "user", "content": user_prompt},
     ]
 
-    trace_name = f"characterize/trial/{domain}"
+    trace_name = f"characterize/trial/{domain}/rep{replicate}"
     with langfuse.start_as_current_observation(
         as_type="span",
         name=trace_name,
@@ -726,12 +726,17 @@ async def main() -> None:
             )
 
             uncovered_count = trial_result.total_cells - trial_result.covered_cells
+            cov_str = (
+                "N/A"
+                if trial_result.coverage_ratio is None
+                else f"{trial_result.coverage_ratio:.2f}"
+            )
             logger.info(
-                "domain=%-22s rep=%2d  parse=%-5s  coverage=%.2f  uncovered=%d  [%d/%d]",
+                "domain=%-22s rep=%2d  parse=%-5s  coverage=%-6s  uncovered=%d  [%d/%d]",
                 domain,
                 replicate,
                 trial_result.parse_success,
-                trial_result.coverage_ratio,
+                cov_str,
                 uncovered_count,
                 completed,
                 total_trials,
@@ -782,7 +787,11 @@ async def main() -> None:
 
     # Summary
     parse_ok = sum(1 for r in score_records if r["parse_success"])
-    covs = [r["coverage_ratio"] for r in score_records if r["parse_success"] and r["coverage_ratio"] is not None]
+    covs = [
+        r["coverage_ratio"]
+        for r in score_records
+        if r["parse_success"] and r["coverage_ratio"] is not None
+    ]
     if covs:
         mean_cov = sum(covs) / len(covs)
     else:
