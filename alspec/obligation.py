@@ -373,14 +373,29 @@ def build_obligation_table(sig: Signature) -> ObligationTable:
                 "A sort with only recursive constructors cannot be initialised."
             )
 
-        # Warn about functions that look like constructors but aren't listed
+        # Check C: Generation constraint — non-constructor functions returning
+        # a generated sort must be "homed" as observers/selectors of some other
+        # generated sort. Constants and uninterpreted functions returning G have
+        # no obligation table home and indicate a signature defect (missing
+        # constructor or definitional abbreviation without an axiom).
+        # Theoretical basis: CASL RM §6.2, generation constraint.
         for name, f in sig.functions.items():
-            if f.result == gen_sort and not (f.params and f.params[0].sort == gen_sort):
-                if name not in info.constructors:
-                    print(
-                        f"Warning: Function '{name}' returns generated sort '{gen_sort}' "
-                        "but is not listed as a constructor in generated_sorts."
-                    )
+            if f.result == gen_sort and name not in info.constructors:
+                role = fn_roles.get(name)
+                if role is None:
+                    continue  # defensive — should not happen
+                if role.kind in (FnKind.OBSERVER, FnKind.SELECTOR, FnKind.CONSTRUCTOR):
+                    # Homed in another sort's obligation table, or is a
+                    # constructor of another sort. Generation constraint on G
+                    # guarantees the range is well-covered.
+                    continue
+                raise ObligationTableError(
+                    f"Function '{name}' returns generated sort '{gen_sort}' "
+                    f"but is not a constructor of '{gen_sort}' and has no "
+                    f"obligation table home (classified as {role.kind.value}). "
+                    f"Either add '{name}' to generated_sorts['{gen_sort}'].constructors "
+                    f"or ensure it is an observer of another generated sort."
+                )
 
     cells: list[ObligationCell] = []
 

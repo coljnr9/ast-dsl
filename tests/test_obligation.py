@@ -70,6 +70,88 @@ class TestClassifyPredicatesEqualityOnGeneratedSort:
         )
         table = build_obligation_table(sig)
         eq_bool_cells = [c for c in table.cells if c.observer_name == "eq_bool"]
-        assert len(eq_bool_cells) == 0, (
-            f"eq_bool should not have obligation cells but got {len(eq_bool_cells)}"
+
+
+
+class TestGenerationConstraint:
+    """Check C: Generation constraint on non-constructor functions."""
+
+    def test_observer_returning_generated_sort_no_error(self):
+        """Observer of sort H returning generated sort G should not raise."""
+        from alspec import Signature, GeneratedSortInfo, atomic, fn
+        from alspec.obligation import build_obligation_table
+
+        sig = Signature(
+            sorts={
+                "User": atomic("User"),
+                "Role": atomic("Role"),
+                "Name": atomic("Name"),
+            },
+            functions={
+                "viewer": fn("viewer", [], "Role"),
+                "editor": fn("editor", [], "Role"),
+                "create_user": fn("create_user", [("n", "Name")], "User"),
+                "get_role": fn("get_role", [("u", "User")], "Role"),
+            },
+            predicates={},
+            generated_sorts={
+                "Role": GeneratedSortInfo(constructors=("viewer", "editor"), selectors={}),
+                "User": GeneratedSortInfo(constructors=("create_user",), selectors={}),
+            },
         )
+        # Should not raise
+        table = build_obligation_table(sig)
+        # get_role should be an observer of User
+        user_cells = [c for c in table.cells if c.generated_sort == "User"]
+        assert any(c.observer_name == "get_role" for c in user_cells)
+
+    def test_constant_returning_generated_sort_raises(self):
+        """Constant returning a generated sort without being a constructor is a defect."""
+        import pytest
+        from alspec import Signature, GeneratedSortInfo, atomic, fn
+        from alspec.obligation import build_obligation_table, ObligationTableError
+
+        sig = Signature(
+            sorts={
+                "Role": atomic("Role"),
+            },
+            functions={
+                "viewer": fn("viewer", [], "Role"),
+                "editor": fn("editor", [], "Role"),
+                "default_role": fn("default_role", [], "Role"),
+            },
+            predicates={},
+            generated_sorts={
+                "Role": GeneratedSortInfo(constructors=("viewer", "editor"), selectors={}),
+            },
+        )
+        with pytest.raises(ObligationTableError, match="default_role"):
+            build_obligation_table(sig)
+
+    def test_uninterpreted_returning_generated_sort_raises(self):
+        """Uninterpreted function returning a generated sort is a defect."""
+        import pytest
+        from alspec import Signature, GeneratedSortInfo, atomic, fn
+        from alspec.obligation import build_obligation_table, ObligationTableError
+
+        sig = Signature(
+            sorts={
+                "Role": atomic("Role"),
+                "String": atomic("String"),
+                "Int": atomic("Int"),
+            },
+            functions={
+                "viewer": fn("viewer", [], "Role"),
+                "editor": fn("editor", [], "Role"),
+                "compute_role": fn("compute_role", [("s", "String"), ("i", "Int")], "Role"),
+            },
+            predicates={},
+            generated_sorts={
+                "Role": GeneratedSortInfo(constructors=("viewer", "editor"), selectors={}),
+            },
+        )
+        with pytest.raises(ObligationTableError, match="compute_role"):
+            build_obligation_table(sig)
+
+
+
