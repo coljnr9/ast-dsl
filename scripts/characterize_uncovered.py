@@ -74,7 +74,11 @@ ALL_DOMAINS = [
 # Imports after path setup
 # ---------------------------------------------------------------------------
 
-from alspec.axiom_gen import generate_mechanical_axioms  # noqa: E402
+from alspec.axiom_gen import (  # noqa: E402
+    MechanicalAxiomReport,
+    generate_mechanical_axioms,
+)
+from alspec.skeleton import generate_skeleton, splice_fills
 from alspec.axiom_match import CoverageStatus, match_spec  # noqa: E402
 from alspec.cache import (  # noqa: E402
     DomainSnapshot,
@@ -321,12 +325,20 @@ async def _run_trial(
     """
     desc = _get_domain_description(domain)
 
+    # Generate skeleton for this trial
+    skeleton = generate_skeleton(
+        sig=upstream.signature,
+        signature_code=upstream.signature_code,
+        table=upstream.obligation_table,
+        mechanical_report=upstream.mech_report,
+        spec_name=upstream.spec_name,
+    )
+
     user_prompt = _build_axioms_user_prompt(
         domain_description=desc,
         spec_name=upstream.spec_name,
-        signature_code=upstream.signature_code,
+        skeleton=skeleton,
         signature_analysis=upstream.signature_analysis,
-        obligation_prompt_md=upstream.obligation_prompt_md,
         domain_analysis=upstream.analysis_text,
     )
 
@@ -355,8 +367,8 @@ async def _run_trial(
                 f"cache:{cache_id}",
             ],
         ):
-            result = await client.generate_with_tool_call(
-                messages, model=MODEL, tool_name="submit_spec"
+            result = await client.generate_with_fills_tool(
+                messages, model=MODEL, name=f"characterize/{domain}/rep{replicate}"
             )
 
     match result:
@@ -372,8 +384,8 @@ async def _run_trial(
                 error=f"LLM error: {exc}",
                 spec_code=None,
             )
-        case Ok((_, code, _)):
-            pass
+        case Ok((_, fills, _)):
+            code = splice_fills(skeleton, fills)
 
     # ---- Inline scoring (Option B) ----
 
