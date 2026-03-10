@@ -96,14 +96,20 @@ Cell coverage rules:
 
 ### Output Format
 
-Write Python code that constructs a complete `Spec` at the top level (no function wrapper).
-Include all necessary imports at the top. Reuse the exact signature from the user prompt.
+Return your axioms as formula fills using the `submit_axiom_fills` tool. Each fill has:
+- `label`: A snake_case axiom label (e.g., `get_cv_step_reset`)
+- `formula`: A complete Python DSL expression using the helper functions from the skeleton's import block
 
-Your code should assign:
-- `sig = Signature(...)` — copy the signature exactly as given in the user prompt
-- Variables using `var(...)`
-- `axioms = (...)` — tuple of all Axiom objects
-- At the end: `spec = Spec(name="<name>", signature=sig, axioms=axioms)` using the spec name from the user prompt
+The skeleton (imports, signature, variables, mechanical axioms) is provided in the user prompt.
+Your fills will be spliced into it -- you do NOT need to write imports, the signature, variable
+declarations, or the Spec wrapper.
 
-Do NOT wrap the code in a function definition.
-Call the `submit_spec` tool with your analysis and code. Do NOT wrap code in markdown fences."""
+Multiple fills may target the same obligation cell. For example, `get_cv x step` in a priority-chain
+domain might need 5 fills: one per priority level (reset, load, count-up, count-down, preserve),
+each with appropriate guards.
+
+Use the exact variable names from the skeleton's Variables section.
+Use the exact helper functions shown in the skeleton's Imports section.
+Do NOT use raw constructors like `FnApp(...)` -- always use the helpers (`app(...)`, `eq(...)`, etc.).
+
+Call `submit_axiom_fills` with your analysis and fills array. Do NOT return code."""

@@ -22,6 +22,7 @@ from .axiom_gen import generate_mechanical_axioms
 from .obligation import build_obligation_table, ObligationTable
 from .obligation_render import render_obligation_prompt
 from .prompt import render
+from .skeleton import generate_skeleton, splice_fills
 from .prompt_chunks import ChunkId, Stage, assemble_prompt, build_default_prompt
 from .result import Err, Ok, Result
 from .score import SpecScore, score_spec
@@ -111,20 +112,24 @@ def _build_signature_user_prompt(
 def _build_axioms_user_prompt(
     domain_description: str,
     spec_name: str,
-    signature_code: str,
+    skeleton: "SkeletonData",
     signature_analysis: str,
-    obligation_prompt_md: str,
     domain_analysis: str | None = None,
 ) -> str:
-    """Build Stage 4 user prompt: generate axioms from signature + obligation table."""
+    """Build Stage 4 user prompt with skeleton context for fill-based generation."""
     return render(
-        "generate_axioms.md.j2",
+        "generate_axiom_fills.md.j2",
         domain_description=domain_description,
         domain_analysis=domain_analysis,
         spec_name=spec_name,
-        signature_code=signature_code,
+        skeleton_imports=skeleton.imports,
+        skeleton_signature_code=skeleton.signature_code,
+        skeleton_var_declarations=skeleton.var_declarations,
+        mechanical_axioms="\n".join(
+            f"    {line}," for line in skeleton.mechanical_axiom_lines
+        ),
+        remaining_cells=skeleton.remaining_cells_description,
         signature_analysis=signature_analysis,
-        obligation_prompt_md=obligation_prompt_md,
     )
 
 
@@ -517,14 +522,21 @@ async def run_pipeline(
             signature_analysis=analysis2,
         )
 
-    # ---- Stage 4: Axiom generation ----
+    # ---- Stage 4: Axiom generation (Sketch-Guided) ----
     spec_name = domain_id.replace("-", " ").title().replace(" ", "")
+    skeleton = generate_skeleton(
+        sig=sig,
+        signature_code=code2,
+        table=table,
+        mechanical_report=mech_report,
+        spec_name=spec_name,
+    )
+
     stage4_user = _build_axioms_user_prompt(
         domain_description=domain_description,
         spec_name=spec_name,
-        signature_code=code2,
+        skeleton=skeleton,
         signature_analysis=analysis2,
-        obligation_prompt_md=table_md,
         domain_analysis=domain_analysis,
     )
     system4 = _build_axioms_system_prompt()
@@ -533,10 +545,9 @@ async def run_pipeline(
         {"role": "user", "content": stage4_user},
     ]
 
-    result4 = await client.generate_with_tool_call(
+    result4 = await client.generate_with_fills_tool(
         stage4_messages,
         model=model,
-        tool_name="submit_spec",
         name=f"Stage 4 (Axioms) - {domain_id}"
     )
 
@@ -554,8 +565,9 @@ async def run_pipeline(
                 obligation_table=table,
                 obligation_table_rendered=table_md,
             )
-        case Ok((analysis4, code4, usage4)):
+        case Ok((analysis4, fills4, usage4)):
             stage_usages.append(StageUsage("axioms", usage4))
+            code4 = splice_fills(skeleton, fills4)
 
     # ---- Validation ----
     spec_or_err = _execute_spec_code(code4)
@@ -578,10 +590,7 @@ async def run_pipeline(
         case Spec() as spec:
             # Merge mechanical axioms (belt-and-suspenders: LLM was told not to repeat
             # these, but we merge anyway to guarantee coverage)
-            mech_labels = {a.label for a in mech_report.axioms}
-            combined_axioms = list(mech_report.axioms) + [
-                a for a in spec.axioms if a.label not in mech_labels
-            ]
+            combined_axioms = list(spec.axioms)
             spec = Spec(
                 name=spec.name,
                 signature=sig,  # Use the validated signature

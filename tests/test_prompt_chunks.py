@@ -200,7 +200,7 @@ class TestStageMethodologyChunks:
         from alspec.prompt_chunks import Stage, build_default_prompt
         prompt = build_default_prompt(Stage.AXIOMS)
         assert "MISS cells" in prompt
-        assert "submit_spec" in prompt
+        assert "submit_axiom_fills" in prompt
 
     def test_signature_methodology_stage_restriction(self):
         from alspec.prompt_chunks import get_chunk, ChunkId, Stage
@@ -312,12 +312,20 @@ class TestDomainAnalysisInPrompts:
     def test_axioms_user_prompt_excludes_domain_analysis(self):
         """Stage 4 template intentionally drops domain_analysis; confirm it is never rendered."""
         from alspec.pipeline import _build_axioms_user_prompt
+        from alspec.skeleton import SkeletonData
+        skeleton = SkeletonData(
+            imports="...",
+            signature_code="sig = Signature(...)",
+            var_declarations="...",
+            mechanical_axiom_lines=(),
+            remaining_cells_description="| obs | ctor |",
+            spec_name="Counter"
+        )
         prompt = _build_axioms_user_prompt(
             domain_description="A simple counter",
             spec_name="Counter",
-            signature_code="sig = Signature(...)",
+            skeleton=skeleton,
             signature_analysis="Step 1: ...",
-            obligation_prompt_md="| obs | ctor |",
             domain_analysis="ENTITIES: Counter with value...",
         )
         # Even when domain_analysis is supplied, Stage 4 template must NOT render it
@@ -326,12 +334,20 @@ class TestDomainAnalysisInPrompts:
 
     def test_axioms_user_prompt_omits_analysis_when_none(self):
         from alspec.pipeline import _build_axioms_user_prompt
+        from alspec.skeleton import SkeletonData
+        skeleton = SkeletonData(
+            imports="...",
+            signature_code="sig = Signature(...)",
+            var_declarations="...",
+            mechanical_axiom_lines=(),
+            remaining_cells_description="| obs | ctor |",
+            spec_name="Counter"
+        )
         prompt = _build_axioms_user_prompt(
             domain_description="A simple counter",
             spec_name="Counter",
-            signature_code="sig = Signature(...)",
+            skeleton=skeleton,
             signature_analysis="Step 1: ...",
-            obligation_prompt_md="| obs | ctor |",
         )
         assert "Domain Analysis" not in prompt
 
@@ -347,14 +363,23 @@ class TestDomainAnalysisInPrompts:
     def test_axioms_user_prompt_has_no_methodology(self):
         """Verify generic methodology was moved to system prompt."""
         from alspec.pipeline import _build_axioms_user_prompt
+        from alspec.skeleton import SkeletonData
+        skeleton = SkeletonData(
+            imports="...",
+            signature_code="sig = Signature(...)",
+            var_declarations="...",
+            mechanical_axiom_lines=(),
+            remaining_cells_description="| obs | ctor |",
+            spec_name="BankAccount"
+        )
         prompt = _build_axioms_user_prompt(
             domain_description="A bank account system",
             spec_name="BankAccount",
-            signature_code="sig = Signature(...)",
+            skeleton=skeleton,
             signature_analysis="Step 1: ...",
-            obligation_prompt_md="| obs | ctor |",
         )
         # These should NOT be in the user prompt anymore
         assert "Axiom writing rules" not in prompt
         assert "submit_spec" not in prompt
+        assert "submit_axiom_fills" not in prompt
         assert "MISS cells" not in prompt

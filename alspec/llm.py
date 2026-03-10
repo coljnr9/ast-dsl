@@ -160,10 +160,72 @@ SUBMIT_ANALYSIS_TOOL: dict[str, object] = {
     },
 }
 
+SUBMIT_AXIOM_FILLS_TOOL: dict[str, object] = {
+    "type": "function",
+    "function": {
+        "name": "submit_axiom_fills",
+        "description": (
+            "Submit formula fills for the remaining obligation table cells. "
+            "Each fill is a Python DSL expression that becomes the formula "
+            "argument to Axiom(label, formula). Multiple fills may target "
+            "the same obligation cell (e.g., a priority chain with multiple "
+            "guarded implications for a single observer x constructor pair)."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "analysis": {
+                    "type": "string",
+                    "description": (
+                        "Your axiom design reasoning: for each obligation "
+                        "cell, note which pattern applies, identify guard "
+                        "polarity decisions, and verify completeness against "
+                        "the provided obligation table. "
+                        "Do NOT re-derive the signature or obligation table."
+                    ),
+                },
+                "fills": {
+                    "type": "array",
+                    "description": (
+                        "One entry per axiom. Multiple entries may target the "
+                        "same obligation cell (e.g., 5 entries for get_cv x step "
+                        "covering reset/load/count-up/count-down/preserve). "
+                        "Use the variable names declared in the skeleton."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {
+                                "type": "string",
+                                "description": (
+                                    "Axiom label, e.g. 'get_cv_step_reset'. "
+                                    "Use snake_case: observer_constructor_variant."
+                                ),
+                            },
+                            "formula": {
+                                "type": "string",
+                                "description": (
+                                    "Complete Python DSL expression for the axiom formula. "
+                                    "This becomes the second argument to Axiom(label, formula). "
+                                    "Use the exact helper functions from the import block. "
+                                    "Example: forall([s, cu], eq(app(\"get_cv\", app(\"init\")), const(\"zero\")))"
+                                ),
+                            },
+                        },
+                        "required": ["label", "formula"],
+                    },
+                },
+            },
+            "required": ["analysis", "fills"],
+        },
+    },
+}
+
 _TOOL_REGISTRY: dict[str, dict[str, object]] = {
     "submit_spec": SUBMIT_SPEC_TOOL,
     "submit_signature": SUBMIT_SIGNATURE_TOOL,
     "submit_analysis": SUBMIT_ANALYSIS_TOOL,
+    "submit_axiom_fills": SUBMIT_AXIOM_FILLS_TOOL,
 }
 
 
@@ -365,6 +427,94 @@ class AsyncLLMClient:
             case _:
                 return Err(
                     RuntimeError("submit_analysis arguments missing 'analysis' field")
+                )
+    async def generate_with_fills_tool(
+        self,
+        messages: list[dict[str, str]],
+        model: str = "meta-llama/llama-3.1-8b-instruct",
+        name: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Result[tuple[str, list[dict[str, str]], UsageInfo | None], Exception]:
+        """Call the model with submit_axiom_fills and return (analysis, fills, usage).
+
+        fills is a list of dicts, each with 'label' and 'formula' string keys.
+        """
+        try:
+            messages = self._prepare_messages(messages)
+            tool_schema = _TOOL_REGISTRY["submit_axiom_fills"]
+            if model in _TOOL_CHOICE_AUTO_MODELS:
+                tool_choice: str | dict[str, object] = "auto"
+            else:
+                tool_choice: str | dict[str, object] = {
+                    "type": "function",
+                    "function": {"name": "submit_axiom_fills"},
+                }
+            extra_body: dict[str, object] = {}
+            match self._session_id:
+                case str(sid):
+                    extra_body["langfuse_session_id"] = sid
+                case _:
+                    pass
+
+            with propagate_attributes(session_id=self._session_id, metadata=metadata):
+                kwargs: dict[str, Any] = {
+                    "model": model,
+                    "messages": messages,
+                    "tools": [tool_schema],
+                    "tool_choice": tool_choice,
+                    "extra_body": extra_body,
+                }
+                match name:
+                    case str(n):
+                        kwargs["name"] = n
+                    case _:
+                        pass
+
+                response = await self._client.chat.completions.create(**kwargs)  # type: ignore[call-overload]
+
+            match response.choices:
+                case []:
+                    return Err(RuntimeError("Model returned no choices."))
+                case [choice, *_]:
+                    pass
+                case _:
+                    return Err(RuntimeError("Unexpected response format from model."))
+
+        except Exception as e:
+            return Err(e)
+
+        usage = _extract_usage(response)
+
+        tool_calls = choice.message.tool_calls
+        match tool_calls:
+            case None | []:
+                return Err(RuntimeError("Model did not use submit_axiom_fills tool"))
+            case [call, *_]:
+                pass
+
+        try:
+            args: dict[str, object] = json.loads(call.function.arguments)
+        except Exception as e:
+            return Err(RuntimeError(f"Failed to parse tool call arguments: {e}"))
+
+        analysis = args.get("analysis")
+        fills = args.get("fills")
+
+        match (analysis, fills):
+            case (str(a), list(f)):
+                # Validate fills structure
+                validated_fills = []
+                for entry in f:
+                    if not isinstance(entry, dict) or "label" not in entry or "formula" not in entry:
+                         return Err(RuntimeError(f"Malformed fill entry: {entry}"))
+                    validated_fills.append({
+                        "label": str(entry["label"]),
+                        "formula": str(entry["formula"])
+                    })
+                return Ok((a, validated_fills, usage))
+            case _:
+                return Err(
+                    RuntimeError("submit_axiom_fills arguments missing 'analysis' or 'fills' fields")
                 )
 
     async def generate_text(
