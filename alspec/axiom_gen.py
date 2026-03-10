@@ -3,13 +3,21 @@
 Generates axioms for obligation cells whose content is fully determined
 by the signature structure, requiring no domain knowledge.
 
-Covers two cell tiers:
+Covers two mechanical patterns:
   - SELECTOR_EXTRACT: sel(ctor(x₁,...,xₙ)) = xᵢ
-  - KEY_DISPATCH MISS: ¬eq(k,k2) → obs(ctor(s,k,...),k2,...) = obs(s,k2,...)
+  - Any MISS dispatch: ¬eq(k,k2) → obs(ctor(s,k,...),k2,...) = obs(s,k2,...)
+
+The MISS pattern applies regardless of cell tier. Tier classifies the
+observer↔constructor relationship (selector, domain, etc.); dispatch
+classifies key guard structure (PLAIN, HIT, MISS). These are independent
+axes. The MISS delegation axiom — the locality/frame axiom from the
+McCarthy store schema (1962) — is a structural consequence of the key
+dispatch decomposition, not of the obs↔ctor relationship.
 
 Formal basis: CASL Reference Manual §2.3.4 (selector axioms from free type
-declarations) and the standard store/map frame axiom pattern (MISS delegation
-with provably different keys).
+declarations), §5.2.2 (conditional axioms), and the McCarthy store axiom
+(select/store with equality). See also CASL standard library Map spec
+and Sannella & Tarlecki (2012) §2.4.
 
 PRESERVATION is NOT generated mechanically. The absence of a shared key sort
 does not imply non-interference — the constructor may affect all keys through
@@ -348,17 +356,21 @@ _MECHANICAL_TIERS: frozenset[CellTier] = frozenset(
     }
 )
 
-_MECHANICAL_DISPATCHES: frozenset[tuple[CellTier, CellDispatch]] = frozenset(
+# Any MISS dispatch cell is mechanical — the locality/frame axiom applies
+# regardless of tier. This replaces the old (CellTier.KEY_DISPATCH, MISS)
+# pair because tier and dispatch are independent classification axes.
+_MECHANICAL_DISPATCHES: frozenset[CellDispatch] = frozenset(
     {
-        (CellTier.KEY_DISPATCH, CellDispatch.MISS),
+        CellDispatch.MISS,
     }
 )
 
 # PRESERVATION is NOT mechanical. The absence of a shared key sort between
 # observer and constructor does not imply the observation is preserved —
 # the constructor may affect all keys through domain logic (e.g., clear_faults
-# in thermocouple, cycle with fault latching). Only KEY_DISPATCH MISS has
-# a genuine frame-axiom justification (provably different keys via ¬eq_K).
+# in thermocouple, cycle with fault latching). The MISS locality axiom has
+# a genuine frame-axiom justification (provably different keys via ¬eq_K),
+# but PRESERVATION lacks the eq_K guard and is therefore domain reasoning.
 # PRESERVATION remains as an informational tier hint for the LLM prompt,
 # but axiom_gen does not generate axioms for it.
 _MECHANICAL_PRESERVATION: frozenset[CellTier] = frozenset()
@@ -428,13 +440,21 @@ def _select_generator(
     """Determine which generator (if any) handles a cell.
 
     Returns the generator function or None if the cell is not mechanical.
+
+    Two mechanical patterns:
+      1. SELECTOR_EXTRACT — tier-based, always PLAIN dispatch.
+      2. Any MISS dispatch — dispatch-based, regardless of tier.
+         The MISS delegation (locality/frame axiom) is a structural
+         consequence of the key dispatch decomposition, independent
+         of the obs↔ctor tier classification.
     """
     # SELECTOR_EXTRACT: any dispatch (always PLAIN for selectors)
     if cell.tier == CellTier.SELECTOR_EXTRACT:
         return _generate_selector_extract  # type: ignore[return-value]
 
-    # KEY_DISPATCH MISS only
-    if cell.tier == CellTier.KEY_DISPATCH and cell.dispatch == CellDispatch.MISS:
+    # MISS dispatch: locality/frame axiom — tier-independent.
+    # The McCarthy store axiom's negative branch: ¬eq(k,k2) → delegate.
+    if cell.dispatch == CellDispatch.MISS:
         return _generate_miss  # type: ignore[return-value]
 
     return None  # type: ignore[return-value]

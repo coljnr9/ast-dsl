@@ -16,13 +16,17 @@ from alspec.axiom_gen import (
 )
 from alspec.axiom_match import CoverageStatus, match_spec_sync
 from alspec.check import check_spec
-from alspec.helpers import app, eq, forall, iff, implication, negation, pred_app, var
+from alspec.helpers import app, atomic, eq, forall, iff, implication, negation, param, pred_app, var
 from alspec.obligation import (
     CellDispatch,
     CellTier,
     build_obligation_table,
 )
 from alspec.spec import Axiom, Spec
+from alspec.signature import (
+    Signature, FnSymbol, PredSymbol, GeneratedSortInfo, Totality,
+)
+from alspec.terms import UniversalQuant, Implication, Negation
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -302,6 +306,184 @@ class TestMiss:
         assert ax.formula == expected
 
 
+def test_selector_foreign_miss_generates_mechanical():
+    """SELECTOR_FOREIGN + MISS should generate the locality/frame axiom."""
+    sig = Signature(
+        sorts={
+            "TodoList": atomic("TodoList"),
+            "ItemId": atomic("ItemId"),
+            "Title": atomic("Title"),
+        },
+        functions={
+            "empty": FnSymbol("empty", params=(), result="TodoList"),
+            "add_item": FnSymbol(
+                "add_item",
+                params=(param("l", "TodoList"), param("k", "ItemId"), param("t", "Title")),
+                result="TodoList",
+            ),
+            "edit": FnSymbol(
+                "edit",
+                params=(param("l", "TodoList"), param("k", "ItemId"), param("t", "Title")),
+                result="TodoList",
+            ),
+            "get_title": FnSymbol(
+                "get_title",
+                params=(param("l", "TodoList"), param("k", "ItemId")),
+                result="Title",
+                totality=Totality.PARTIAL,
+            ),
+        },
+        predicates={
+            "eq_id": PredSymbol("eq_id", params=(param("k1", "ItemId"), param("k2", "ItemId"))),
+        },
+        generated_sorts={
+            "TodoList": GeneratedSortInfo(
+                constructors=("empty", "add_item", "edit"),
+                selectors={"add_item": {"get_title": "Title"}},
+            )
+        },
+    )
+
+    table = build_obligation_table(sig)
+    report = generate_mechanical_axioms(sig, table)
+
+    # Find the MISS cells for get_title × edit
+    covered_keys = {
+        (c.observer_name, c.constructor_name, c.dispatch)
+        for c in report.cells_covered
+    }
+
+    # SELECTOR_EXTRACT: get_title × add_item (PLAIN) should be covered
+    assert ("get_title", "add_item", CellDispatch.PLAIN) in covered_keys or \
+           ("get_title", "add_item", CellDispatch.HIT) in covered_keys  # depends on dispatch
+
+    # The key test: MISS for get_title × edit should now be covered
+    assert ("get_title", "edit", CellDispatch.MISS) in covered_keys, (
+        f"SELECTOR_FOREIGN + MISS cell not covered. Covered: {covered_keys}"
+    )
+
+    # Verify the generated axiom has the right structure
+    miss_axiom = None
+    for ax, cell in zip(report.axioms, report.cells_covered):
+        if (cell.observer_name == "get_title"
+                and cell.constructor_name == "edit"
+                and cell.dispatch == CellDispatch.MISS):
+            miss_axiom = ax
+            break
+
+    assert miss_axiom is not None
+    assert "miss" in miss_axiom.label
+    # The formula should be: forall(..., implication(negation(eq_pred(...)), eq(...)))
+    assert isinstance(miss_axiom.formula, UniversalQuant)
+    assert isinstance(miss_axiom.formula.body, Implication)
+    assert isinstance(miss_axiom.formula.body.antecedent, Negation)
+
+
+def test_all_miss_cells_covered():
+    """Every MISS cell in an obligation table should be mechanically covered."""
+    sig = Signature(
+        sorts={
+            "Store": atomic("Store"),
+            "Key": atomic("Key"),
+            "Val": atomic("Val"),
+        },
+        functions={
+            "empty": FnSymbol("empty", params=(), result="Store"),
+            "update": FnSymbol(
+                "update",
+                params=(param("s", "Store"), param("k", "Key"), param("v", "Val")),
+                result="Store",
+            ),
+            "lookup": FnSymbol(
+                "lookup",
+                params=(param("s", "Store"), param("k", "Key")),
+                result="Val",
+                totality=Totality.PARTIAL,
+            ),
+        },
+        predicates={
+            "eq_key": PredSymbol("eq_key", params=(param("k1", "Key"), param("k2", "Key"))),
+        },
+        generated_sorts={
+            "Store": GeneratedSortInfo(
+                constructors=("empty", "update"),
+                selectors={},
+            )
+        },
+    )
+
+    table = build_obligation_table(sig)
+    report = generate_mechanical_axioms(sig, table)
+
+    # Find all MISS cells in the table
+    miss_cells = [c for c in table.cells if c.dispatch == CellDispatch.MISS]
+    assert len(miss_cells) > 0, "Expected at least one MISS cell"
+
+    # Every MISS cell should be in covered
+    covered_keys = {
+        (c.observer_name, c.constructor_name, c.dispatch)
+        for c in report.cells_covered
+    }
+
+    for cell in miss_cells:
+        key = (cell.observer_name, cell.constructor_name, cell.dispatch)
+        assert key in covered_keys, (
+            f"MISS cell {key} not covered. Tier={cell.tier}. Covered: {covered_keys}"
+        )
+
+
+def test_hit_cells_not_mechanical():
+    """HIT cells should NOT be generated mechanically regardless of tier."""
+    sig = Signature(
+        sorts={
+            "TodoList": atomic("TodoList"),
+            "ItemId": atomic("ItemId"),
+            "Title": atomic("Title"),
+        },
+        functions={
+            "empty": FnSymbol("empty", params=(), result="TodoList"),
+            "add_item": FnSymbol(
+                "add_item",
+                params=(param("l", "TodoList"), param("k", "ItemId"), param("t", "Title")),
+                result="TodoList",
+            ),
+            "edit": FnSymbol(
+                "edit",
+                params=(param("l", "TodoList"), param("k", "ItemId"), param("t", "Title")),
+                result="TodoList",
+            ),
+            "get_title": FnSymbol(
+                "get_title",
+                params=(param("l", "TodoList"), param("k", "ItemId")),
+                result="Title",
+                totality=Totality.PARTIAL,
+            ),
+        },
+        predicates={
+            "eq_id": PredSymbol("eq_id", params=(param("k1", "ItemId"), param("k2", "ItemId"))),
+        },
+        generated_sorts={
+            "TodoList": GeneratedSortInfo(
+                constructors=("empty", "add_item", "edit"),
+                selectors={"add_item": {"get_title": "Title"}},
+            )
+        },
+    )
+
+    table = build_obligation_table(sig)
+    report = generate_mechanical_axioms(sig, table)
+
+    covered_keys = {
+        (c.observer_name, c.constructor_name, c.dispatch)
+        for c in report.cells_covered
+    }
+
+    # HIT for get_title × edit should NOT be covered (requires domain reasoning)
+    assert ("get_title", "edit", CellDispatch.HIT) not in covered_keys, (
+        "HIT cell should not be mechanically generated"
+    )
+
+
 # ---------------------------------------------------------------------------
 # TestPreservation
 # ---------------------------------------------------------------------------
@@ -453,24 +635,16 @@ class TestIntegration:
         table = build_obligation_table(sig)
         report = generate_mechanical_axioms(sig, table)
 
-        allowed_tiers = {
-            CellTier.SELECTOR_EXTRACT,
-            CellTier.KEY_DISPATCH,
-        }
-
         for cell in report.cells_covered:
-            assert cell.tier in allowed_tiers, (
-                f"Cell ({cell.observer_name}, {cell.constructor_name}) "
-                f"has tier {cell.tier.value} which should not be generated"
-            )
+            if cell.tier == CellTier.SELECTOR_EXTRACT:
+                continue
 
-            # KEY_DISPATCH cells must be MISS only
-            if cell.tier == CellTier.KEY_DISPATCH:
-                assert cell.dispatch == CellDispatch.MISS, (
-                    f"Cell ({cell.observer_name}, {cell.constructor_name}) "
-                    f"is KEY_DISPATCH but dispatch is {cell.dispatch.value}, "
-                    f"expected MISS"
-                )
+            # Non-SELECTOR_EXTRACT cells must be MISS (any tier is allowed)
+            assert cell.dispatch == CellDispatch.MISS, (
+                f"Cell ({cell.observer_name}, {cell.constructor_name}) "
+                f"has tier {cell.tier.value} and dispatch {cell.dispatch.value}, "
+                f"expected MISS for mechanical non-selector"
+            )
 
     def test_report_counts(self):
         """Verify cells_covered + cells_skipped + LLM_cells = total cells."""
@@ -487,10 +661,7 @@ class TestIntegration:
         for cell in table.cells:
             if cell.tier == CellTier.SELECTOR_EXTRACT:
                 expected_mechanical += 1
-            elif (
-                cell.tier == CellTier.KEY_DISPATCH
-                and cell.dispatch == CellDispatch.MISS
-            ):
+            elif cell.dispatch == CellDispatch.MISS:
                 expected_mechanical += 1
 
         assert mechanical_cell_count == expected_mechanical, (
