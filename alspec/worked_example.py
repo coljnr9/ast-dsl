@@ -345,7 +345,7 @@ class WorkedExample:
         """
         parts: list[str] = []
 
-        parts.append(f"### Worked Example: {self.domain_name}")
+        parts.append(f"---\n\n#### Worked Example: {self.domain_name}")
         parts.append(f"_{self.summary}_\n")
 
         if mode in (RenderMode.FULL, RenderMode.ANALYSIS, RenderMode.SIGNATURE, RenderMode.SPEC):

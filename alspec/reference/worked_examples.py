@@ -6170,7 +6170,14 @@ def session_store_spec() -> Spec:
         "Sessions have a two-phase lifecycle: active and expired. That gives me an "
         "enumeration sort Status with constructors active and expired. These must be "
         "explicitly distinct — under loose semantics, a model where active = expired "
-        "would collapse the entire state machine.\n\n"
+        "would collapse the entire state machine. Status needs constructors because "
+        "get_status(create(t)) must equal a specific value (active) and "
+        "get_status(expire(s)) must equal another specific value (expired) — these are "
+        "computed results, not retrieved parameters. Token, by contrast, is opaque — "
+        "the session stores a token via create(t) and get_token retrieves it, but no "
+        "axiom ever needs to name a specific token value. Every Token that appears on "
+        "the right side of an equation is a variable already in scope from the "
+        "constructor's parameter list. Opaque sorts flow through as abstract values.\n\n"
         "Four constructors handle the lifecycle: create(t) initializes a session with "
         "an authentication token t, starting active. verify(s, t) attempts to match "
         "token t against the session's stored token. expire(s) moves the session to "
@@ -6697,9 +6704,12 @@ def rate_limiter_spec() -> Spec:
         "The domain is a rate limiter that tracks request counts against a configured "
         "maximum per time window. The generated sort is Limiter.\n\n"
         "I need Peano naturals for counting — a separate sort Nat with zero and succ. "
-        "This is a cross-sort helper: Nat is a generated sort with its own constructors "
-        "but no obligation cells (no observers take Nat as first argument in the Limiter "
-        "spec). I also need a comparison predicate geq (greater-or-equal) with inductive "
+        "Nat needs constructors here because get_count computes values: "
+        "get_count(create(m)) must equal zero (an initial value, not a stored parameter), "
+        "and get_count(record(l)) must equal succ(get_count(l)) (a derived value). "
+        "Because the axioms need to name specific Nat values (zero as an initial count, "
+        "succ as the increment), Nat cannot stay opaque — it needs constructors zero and succ. "
+        "I also need a comparison predicate geq (greater-or-equal) with inductive "
         "Peano axioms: geq(n, zero) holds for all n, ¬geq(zero, succ(n)), and "
         "geq(succ(a), succ(b)) ↔ geq(a, b). These three axioms fully characterize geq "
         "and prevent vacuous models under loose semantics.\n\n"
@@ -6760,7 +6770,7 @@ DNS_ZONE = WorkedExample(
         SortInfo("DomainName", "ATOMIC", "First key sort — opaque domain name identifier"),
         SortInfo("RecordType", "ATOMIC", "Second key sort — opaque record type identifier"),
         SortInfo("RData", "ATOMIC", "Opaque record data payload"),
-        SortInfo("Nat", "ATOMIC", "Opaque TTL value (no zero/succ — purely opaque in this domain)"),
+        SortInfo("Nat", "ATOMIC", "Opaque TTL value — only stored and retrieved, never computed, so no constructors needed"),
     ),
     functions=(
         FunctionInfo("empty", "→ Zone", FunctionRole.CONSTRUCTOR, "Creates empty DNS zone"),
@@ -6800,7 +6810,7 @@ DNS_ZONE = WorkedExample(
     ),
     design_decisions=(
         DesignDecision("Dual-key dispatch via nested implication", "Obligation table splits on first key (DomainName); second key (RecordType) handled as domain logic within HIT cells via nested Implication"),
-        DesignDecision("Nat is purely opaque", "No zero/succ — TTL has no arithmetic in this domain, unlike Rate Limiter"),
+        DesignDecision("Nat is purely opaque", "TTL values are only stored by add_record and retrieved by get_ttl — no axiom needs to name a specific Nat value, so Nat needs no constructors or constants"),
         DesignDecision("has_record linked to definedness", "has_record(z,n,t) ⟺ def(get_rdata(z,n,t)) via explicit biconditional; obligation axioms still required"),
         DesignDecision("Strong equality delegation", "MISS cells use strong equality (eq) which correctly propagates undefinedness for partial observers"),
     ),
@@ -7361,6 +7371,15 @@ def dns_zone_spec() -> Spec:
         "add_record(z, n, t, d, ttl) inserts or overwrites a record with domain name "
         "n, record type t, resource data d, and time-to-live ttl. "
         "remove_record(z, n, t) deletes the record at (n, t).\n\n"
+        "All four parameter sorts — DomainName, RecordType, RData, and Nat — are "
+        "purely opaque. None of them need constructors or constants. The reason: every "
+        "observer axiom either retrieves a stored value (get_rdata and get_ttl return "
+        "the d or ttl that was passed into add_record — these are variables already in "
+        "scope from the constructor's parameter list) or delegates to the inner zone "
+        "(MISS cases). No axiom needs to name a specific DomainName, RecordType, RData, "
+        "or Nat value that isn't already bound by the universal quantifier from the "
+        "constructor's parameter list. This is the hallmark of opaque sorts: they flow "
+        "through the specification as abstract values, never constructed or decomposed.\n\n"
         "The observers are both partial: get_rdata(z, n, t) returns the resource data "
         "and get_ttl(z, n, t) returns the TTL, but both are undefined when no record "
         "exists at (n, t). On the empty zone, both are unconditionally undefined for "
@@ -7801,9 +7820,20 @@ def connection_spec() -> Spec:
         "enumeration sort State with three nullary constructors idle_st, active_st, "
         "and failed_st. Since these are distinct states, I need explicit distinctness "
         "axioms — under loose semantics, nothing prevents a model from collapsing "
-        "idle_st = failed_st without them.\n\n"
+        "idle_st = failed_st without them. State must be structured (with named "
+        "constants) because get_state(create(n)) = idle_st and "
+        "get_state(connect(c)) = active_st — these are computed initial and transition "
+        "values that require specific named constants on the right-hand side.\n\n"
         "Failures carry diagnostic information, so I need an ErrorCode sort for the "
-        "error payload. Nat models the timeout configuration value.\n\n"
+        "error payload. Nat models the timeout configuration value. ErrorCode is "
+        "opaque — fail(c, e) stores an error code and get_error retrieves it, but no "
+        "axiom computes or initializes an ErrorCode value. Nat is similarly opaque: "
+        "create(n) stores a timeout value and get_timeout retrieves it unchanged. "
+        "Neither sort appears on the right side of an equation except as a variable "
+        "from the constructor's parameter list. Contrast this with State: State cannot "
+        "be opaque because observers return named State constants (idle_st, active_st, "
+        "failed_st) that are not in scope as variables — they are specific values the "
+        "axioms must name explicitly.\n\n"
         "The constructors of Conn correspond to lifecycle transitions: create(n) "
         "initializes a new connection with a timeout configuration and starts idle. "
         "connect(c) activates it. disconnect(c) is graceful teardown back to idle. "

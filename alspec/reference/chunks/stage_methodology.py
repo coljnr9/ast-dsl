@@ -30,10 +30,11 @@ sorts speculatively — every sort should be justified by a function that uses i
 - **Equality predicate:** named `eq_<sort>`, used for key dispatch (e.g., `eq_token(t1, t2)`)
 - **Helper predicate:** operates entirely on parameter sorts — comparisons, orderings (e.g., `geq(n1, n2)`, `lt(a, b)`)
 
-This classification matters because observer predicates create obligation table rows. Study the
-worked examples: `over_limit(l)` is an observer predicate (first param is Limiter), while
-`geq(n1, n2)` is a helper predicate (both params are Nat). The rate-limiter example shows
-how to keep comparison logic in helper predicates and use observer predicates for simple state queries.
+This classification matters because observer predicates create obligation table rows.
+Observer predicates have the generated sort as first parameter — they query state.
+Helper predicates operate entirely on parameter sorts — comparisons, orderings.
+Keep comparison logic in helper predicates and use observer predicates for simple state queries.
+The worked examples demonstrate this distinction.
 
 **Step 4 — Mark partial functions.** Any constructor or observer that may be undefined
 in some cases gets `total=False`.
