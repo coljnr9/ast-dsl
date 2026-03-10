@@ -7369,7 +7369,6 @@ def dns_zone_spec() -> Spec:
         "the obligation table), then within the HIT case check eq_type (domain-level "
         "dispatch via nested implication). MISS on the name level delegates to the "
         "inner zone unconditionally. HIT on name but MISS on type also delegates. "
-        "Only the double-HIT case (matching name and type) gets new behavior — return "
         "the new data for add, or become undefined for remove.\n\n"
         "I also want has_record as a predicate observer that answers \"does a record "
         "exist at (n, t)?\" This is derived from the definedness of get_rdata: "
@@ -7397,10 +7396,17 @@ def dns_zone_spec() -> Spec:
 
 CONNECTION = WorkedExample(
     domain_name="Connection",
-    summary="Models a network connection with state lifecycle. Demonstrates derivation link between a predicate observer (is_active) and a function observer (get_state) via biconditional — per-constructor is_active axioms follow by substituting get_state results into the derivation condition. Also shows selector extraction, preservation collapse, and enumeration distinctness.",
+    summary=(
+        "Models a network connection with state lifecycle. Teaches the distinction "
+        "between a genuine CASL selector (get_error: partial, one home constructor) "
+        "and a total observer that coincidentally projects a constructor parameter "
+        "(get_timeout: total, preserved across all constructors). Also demonstrates "
+        "derivation link, preservation collapse, and enumeration distinctness."
+    ),
     patterns=frozenset({
         Pattern.ENUMERATION,
         Pattern.SEL_EXTRACT,
+        Pattern.EXPLICIT_UNDEF,
         Pattern.PRESERVATION,
         Pattern.BICOND_CHAR,
         Pattern.STATE_DEPENDENT,
@@ -7409,6 +7415,7 @@ CONNECTION = WorkedExample(
         SortInfo("Conn", "GENERATED", "Central domain object representing connection state"),
         SortInfo("State", "ENUMERATION", "Connection lifecycle states with explicit distinctness (idle_st/active_st/failed_st)"),
         SortInfo("Nat", "ATOMIC", "Opaque timeout configuration value"),
+        SortInfo("ErrorCode", "ATOMIC", "Opaque error payload — only meaningful after a failure"),
     ),
     functions=(
         FunctionInfo("idle_st", "→ State", FunctionRole.CONSTANT, "Initial and post-disconnect/retry state"),
@@ -7417,30 +7424,48 @@ CONNECTION = WorkedExample(
         FunctionInfo("create", "Nat → Conn", FunctionRole.CONSTRUCTOR, "Creates new connection with timeout config, starts idle"),
         FunctionInfo("connect", "Conn → Conn", FunctionRole.CONSTRUCTOR, "Activates the connection"),
         FunctionInfo("disconnect", "Conn → Conn", FunctionRole.CONSTRUCTOR, "Graceful teardown, returns to idle"),
-        FunctionInfo("fail", "Conn → Conn", FunctionRole.CONSTRUCTOR, "Connection error, enters failed state"),
+        FunctionInfo("fail", "Conn × ErrorCode → Conn", FunctionRole.CONSTRUCTOR, "Connection error with diagnostic code, enters failed state"),
         FunctionInfo("retry", "Conn → Conn", FunctionRole.CONSTRUCTOR, "Recovery attempt, returns to idle"),
         FunctionInfo("get_state", "Conn → State", FunctionRole.OBSERVER, "Returns current connection lifecycle state"),
-        FunctionInfo("get_timeout", "Conn → Nat", FunctionRole.SELECTOR, "Selector of create — returns configured timeout"),
+        FunctionInfo("get_timeout", "Conn → Nat", FunctionRole.OBSERVER, "Total observer — returns configured timeout. NOT a selector: total functions are defined everywhere, contradicting selector foreign-undefinedness"),
+        FunctionInfo("get_error", "Conn →? ErrorCode", FunctionRole.SELECTOR, "Selector of fail — extracts error code. Partial: undefined on all other constructors"),
         FunctionInfo("is_active", "Conn", FunctionRole.PREDICATE, "Derived: is_active(c) ↔ get_state(c) = active_st. Per-constructor axioms follow by substituting get_state results"),
     ),
     obligations=(
+        # get_state (5 DOMAIN cells)
         ObligationCell("get_state", "create", CellType.DOMAIN, "idle_st"),
         ObligationCell("get_state", "connect", CellType.DOMAIN, "active_st"),
         ObligationCell("get_state", "disconnect", CellType.DOMAIN, "idle_st"),
         ObligationCell("get_state", "fail", CellType.DOMAIN, "failed_st"),
         ObligationCell("get_state", "retry", CellType.DOMAIN, "idle_st"),
+        # get_timeout (5 DOMAIN cells — NOT selector, just a total observer)
+        ObligationCell("get_timeout", "create", CellType.DOMAIN, "n (coincidental extraction — looks like projection but get_timeout is total)"),
+        ObligationCell("get_timeout", "connect", CellType.PRESERVATION, "get_timeout(c) — config immutable"),
+        ObligationCell("get_timeout", "disconnect", CellType.PRESERVATION, "get_timeout(c) — config immutable"),
+        ObligationCell("get_timeout", "fail", CellType.PRESERVATION, "get_timeout(c) — config immutable"),
+        ObligationCell("get_timeout", "retry", CellType.PRESERVATION, "get_timeout(c) — config immutable"),
+        # get_error (1 SELECTOR_EXTRACT + 4 SELECTOR_FOREIGN — genuine partial selector)
+        ObligationCell("get_error", "create", CellType.SELECTOR_FOREIGN, "¬def — no error on fresh connection"),
+        ObligationCell("get_error", "connect", CellType.SELECTOR_FOREIGN, "¬def — no error on active connection"),
+        ObligationCell("get_error", "disconnect", CellType.SELECTOR_FOREIGN, "¬def — no error on graceful teardown"),
+        ObligationCell("get_error", "fail", CellType.SELECTOR_EXTRACT, "e — extracts error code from fail"),
+        ObligationCell("get_error", "retry", CellType.SELECTOR_FOREIGN, "¬def — error cleared on recovery"),
+        # is_active (5 DOMAIN cells — derived from get_state)
         ObligationCell("is_active", "create", CellType.DOMAIN, "false (idle_st ≠ active_st)"),
         ObligationCell("is_active", "connect", CellType.DOMAIN, "true (active_st = active_st)"),
         ObligationCell("is_active", "disconnect", CellType.DOMAIN, "false (idle_st ≠ active_st)"),
         ObligationCell("is_active", "fail", CellType.DOMAIN, "false (failed_st ≠ active_st)"),
         ObligationCell("is_active", "retry", CellType.DOMAIN, "false (idle_st ≠ active_st)"),
-        ObligationCell("get_timeout", "create", CellType.SELECTOR_EXTRACT, "n"),
-        ObligationCell("get_timeout", "connect", CellType.PRESERVATION, "get_timeout(c)"),
-        ObligationCell("get_timeout", "disconnect", CellType.PRESERVATION, "get_timeout(c)"),
-        ObligationCell("get_timeout", "fail", CellType.PRESERVATION, "get_timeout(c)"),
-        ObligationCell("get_timeout", "retry", CellType.PRESERVATION, "get_timeout(c)"),
     ),
     design_decisions=(
+        DesignDecision(
+            "Selector vs total observer",
+            "get_error is a genuine CASL selector of fail: partial, one home constructor, "
+            "mechanical extraction + foreign-undefinedness. get_timeout is a total observer — "
+            "get_timeout(create(n)) = n looks like extraction, but get_timeout is defined on "
+            "every constructor (preservation), so it cannot be a selector. Selectors must be "
+            "partial because they are undefined on foreign constructors"
+        ),
         DesignDecision(
             "Derivation link",
             "is_active is derived from get_state: is_active(c) ↔ get_state(c) = active_st. "
@@ -7448,19 +7473,14 @@ CONNECTION = WorkedExample(
             "into the derivation condition. Both observers require independent obligation coverage"
         ),
         DesignDecision(
-            "Selector preservation",
-            "get_timeout is a selector of create — extracts the configured timeout. "
-            "All other constructors preserve it (configuration is immutable after creation)"
-        ),
-        DesignDecision(
             "Retry semantics",
             "retry returns to idle_st, not directly to active_st — recovery and reconnection are "
             "separate concerns. The lifecycle goes failed → idle → active, not failed → active"
         ),
         DesignDecision(
-            "No partiality",
-            "All constructors and observers are total. Room to add get_error : Conn →? ErrorCode "
-            "in a future iteration to demonstrate partial observers with explicit undefinedness"
+            "Error lifecycle",
+            "Error codes are injected at failure and lost at recovery. get_error is undefined after "
+            "retry because the failure context is cleared — this is the natural partial lifecycle"
         ),
     ),
     code='''from alspec import (
@@ -7471,6 +7491,7 @@ CONNECTION = WorkedExample(
     app,
     atomic,
     const,
+    definedness,
     eq,
     fn,
     forall,
@@ -7487,19 +7508,21 @@ def connection_spec() -> Spec:
 
     Models a network connection with state lifecycle. Demonstrates:
 
-    - Derivation link: is_active (predicate) derived from get_state (function)
-      via biconditional — per-constructor axioms follow by substitution
-    - Selector extraction (get_timeout from create)
+    - Selector vs total observer contrast:
+      get_error (partial selector of fail) vs get_timeout (total observer)
+    - Derivation link: is_active derived from get_state via biconditional
     - Preservation collapse (get_timeout across all state-transition constructors)
+    - Selector extraction + foreign undefinedness (get_error)
     - Enumeration sort with explicit distinctness (State: idle/active/failed)
 
-    Obligation table: 3 observers × 5 constructors = 15 cells, all PLAIN.
-    No key dispatch. No partial functions.
-    Total axioms: 19 (15 obligation + 1 derivation definition + 3 distinctness).
+    Obligation table: 4 observers × 5 constructors = 20 cells, all PLAIN.
+    No key dispatch. get_error is partial; all other functions are total.
+    Total axioms: 24 (20 obligation + 1 derivation definition + 3 distinctness).
     """
     # --- Variables ---
     c = var("c", "Conn")
     n = var("n", "Nat")
+    e = var("e", "ErrorCode")
 
     # --- Signature ---
     sig = Signature(
@@ -7507,6 +7530,7 @@ def connection_spec() -> Spec:
             "Conn": atomic("Conn"),
             "State": atomic("State"),
             "Nat": atomic("Nat"),
+            "ErrorCode": atomic("ErrorCode"),
         },
         functions={
             # State enumeration
@@ -7517,11 +7541,14 @@ def connection_spec() -> Spec:
             "create": fn("create", [("n", "Nat")], "Conn"),
             "connect": fn("connect", [("c", "Conn")], "Conn"),
             "disconnect": fn("disconnect", [("c", "Conn")], "Conn"),
-            "fail": fn("fail", [("c", "Conn")], "Conn"),
+            "fail": fn("fail", [("c", "Conn"), ("e", "ErrorCode")], "Conn"),
             "retry": fn("retry", [("c", "Conn")], "Conn"),
             # Conn observers
             "get_state": fn("get_state", [("c", "Conn")], "State"),
             "get_timeout": fn("get_timeout", [("c", "Conn")], "Nat"),
+            "get_error": fn(
+                "get_error", [("c", "Conn")], "ErrorCode", total=False
+            ),
         },
         predicates={
             # Conn predicate observer (derived from get_state)
@@ -7531,7 +7558,7 @@ def connection_spec() -> Spec:
             "Conn": GeneratedSortInfo(
                 constructors=("create", "connect", "disconnect", "fail", "retry"),
                 selectors={
-                    "create": {"get_timeout": "Nat"},
+                    "fail": {"get_error": "ErrorCode"},
                 },
             ),
             "State": GeneratedSortInfo(
@@ -7543,62 +7570,55 @@ def connection_spec() -> Spec:
 
     axioms = (
         # ==================================================================
-        # SELECTOR CELLS (mechanical)
+        # SELECTOR CELLS — get_error (genuine partial selector of fail)
+        #
+        # get_error is partial: defined only on fail, undefined elsewhere.
+        # This is the CASL free-type pattern — fail injects an ErrorCode,
+        # get_error extracts it. Mechanical axiom generation handles these.
         # ==================================================================
-        # Cell 1: get_timeout × create — SELECTOR_EXTRACT
+        # get_error × fail — SELECTOR_EXTRACT
         Axiom(
-            label="get_timeout_create",
+            label="get_error_fail",
+            formula=forall(
+                [c, e],
+                eq(app("get_error", app("fail", c, e)), e),
+            ),
+        ),
+        # get_error × create — SELECTOR_FOREIGN
+        Axiom(
+            label="get_error_create",
             formula=forall(
                 [n],
-                eq(app("get_timeout", app("create", n)), n),
+                negation(definedness(app("get_error", app("create", n)))),
+            ),
+        ),
+        # get_error × connect — SELECTOR_FOREIGN
+        Axiom(
+            label="get_error_connect",
+            formula=forall(
+                [c],
+                negation(definedness(app("get_error", app("connect", c)))),
+            ),
+        ),
+        # get_error × disconnect — SELECTOR_FOREIGN
+        Axiom(
+            label="get_error_disconnect",
+            formula=forall(
+                [c],
+                negation(definedness(app("get_error", app("disconnect", c)))),
+            ),
+        ),
+        # get_error × retry — SELECTOR_FOREIGN
+        Axiom(
+            label="get_error_retry",
+            formula=forall(
+                [c],
+                negation(definedness(app("get_error", app("retry", c)))),
             ),
         ),
         # ==================================================================
-        # PRESERVATION CELLS — get_timeout
-        # Configuration is immutable after creation. All state-transition
-        # constructors preserve the timeout value.
+        # get_state CELLS — DOMAIN
         # ==================================================================
-        # Cell 2: get_timeout × connect
-        Axiom(
-            label="get_timeout_connect",
-            formula=forall(
-                [c],
-                eq(app("get_timeout", app("connect", c)),
-                   app("get_timeout", c)),
-            ),
-        ),
-        # Cell 3: get_timeout × disconnect
-        Axiom(
-            label="get_timeout_disconnect",
-            formula=forall(
-                [c],
-                eq(app("get_timeout", app("disconnect", c)),
-                   app("get_timeout", c)),
-            ),
-        ),
-        # Cell 4: get_timeout × fail
-        Axiom(
-            label="get_timeout_fail",
-            formula=forall(
-                [c],
-                eq(app("get_timeout", app("fail", c)),
-                   app("get_timeout", c)),
-            ),
-        ),
-        # Cell 5: get_timeout × retry
-        Axiom(
-            label="get_timeout_retry",
-            formula=forall(
-                [c],
-                eq(app("get_timeout", app("retry", c)),
-                   app("get_timeout", c)),
-            ),
-        ),
-        # ==================================================================
-        # DOMAIN CELLS — get_state
-        # Each constructor determines the resulting connection state.
-        # ==================================================================
-        # Cell 6: get_state × create — new connection starts idle
         Axiom(
             label="get_state_create",
             formula=forall(
@@ -7606,7 +7626,6 @@ def connection_spec() -> Spec:
                 eq(app("get_state", app("create", n)), const("idle_st")),
             ),
         ),
-        # Cell 7: get_state × connect — activates the connection
         Axiom(
             label="get_state_connect",
             formula=forall(
@@ -7614,7 +7633,6 @@ def connection_spec() -> Spec:
                 eq(app("get_state", app("connect", c)), const("active_st")),
             ),
         ),
-        # Cell 8: get_state × disconnect — graceful teardown to idle
         Axiom(
             label="get_state_disconnect",
             formula=forall(
@@ -7622,15 +7640,13 @@ def connection_spec() -> Spec:
                 eq(app("get_state", app("disconnect", c)), const("idle_st")),
             ),
         ),
-        # Cell 9: get_state × fail — enters failed state
         Axiom(
             label="get_state_fail",
             formula=forall(
-                [c],
-                eq(app("get_state", app("fail", c)), const("failed_st")),
+                [c, e],
+                eq(app("get_state", app("fail", c, e)), const("failed_st")),
             ),
         ),
-        # Cell 10: get_state × retry — recovery returns to idle
         Axiom(
             label="get_state_retry",
             formula=forall(
@@ -7639,14 +7655,65 @@ def connection_spec() -> Spec:
             ),
         ),
         # ==================================================================
-        # DOMAIN CELLS — is_active (derived from get_state)
-        # Each axiom follows mechanically from the derivation link:
-        #   is_active(c) ↔ get_state(c) = active_st
-        # Substitute the get_state result for each constructor:
-        #   connect → active_st = active_st → true
-        #   all others → X ≠ active_st → false
+        # get_timeout CELLS — DOMAIN (total observer, NOT a selector)
+        #
+        # get_timeout(create(n)) = n looks like selector extraction, but
+        # get_timeout is total — defined on every constructor. A CASL
+        # selector must be partial (undefined on foreign constructors).
+        # get_timeout is an observer whose create axiom coincidentally
+        # resembles projection. The preservation axioms are domain equations
+        # asserting configuration immutability, not structural consequences.
         # ==================================================================
-        # Cell 11: is_active × create — idle_st ≠ active_st → false
+        Axiom(
+            label="get_timeout_create",
+            formula=forall(
+                [n],
+                eq(app("get_timeout", app("create", n)), n),
+            ),
+        ),
+        Axiom(
+            label="get_timeout_connect",
+            formula=forall(
+                [c],
+                eq(
+                    app("get_timeout", app("connect", c)),
+                    app("get_timeout", c),
+                ),
+            ),
+        ),
+        Axiom(
+            label="get_timeout_disconnect",
+            formula=forall(
+                [c],
+                eq(
+                    app("get_timeout", app("disconnect", c)),
+                    app("get_timeout", c),
+                ),
+            ),
+        ),
+        Axiom(
+            label="get_timeout_fail",
+            formula=forall(
+                [c, e],
+                eq(
+                    app("get_timeout", app("fail", c, e)),
+                    app("get_timeout", c),
+                ),
+            ),
+        ),
+        Axiom(
+            label="get_timeout_retry",
+            formula=forall(
+                [c],
+                eq(
+                    app("get_timeout", app("retry", c)),
+                    app("get_timeout", c),
+                ),
+            ),
+        ),
+        # ==================================================================
+        # is_active CELLS — DOMAIN (derived from get_state)
+        # ==================================================================
         Axiom(
             label="is_active_create",
             formula=forall(
@@ -7654,7 +7721,6 @@ def connection_spec() -> Spec:
                 negation(pred_app("is_active", app("create", n))),
             ),
         ),
-        # Cell 12: is_active × connect — active_st = active_st → true
         Axiom(
             label="is_active_connect",
             formula=forall(
@@ -7662,7 +7728,6 @@ def connection_spec() -> Spec:
                 pred_app("is_active", app("connect", c)),
             ),
         ),
-        # Cell 13: is_active × disconnect — idle_st ≠ active_st → false
         Axiom(
             label="is_active_disconnect",
             formula=forall(
@@ -7670,15 +7735,13 @@ def connection_spec() -> Spec:
                 negation(pred_app("is_active", app("disconnect", c))),
             ),
         ),
-        # Cell 14: is_active × fail — failed_st ≠ active_st → false
         Axiom(
             label="is_active_fail",
             formula=forall(
-                [c],
-                negation(pred_app("is_active", app("fail", c))),
+                [c, e],
+                negation(pred_app("is_active", app("fail", c, e))),
             ),
         ),
-        # Cell 15: is_active × retry — idle_st ≠ active_st → false
         Axiom(
             label="is_active_retry",
             formula=forall(
@@ -7687,12 +7750,13 @@ def connection_spec() -> Spec:
             ),
         ),
         # ==================================================================
-        # DERIVED DEFINITION — is_active (non-obligation)
-        # Defines is_active as a derivation from get_state. This is a
-        # definitional extension (conservative) — is_active adds no semantic
-        # content beyond get_state, but provides a convenient boolean query.
-        # The obligation table still requires per-constructor axioms above —
-        # this definition provides the derivation link but does not
+        # NON-OBLIGATION AXIOMS
+        # ==================================================================
+        # Derivation definition — is_active is a conservative extension.
+        # This is a definitional extension (conservative) — is_active adds no
+        # semantic content beyond get_state, but provides a convenient boolean
+        # query. The obligation table still requires per-constructor axioms
+        # above — this definition provides the derivation link but does not
         # substitute for obligation coverage.
         # ==================================================================
         Axiom(
@@ -7738,35 +7802,49 @@ def connection_spec() -> Spec:
         "and failed_st. Since these are distinct states, I need explicit distinctness "
         "axioms — under loose semantics, nothing prevents a model from collapsing "
         "idle_st = failed_st without them.\n\n"
+        "Failures carry diagnostic information, so I need an ErrorCode sort for the "
+        "error payload. Nat models the timeout configuration value.\n\n"
         "The constructors of Conn correspond to lifecycle transitions: create(n) "
         "initializes a new connection with a timeout configuration and starts idle. "
         "connect(c) activates it. disconnect(c) is graceful teardown back to idle. "
-        "fail(c) puts it into the failed state. retry(c) is recovery, returning to "
-        "idle — not directly to active, because recovery and reconnection are separate "
-        "concerns. A real system would re-establish the connection as a second step "
-        "after retry, so the lifecycle goes failed → idle → active, not "
-        "failed → active.\n\n"
-        "For observers, I need get_state : Conn → State to report the lifecycle "
-        "phase, and get_timeout : Conn → Nat as a selector that extracts the timeout "
-        "configuration injected at create. The timeout is immutable after creation — "
-        "all four state-transition constructors (connect, disconnect, fail, retry) "
-        "preserve it.\n\n"
-        "I also want a convenience predicate is_active : Conn that answers the common "
-        "boolean question \"is this connection currently active?\" This is a derivation "
-        "from get_state: is_active(c) holds exactly when get_state(c) = active_st. "
-        "This means every per-constructor is_active axiom can be derived mechanically "
-        "— substitute the get_state result for that constructor into the condition "
-        "and simplify. For connect, get_state returns active_st, so "
-        "active_st = active_st is true, so is_active holds. For all others, the state "
-        "isn't active_st, so is_active doesn't hold. I'll write the derivation "
-        "definition as a non-obligation axiom (is_active_def) and the per-constructor "
-        "axioms as the obligation coverage.\n\n"
-        "The obligation table is 3 observers × 5 constructors = 15 PLAIN cells. No "
-        "key dispatch since none of the observers take a key parameter. No partial "
-        "functions."
+        "fail(c, e) records a failure with an error code. retry(c) is recovery, "
+        "returning to idle — not directly to active, because recovery and "
+        "reconnection are separate concerns.\n\n"
+        "For observers, get_state : Conn → State reports the lifecycle phase, and "
+        "get_timeout : Conn → Nat returns the timeout configuration. Both are "
+        "total — every connection has a state and a timeout.\n\n"
+        "get_error : Conn →? ErrorCode is partial — error information only exists "
+        "after a failure. This is a genuine CASL selector of fail: "
+        "get_error(fail(c, e)) = e extracts the error code, and get_error is "
+        "undefined on all other constructors. The partiality is the key signal: "
+        "a selector is defined on its home constructor and undefined elsewhere "
+        "(CASL RM §2.3.4). That is what makes mechanical axiom generation safe — "
+        "the extraction axiom and the foreign-undefinedness axioms follow from the "
+        "free-type structure alone.\n\n"
+        "Contrast this with get_timeout. The axiom get_timeout(create(n)) = n "
+        "looks like extraction, and get_timeout preserves across all other "
+        "constructors. But get_timeout is total — defined everywhere, not just on "
+        "create. A total function cannot be a CASL selector, because selectors "
+        "must be undefined on foreign constructors. get_timeout is an observer "
+        "whose create axiom coincidentally resembles projection. The preservation "
+        "axioms (get_timeout(connect(c)) = get_timeout(c), etc.) are domain "
+        "equations asserting configuration immutability, not structural "
+        "consequences of a free-type declaration.\n\n"
+        "I also want a convenience predicate is_active : Conn that answers the "
+        "common boolean question 'is this connection currently active?' This is a "
+        "derivation from get_state: is_active(c) holds exactly when "
+        "get_state(c) = active_st. Every per-constructor is_active axiom follows "
+        "by substituting the get_state result for each constructor "
+        "into the derivation condition. Both observers require independent obligation coverage"
+        "\n\n"
+        "The obligation table is 4 observers × 5 constructors = 20 cells, all "
+        "PLAIN. No key dispatch since none of the observers take a key parameter. "
+        "get_error contributes 5 cells: 1 SELECTOR_EXTRACT (mechanical) and 4 "
+        "SELECTOR_FOREIGN (mechanical). The remaining 15 cells require domain "
+        "reasoning. Total axioms: 24 (20 obligation + 1 derivation definition + "
+        "3 distinctness)."
     ),
 )
-
 ALL_EXAMPLES: dict[str, WorkedExample] = {
     "stack": STACK,
     "bug-tracker": BUG_TRACKER,
