@@ -446,7 +446,10 @@ async def _run_trial(
     )
 
     # 3. Well-formedness
-    checker_report = check_spec(spec)
+    try:
+        checker_report = check_spec(spec)
+    except Exception as e:
+        return TrialResult(domain=domain, replicate=replicate, parse_success=False, parse_error=f"check_spec crashed: {e}", coverage_ratio=0.0, uncovered_cells=[], spec_code=spec_code)
     well_formed = checker_report.is_well_formed
 
     # 4. Match — uses upstream sig NOT spec.signature (consistent with doe_runner)

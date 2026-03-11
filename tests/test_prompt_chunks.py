@@ -320,6 +320,7 @@ class TestDomainAnalysisInPrompts:
             imports="...",
             signature_code="sig = Signature(...)",
             mechanical_axiom_lines=(),
+            mechanical_variables=(),
             remaining_cells_description="| obs | ctor |",
             spec_name="Counter"
         )
@@ -341,6 +342,7 @@ class TestDomainAnalysisInPrompts:
             imports="...",
             signature_code="sig = Signature(...)",
             mechanical_axiom_lines=(),
+            mechanical_variables=(),
             remaining_cells_description="| obs | ctor |",
             spec_name="Counter"
         )
@@ -369,6 +371,7 @@ class TestDomainAnalysisInPrompts:
             imports="...",
             signature_code="sig = Signature(...)",
             mechanical_axiom_lines=(),
+            mechanical_variables=(),
             remaining_cells_description="| obs | ctor |",
             spec_name="BankAccount"
         )

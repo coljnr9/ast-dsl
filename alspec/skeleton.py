@@ -117,6 +117,7 @@ class SkeletonData:
     imports: str  # The annotated import block
     signature_code: str  # Verbatim Stage 2 sig code
     mechanical_axiom_lines: tuple[str, ...]  # Each is a complete Axiom(...) expression string
+    mechanical_variables: tuple[tuple[str, str], ...]  # (name, sort) pairs from mechanical axioms
     remaining_cells_description: str  # Markdown description of cells the LLM must fill
     spec_name: str
 
@@ -135,9 +136,23 @@ def generate_skeleton(
     # 2. (Removed) Variable declarations are now provided by the LLM in the tool call.
 
     # 3. Mechanical axiom lines
+    from .axiom_gen import collect_variables
+
     mechanical_lines = tuple(
         render_axiom_to_python(ax, declarations=False) for ax in mechanical_report.axioms
     )
+
+    mech_vars: list[tuple[str, str]] = []
+    for axiom in mechanical_report.axioms:
+        mech_vars.extend(collect_variables(axiom))
+
+    # Deduplicate preserving order
+    seen_vars: set[str] = set()
+    unique_mech_vars: list[tuple[str, str]] = []
+    for name, sort in mech_vars:
+        if name not in seen_vars:
+            seen_vars.add(name)
+            unique_mech_vars.append((name, sort))
 
     # 4. Remaining cells description
     from .obligation_render import _structural_hint_parts
@@ -223,6 +238,7 @@ def generate_skeleton(
         imports=imports,
         signature_code=_strip_imports(signature_code),
         mechanical_axiom_lines=mechanical_lines,
+        mechanical_variables=tuple(unique_mech_vars),
         remaining_cells_description=remaining_cells_description,
         spec_name=spec_name,
     )
@@ -251,7 +267,13 @@ def splice_fills(
     fills: list[dict[str, str]],
 ) -> str:
     """Assembles the final .py file from skeleton + fills."""
-    var_declarations = render_variable_declarations(variables)
+    # Merge mechanical axiom variables with LLM-provided variables
+    # LLM variables take precedence (they come first in the list for dedup)
+    merged_variables = list(variables)
+    for name, sort in skeleton.mechanical_variables:
+        merged_variables.append({"name": name, "sort": sort})
+
+    var_declarations = render_variable_declarations(merged_variables)
     mechanical_axioms_code = "\n".join(
         f"    {line}," for line in skeleton.mechanical_axiom_lines
     )
