@@ -114,4 +114,6 @@ Declare all variables in the `variables` field of the tool call. Each variable n
 Use the exact helper functions shown in the skeleton's Imports section.
 Do NOT use raw constructors like `FnApp(...)` -- always use the helpers (`app(...)`, `eq(...)`, etc.).
 
+Note: The worked examples below are formatted as Python function calls with triple-quoted strings to preserve multi-line readability. When evaluating a new specification, you must map your response directly into the JSON arguments required by the `submit_axiom_fills` tool.
+
 Call `submit_axiom_fills` with your analysis and fills array. Do NOT return code."""

@@ -380,13 +380,36 @@ class WorkedExample:
             parts.append("```")
         elif mode == RenderMode.FILLS:
             import json
-            fills_data = {
-                "analysis": self.fills_analysis,
-                "variables": self.fills_variables,
-                "fills": self.fills_entries,
-            }
-            parts.append("```json")
-            parts.append(json.dumps(fills_data, indent=2))
+            parts.append("```python")
+            parts.append("submit_axiom_fills(")
+            parts.append(f"    analysis={json.dumps(self.fills_analysis)},")
+            
+            # format variables
+            if not self.fills_variables:
+                parts.append("    variables=[],")
+            else:
+                parts.append("    variables=[")
+                for i, var in enumerate(self.fills_variables):
+                    comma = "," if i < len(self.fills_variables) - 1 else ""
+                    parts.append(f"        {json.dumps(var)}{comma}")
+                parts.append("    ],")
+            
+            # format fills
+            if not self.fills_entries:
+                parts.append("    fills=[]")
+            else:
+                parts.append("    fills=[")
+                for i, fill in enumerate(self.fills_entries):
+                    comma = "," if i < len(self.fills_entries) - 1 else ""
+                    label_json = json.dumps(fill['label'])
+                    formula_str = fill['formula'].replace('"""', '\\"\\"\\"')
+                    parts.append("        {")
+                    parts.append(f"            \"label\": {label_json},")
+                    parts.append(f"            \"formula\": \"\"\"{formula_str}\"\"\"")
+                    parts.append(f"        }}{comma}")
+                parts.append("    ]")
+            
+            parts.append(")")
             parts.append("```")
 
         return "\n".join(parts)

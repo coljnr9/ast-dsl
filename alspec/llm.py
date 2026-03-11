@@ -542,7 +542,7 @@ class AsyncLLMClient:
                          return Err(RuntimeError(f"Malformed fill entry: {entry}"))
                     validated_fills.append({
                         "label": str(entry["label"]),
-                        "formula": str(entry["formula"])
+                        "formula": str(entry["formula"]).strip('"\n ')
                     })
                 return Ok((a, validated_vars, validated_fills, usage))
             case _:
