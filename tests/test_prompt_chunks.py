@@ -163,25 +163,28 @@ class TestChunkContent:
         assert "Step 1: Identify Sorts" in content
         assert 'spec = Spec(name="BugTracker"' in content
 
-    def test_example_session_store_spec_has_axioms(self):
+    def test_example_session_store_spec_has_fills(self):
         chunk = get_chunk(ChunkId.EXAMPLE_SESSION_STORE_SPEC)
         content = chunk.render()
         assert "Step 1: Identify Sorts" in content
-        assert "Axiom(" in content
+        assert "```json" in content
+        assert '"fills": [' in content
         assert "def session_store_spec" not in content
 
-    def test_example_rate_limiter_spec_has_axioms(self):
+    def test_example_rate_limiter_spec_has_fills(self):
         chunk = get_chunk(ChunkId.EXAMPLE_RATE_LIMITER_SPEC)
         content = chunk.render()
         assert "Step 1: Identify Sorts" in content
-        assert "Axiom(" in content
+        assert "```json" in content
+        assert '"fills": [' in content
         assert "def rate_limiter_spec" not in content
 
-    def test_example_dns_zone_spec_has_axioms(self):
+    def test_example_dns_zone_spec_has_fills(self):
         chunk = get_chunk(ChunkId.EXAMPLE_DNS_ZONE_SPEC)
         content = chunk.render()
         assert "Step 1: Identify Sorts" in content
-        assert "Axiom(" in content
+        assert "```json" in content
+        assert '"fills": [' in content
         assert "def dns_zone_spec" not in content
 
 

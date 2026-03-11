@@ -203,7 +203,7 @@ def _example_dns_zone() -> str:
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
 def _example_session_store_spec() -> str:
-    return ALL_EXAMPLES["session-store"].render(RenderMode.SPEC)
+    return ALL_EXAMPLES["session-store"].render(RenderMode.FILLS)
 
 
 @register(
@@ -223,7 +223,7 @@ def _example_session_store_spec() -> str:
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
 def _example_rate_limiter_spec() -> str:
-    return ALL_EXAMPLES["rate-limiter"].render(RenderMode.SPEC)
+    return ALL_EXAMPLES["rate-limiter"].render(RenderMode.FILLS)
 
 
 @register(
@@ -243,7 +243,7 @@ def _example_rate_limiter_spec() -> str:
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
 def _example_dns_zone_spec() -> str:
-    return ALL_EXAMPLES["dns-zone"].render(RenderMode.SPEC)
+    return ALL_EXAMPLES["dns-zone"].render(RenderMode.FILLS)
 
 
 @register(
@@ -279,4 +279,4 @@ def _example_connection() -> str:
     depends_on=(ChunkId.OBLIGATION_PATTERN,),
 )
 def _example_connection_spec() -> str:
-    return ALL_EXAMPLES["connection"].render(RenderMode.SPEC)
+    return ALL_EXAMPLES["connection"].render(RenderMode.FILLS)

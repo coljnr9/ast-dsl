@@ -24,6 +24,7 @@ class RenderMode(Enum):
     ANALYSIS = auto()       # Structured analysis only (no code)
     SIGNATURE = auto()      # Analysis + signature-only code (no axioms, no function wrapper)
     SPEC = auto()           # Analysis + full code without function wrapper
+    FILLS = auto()          # Analysis + submit_axiom_fills tool call JSON
 
 
 class FunctionRole(Enum):
@@ -327,6 +328,11 @@ class WorkedExample:
     code: str
     analysis_text: str = ""   # Free-form reasoning monologue
 
+    # Fields for RenderMode.FILLS (Stage 4 tool call format)
+    fills_analysis: str = ""                          # Axiom design reasoning for the tool call
+    fills_variables: tuple[dict[str, str], ...] = ()  # [{"name": "s", "sort": "Session"}, ...]
+    fills_entries: tuple[dict[str, str], ...] = ()    # [{"label": "...", "formula": "..."}, ...]
+
     def render(
         self,
         mode: RenderMode = RenderMode.FULL,
@@ -348,7 +354,7 @@ class WorkedExample:
         parts.append(f"---\n\n#### Worked Example: {self.domain_name}")
         parts.append(f"_{self.summary}_\n")
 
-        if mode in (RenderMode.FULL, RenderMode.ANALYSIS, RenderMode.SIGNATURE, RenderMode.SPEC):
+        if mode in (RenderMode.FULL, RenderMode.ANALYSIS, RenderMode.SIGNATURE, RenderMode.SPEC, RenderMode.FILLS):
             if self.analysis_text:
                 parts.append("")
                 parts.append("**Analysis**")
@@ -371,6 +377,16 @@ class WorkedExample:
             code = self.code if mode != RenderMode.CODE_BARE else _strip_comments(self.code)
             parts.append("```python")
             parts.append(code)
+            parts.append("```")
+        elif mode == RenderMode.FILLS:
+            import json
+            fills_data = {
+                "analysis": self.fills_analysis,
+                "variables": self.fills_variables,
+                "fills": self.fills_entries,
+            }
+            parts.append("```json")
+            parts.append(json.dumps(fills_data, indent=2))
             parts.append("```")
 
         return "\n".join(parts)
