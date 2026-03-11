@@ -77,7 +77,13 @@ DOMAINS: list[DomainPrompt] = [
     DomainPrompt(
         id="bounded-counter",
         name="Bounded Counter",
-        description="A counter with a maximum value. Increment fails at max. Has observers for value and is-at-max.",
+        description=(
+            "A PLC-style up/down counter (CTUD). Created with a preset value (PV). "
+            "Count-up increments the current value (CV) up to a maximum; count-down "
+            "decrements CV down to zero. Reset sets CV to zero; load sets CV to PV. "
+            "Has observers for CV, PV, and two limit flags: QU (CV >= PV) and "
+            "QD (CV <= 0)."
+        ),
         expected_features={"partial", "predicate", "definedness"},
         complexity=2,
     ),
