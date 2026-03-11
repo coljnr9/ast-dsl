@@ -6282,6 +6282,18 @@ RATE_LIMITER = WorkedExample(
         DesignDecision("Dropped warn infrastructure", "Original design had set_warn/get_warn but stored config with no observable predicate is dead state — removed"),
         DesignDecision("Function-valued derived observer", "get_status is defined compositionally via geq(get_count, get_max) → Status. For each constructor, substitute its post-values into the condition: record changes get_count to succ(get_count(l)) and preserves get_max, giving geq(succ(get_count(l)), get_max(l)) → exceeded, ¬geq(...) → ok. Per-constructor axioms are required — a global definition does not satisfy obligation cells"),
         DesignDecision("Linked predicate and function observers", "over_limit (predicate) and get_status (function) are derived from the same geq condition; get_status_def links them via biconditional, demonstrating that both forms require independent obligation coverage"),
+        DesignDecision(
+            "Counting predicate infrastructure",
+            "over_limit depends on comparing accumulated state (get_count) against "
+            "a stored threshold (get_max) — it cannot be determined from the "
+            "constructor's arguments alone without counting how many records have "
+            "been applied. The full dependency chain: capacity/threshold predicate "
+            "→ counting observer (get_count) → structured Nat with zero/succ → "
+            "comparison predicate (geq). Without any link in this chain, the "
+            "predicate's per-constructor axioms cannot be written. Contrast with "
+            "structural predicates like is_empty or is_active, which need no "
+            "such infrastructure."
+        ),
     ),
     code='''from alspec import (
     Axiom,
@@ -7508,6 +7520,15 @@ CONNECTION = WorkedExample(
             "Error lifecycle",
             "Error codes are injected at failure and lost at recovery. get_error is undefined after "
             "retry because the failure context is cleared — this is the natural partial lifecycle"
+        ),
+        DesignDecision(
+            "Structural predicate",
+            "is_active is defined directly from get_state — its truth on each "
+            "constructor is determined by which State constant get_state returns. "
+            "No counting, comparison, or auxiliary observers needed. Predicates "
+            "like is_empty, is_active, and is_verified follow this pattern: their "
+            "truth value per constructor is immediate from the constructor's "
+            "structure or stored enumeration values."
         ),
     ),
     code='''from alspec import (
