@@ -101,15 +101,16 @@ Return your axioms as formula fills using the `submit_axiom_fills` tool. Each fi
 - `label`: A snake_case axiom label (e.g., `get_cv_step_reset`)
 - `formula`: A complete Python DSL expression using the helper functions from the skeleton's import block
 
-The skeleton (imports, signature, variables, mechanical axioms) is provided in the user prompt.
-Your fills will be spliced into it -- you do NOT need to write imports, the signature, variable
-declarations, or the Spec wrapper.
+The skeleton (imports, signature, mechanical axioms) is provided in the user prompt.
+Your fills will be spliced into it -- you do NOT need to write imports, the signature,
+or the Spec wrapper. You MUST declare all variables you use in the `variables` field
+of the tool call.
 
 Multiple fills may target the same obligation cell. For example, `get_cv x step` in a priority-chain
 domain might need 5 fills: one per priority level (reset, load, count-up, count-down, preserve),
 each with appropriate guards.
 
-Use the exact variable names from the skeleton's Variables section.
+Declare all variables in the `variables` field of the tool call. Each variable needs a name and sort matching the signature.
 Use the exact helper functions shown in the skeleton's Imports section.
 Do NOT use raw constructors like `FnApp(...)` -- always use the helpers (`app(...)`, `eq(...)`, etc.).
 

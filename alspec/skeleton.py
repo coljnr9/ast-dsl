@@ -116,7 +116,6 @@ class SkeletonData:
 
     imports: str  # The annotated import block
     signature_code: str  # Verbatim Stage 2 sig code
-    var_declarations: str  # Variable declarations derived from constructor params
     mechanical_axiom_lines: tuple[str, ...]  # Each is a complete Axiom(...) expression string
     remaining_cells_description: str  # Markdown description of cells the LLM must fill
     spec_name: str
@@ -133,49 +132,7 @@ def generate_skeleton(
     # 1. Imports
     imports = render_dsl_imports()
 
-    # 2. Variable declarations
-    # Collect all (name, sort) pairs across all constructors and observers for all generated sorts
-    var_pairs: set[tuple[str, str]] = set()
-
-    for gen_sort_name, gen_sort_info in sig.generated_sorts.items():
-        # Constructors
-        for ctor_name in gen_sort_info.constructors:
-            ctor = sig.functions[ctor_name]
-            for p in ctor.params:
-                var_pairs.add((p.name, str(p.sort)))
-
-        # Observers (functions)
-        for fn_name, fn_sym in sig.functions.items():
-            if fn_sym.params and fn_sym.params[0].sort == gen_sort_name:
-                # This is an observer or another operation on this sort
-                for p in fn_sym.params:
-                    var_pairs.add((p.name, str(p.sort)))
-
-        # Observers (predicates)
-        for pred_name, pred_sym in sig.predicates.items():
-            if pred_sym.params and pred_sym.params[0].sort == gen_sort_name:
-                for p in pred_sym.params:
-                    var_pairs.add((p.name, str(p.sort)))
-
-    # Deduplicate and check for name collisions (same name, different sort)
-    name_to_sort: dict[str, str] = {}
-    for name, sort in sorted(var_pairs):
-        if name in name_to_sort and name_to_sort[name] != sort:
-            # Check if we can rename one of them? No, let's follow the simple rule.
-            # Actually, most signatures will use consistent naming.
-            # If there's a collision, we'll just use the first sort we found.
-            # But the user said "raise an error".
-            pass  # We'll stick to the one in name_to_sort for now to avoid crashing if possible,
-            # but let's follow the user's "raising an error" instruction.
-            # Wait, I'll just skip the collision for now and use the first one if I must,
-            # or indeed raise an error if it's a real conflict.
-        else:
-            name_to_sort[name] = sort
-
-    var_lines = []
-    for name, sort in sorted(name_to_sort.items()):
-        var_lines.append(f'{name} = var("{name}", "{sort}")')
-    var_declarations = "\n".join(var_lines)
+    # 2. (Removed) Variable declarations are now provided by the LLM in the tool call.
 
     # 3. Mechanical axiom lines
     mechanical_lines = tuple(
@@ -265,15 +222,36 @@ def generate_skeleton(
     return SkeletonData(
         imports=imports,
         signature_code=_strip_imports(signature_code),
-        var_declarations=var_declarations,
         mechanical_axiom_lines=mechanical_lines,
         remaining_cells_description=remaining_cells_description,
         spec_name=spec_name,
     )
 
 
-def splice_fills(skeleton: SkeletonData, fills: list[dict[str, str]]) -> str:
+def render_variable_declarations(variables: list[dict[str, str]]) -> str:
+    """Render LLM-provided variable declarations as Python var() calls.
+
+    Deduplicates by name (first occurrence wins) and sorts alphabetically.
+    """
+    seen: dict[str, str] = {}
+    for v in variables:
+        name = v["name"]
+        sort = v["sort"]
+        if name not in seen:
+            seen[name] = sort
+    lines = []
+    for name, sort in sorted(seen.items()):
+        lines.append(f'{name} = var("{name}", "{sort}")')
+    return "\n".join(lines)
+
+
+def splice_fills(
+    skeleton: SkeletonData,
+    variables: list[dict[str, str]],
+    fills: list[dict[str, str]],
+) -> str:
     """Assembles the final .py file from skeleton + fills."""
+    var_declarations = render_variable_declarations(variables)
     mechanical_axioms_code = "\n".join(
         f"    {line}," for line in skeleton.mechanical_axiom_lines
     )
@@ -290,7 +268,7 @@ def splice_fills(skeleton: SkeletonData, fills: list[dict[str, str]]) -> str:
 {skeleton.signature_code}
 
 # Variables
-{skeleton.var_declarations}
+{var_declarations}
 
 axioms = (
     # === Mechanical axioms (deterministic) ===

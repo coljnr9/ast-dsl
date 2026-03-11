@@ -384,8 +384,8 @@ async def _run_trial(
                 error=f"LLM error: {exc}",
                 spec_code=None,
             )
-        case Ok((_, fills, _)):
-            code = splice_fills(skeleton, fills)
+        case Ok((_, vars_list, fills, _)):
+            code = splice_fills(skeleton, vars_list, fills)
 
     # ---- Inline scoring (Option B) ----
 

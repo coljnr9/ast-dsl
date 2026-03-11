@@ -316,7 +316,6 @@ class TestDomainAnalysisInPrompts:
         skeleton = SkeletonData(
             imports="...",
             signature_code="sig = Signature(...)",
-            var_declarations="...",
             mechanical_axiom_lines=(),
             remaining_cells_description="| obs | ctor |",
             spec_name="Counter"
@@ -338,7 +337,6 @@ class TestDomainAnalysisInPrompts:
         skeleton = SkeletonData(
             imports="...",
             signature_code="sig = Signature(...)",
-            var_declarations="...",
             mechanical_axiom_lines=(),
             remaining_cells_description="| obs | ctor |",
             spec_name="Counter"
@@ -367,7 +365,6 @@ class TestDomainAnalysisInPrompts:
         skeleton = SkeletonData(
             imports="...",
             signature_code="sig = Signature(...)",
-            var_declarations="...",
             mechanical_axiom_lines=(),
             remaining_cells_description="| obs | ctor |",
             spec_name="BankAccount"

@@ -184,13 +184,36 @@ SUBMIT_AXIOM_FILLS_TOOL: dict[str, object] = {
                         "Do NOT re-derive the signature or obligation table."
                     ),
                 },
+                "variables": {
+                    "type": "array",
+                    "description": (
+                        "Declare all variables used in your axiom formulas. "
+                        "Each variable has a name and sort. These become "
+                        "var(name, sort) declarations in the final spec. "
+                        "Include every variable referenced in any formula."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Variable name, e.g. 's', 'e2', 'key'",
+                            },
+                            "sort": {
+                                "type": "string",
+                                "description": "Sort name matching a sort in the signature, e.g. 'Stack', 'Elem'",
+                            },
+                        },
+                        "required": ["name", "sort"],
+                    },
+                },
                 "fills": {
                     "type": "array",
                     "description": (
                         "One entry per axiom. Multiple entries may target the "
                         "same obligation cell (e.g., 5 entries for get_cv x step "
                         "covering reset/load/count-up/count-down/preserve). "
-                        "Use the variable names declared in the skeleton."
+                        "Use the variable names you declared in the variables field."
                     ),
                     "items": {
                         "type": "object",
@@ -216,7 +239,7 @@ SUBMIT_AXIOM_FILLS_TOOL: dict[str, object] = {
                     },
                 },
             },
-            "required": ["analysis", "fills"],
+            "required": ["analysis", "variables", "fills"],
         },
     },
 }
@@ -434,7 +457,7 @@ class AsyncLLMClient:
         model: str = "meta-llama/llama-3.1-8b-instruct",
         name: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> Result[tuple[str, list[dict[str, str]], UsageInfo | None], Exception]:
+    ) -> Result[tuple[str, list[dict[str, str]], list[dict[str, str]], UsageInfo | None], Exception]:
         """Call the model with submit_axiom_fills and return (analysis, fills, usage).
 
         fills is a list of dicts, each with 'label' and 'formula' string keys.
@@ -498,10 +521,20 @@ class AsyncLLMClient:
             return Err(RuntimeError(f"Failed to parse tool call arguments: {e}"))
 
         analysis = args.get("analysis")
+        variables = args.get("variables")
         fills = args.get("fills")
 
-        match (analysis, fills):
-            case (str(a), list(f)):
+        match (analysis, variables, fills):
+            case (str(a), list(v), list(f)):
+                # Validate variables structure
+                validated_vars = []
+                for entry in v:
+                    if not isinstance(entry, dict) or "name" not in entry or "sort" not in entry:
+                        return Err(RuntimeError(f"Malformed variable entry: {entry}"))
+                    validated_vars.append({
+                        "name": str(entry["name"]),
+                        "sort": str(entry["sort"]),
+                    })
                 # Validate fills structure
                 validated_fills = []
                 for entry in f:
@@ -511,10 +544,10 @@ class AsyncLLMClient:
                         "label": str(entry["label"]),
                         "formula": str(entry["formula"])
                     })
-                return Ok((a, validated_fills, usage))
+                return Ok((a, validated_vars, validated_fills, usage))
             case _:
                 return Err(
-                    RuntimeError("submit_axiom_fills arguments missing 'analysis' or 'fills' fields")
+                    RuntimeError("submit_axiom_fills arguments missing 'analysis', 'variables', or 'fills' fields")
                 )
 
     async def generate_text(

@@ -124,7 +124,6 @@ def _build_axioms_user_prompt(
         spec_name=spec_name,
         skeleton_imports=skeleton.imports,
         skeleton_signature_code=skeleton.signature_code,
-        skeleton_var_declarations=skeleton.var_declarations,
         mechanical_axioms="\n".join(
             f"    {line}," for line in skeleton.mechanical_axiom_lines
         ),
@@ -565,9 +564,9 @@ async def run_pipeline(
                 obligation_table=table,
                 obligation_table_rendered=table_md,
             )
-        case Ok((analysis4, fills4, usage4)):
+        case Ok((analysis4, vars4, fills4, usage4)):
             stage_usages.append(StageUsage("axioms", usage4))
-            code4 = splice_fills(skeleton, fills4)
+            code4 = splice_fills(skeleton, vars4, fills4)
 
     # ---- Validation ----
     spec_or_err = _execute_spec_code(code4)
