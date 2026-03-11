@@ -331,6 +331,7 @@ class WorkedExample:
     # Fields for RenderMode.FILLS (Stage 4 tool call format)
     fills_analysis: str = ""                          # Axiom design reasoning for the tool call
     fills_variables: tuple[dict[str, str], ...] = ()  # [{"name": "s", "sort": "Session"}, ...]
+    fills_constructor_terms: tuple[dict[str, str], ...] = ()  # [{"name": "_zone_add_record", "expression": "app(\"add_record\", z, n, t, d, ttl)"}, ...]
     fills_entries: tuple[dict[str, str], ...] = ()    # [{"label": "...", "formula": "..."}, ...]
 
     def render(
@@ -379,6 +380,16 @@ class WorkedExample:
             parts.append(code)
             parts.append("```")
         elif mode == RenderMode.FILLS:
+            # Constructor terms section
+            if self.fills_constructor_terms:
+                parts.append("")
+                parts.append("**Constructor Terms (from skeleton)**")
+                parts.append("```python")
+                for ct in self.fills_constructor_terms:
+                    parts.append(f"{ct['name']} = {ct['expression']}")
+                parts.append("```")
+                parts.append("")
+
             import json
             parts.append("```python")
             parts.append("submit_axiom_fills(")

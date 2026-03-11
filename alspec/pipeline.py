@@ -11,6 +11,7 @@ The pipeline is the core logic; eval harness is a thin wrapper around it.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from dataclasses import dataclass
@@ -129,6 +130,9 @@ def _build_axioms_user_prompt(
         ),
         remaining_cells=skeleton.remaining_cells_description,
         signature_analysis=signature_analysis,
+        constructor_terms="\n".join(
+            f"{abbrev} = {expr}" for _, abbrev, expr in skeleton.constructor_terms
+        ),
     )
 
 
@@ -531,6 +535,14 @@ async def run_pipeline(
         spec_name=spec_name,
     )
 
+    logger.info(
+        "Constructor terms: %d abbreviations across %d sorts",
+        len(skeleton.constructor_terms),
+        len(set(sort for sort, _, _ in skeleton.constructor_terms)),
+    )
+    for sort_name, abbrev, expr in skeleton.constructor_terms:
+        logger.debug("  %s = %s", abbrev, expr)
+
     stage4_user = _build_axioms_user_prompt(
         domain_description=domain_description,
         spec_name=spec_name,
@@ -547,7 +559,12 @@ async def run_pipeline(
     result4 = await client.generate_with_fills_tool(
         stage4_messages,
         model=model,
-        name=f"Stage 4 (Axioms) - {domain_id}"
+        name=f"Stage 4 (Axioms) - {domain_id}",
+        metadata={
+            "constructor_term_count": str(len(skeleton.constructor_terms)),
+            "constructor_term_sorts": ", ".join(sorted(set(sort for sort, _, _ in skeleton.constructor_terms))),
+            "constructor_terms": json.dumps({abbrev: expr for _, abbrev, expr in skeleton.constructor_terms}),
+        }
     )
 
     match result4:

@@ -321,6 +321,7 @@ class TestDomainAnalysisInPrompts:
             signature_code="sig = Signature(...)",
             mechanical_axiom_lines=(),
             mechanical_variables=(),
+            constructor_terms=(),
             remaining_cells_description="| obs | ctor |",
             spec_name="Counter"
         )
@@ -343,6 +344,7 @@ class TestDomainAnalysisInPrompts:
             signature_code="sig = Signature(...)",
             mechanical_axiom_lines=(),
             mechanical_variables=(),
+            constructor_terms=(),
             remaining_cells_description="| obs | ctor |",
             spec_name="Counter"
         )
@@ -372,6 +374,7 @@ class TestDomainAnalysisInPrompts:
             signature_code="sig = Signature(...)",
             mechanical_axiom_lines=(),
             mechanical_variables=(),
+            constructor_terms=(),
             remaining_cells_description="| obs | ctor |",
             spec_name="BankAccount"
         )

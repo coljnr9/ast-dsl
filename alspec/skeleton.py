@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import inspect
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 import alspec.helpers as helpers
 from alspec.axiom_gen import render_axiom_to_python
@@ -118,6 +121,7 @@ class SkeletonData:
     signature_code: str  # Verbatim Stage 2 sig code
     mechanical_axiom_lines: tuple[str, ...]  # Each is a complete Axiom(...) expression string
     mechanical_variables: tuple[tuple[str, str], ...]  # (name, sort) pairs from mechanical axioms
+    constructor_terms: tuple[tuple[str, str, str], ...]  # (sort_name, abbrev_name, expression)
     remaining_cells_description: str  # Markdown description of cells the LLM must fill
     spec_name: str
 
@@ -135,11 +139,33 @@ def generate_skeleton(
 
     # 2. (Removed) Variable declarations are now provided by the LLM in the tool call.
 
-    # 3. Mechanical axiom lines
+    # 3. Constructor term abbreviations
+    constructor_terms: list[tuple[str, str, str]] = []
+    reverse_abbreviations: dict[str, str] = {}
+    for sort_name, info in sig.generated_sorts.items():
+        for ctor_name in info.constructors:
+            ctor = sig.functions[ctor_name]
+            abbrev = f"_{sort_name.lower()}_{ctor_name}"
+            if not ctor.params:
+                expr = f'const("{ctor_name}")'
+            else:
+                params_str = ", ".join(p.name for p in ctor.params)
+                expr = f'app("{ctor_name}", {params_str})'
+            constructor_terms.append((sort_name, abbrev, expr))
+            reverse_abbreviations[expr] = abbrev
+
+    logger.info(
+        "Generated %d constructor term abbreviations for %d sorts",
+        len(constructor_terms),
+        len(sig.generated_sorts),
+    )
+
+    # 4. Mechanical axiom lines
     from .axiom_gen import collect_variables
 
     mechanical_lines = tuple(
-        render_axiom_to_python(ax, declarations=False) for ax in mechanical_report.axioms
+        render_axiom_to_python(ax, declarations=False, abbreviations=reverse_abbreviations)
+        for ax in mechanical_report.axioms
     )
 
     mech_vars: list[tuple[str, str]] = []
@@ -154,7 +180,7 @@ def generate_skeleton(
             seen_vars.add(name)
             unique_mech_vars.append((name, sort))
 
-    # 4. Remaining cells description
+    # 5. Remaining cells description
     from .obligation_render import _structural_hint_parts
 
     covered_keys = {
@@ -239,6 +265,7 @@ def generate_skeleton(
         signature_code=_strip_imports(signature_code),
         mechanical_axiom_lines=mechanical_lines,
         mechanical_variables=tuple(unique_mech_vars),
+        constructor_terms=tuple(constructor_terms),
         remaining_cells_description=remaining_cells_description,
         spec_name=spec_name,
     )
@@ -274,6 +301,9 @@ def splice_fills(
         merged_variables.append({"name": name, "sort": sort})
 
     var_declarations = render_variable_declarations(merged_variables)
+    constructor_term_lines = "\n".join(
+        f"{abbrev} = {expr}" for _, abbrev, expr in skeleton.constructor_terms
+    )
     mechanical_axioms_code = "\n".join(
         f"    {line}," for line in skeleton.mechanical_axiom_lines
     )
@@ -291,6 +321,9 @@ def splice_fills(
 
 # Variables
 {var_declarations}
+
+# Constructor terms
+{constructor_term_lines}
 
 axioms = (
     # === Mechanical axioms (deterministic) ===

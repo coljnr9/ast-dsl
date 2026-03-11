@@ -530,7 +530,12 @@ def collect_variables(axiom: Axiom) -> list[tuple[str, str]]:
     return ordered
 
 
-def render_axiom_to_python(axiom: Axiom, *, declarations: bool = True) -> str:
+def render_axiom_to_python(
+    axiom: Axiom,
+    *,
+    declarations: bool = True,
+    abbreviations: dict[str, str] | None = None,
+) -> str:
     """Render an Axiom as a Python DSL source code string.
 
     If declarations=True (default), includes variable declarations
@@ -544,6 +549,9 @@ def render_axiom_to_python(axiom: Axiom, *, declarations: bool = True) -> str:
     variable names. Caller is responsible for ensuring the variable declarations
     are in scope.
 
+    If abbreviations is provided, it maps expression strings (e.g. 'app("push", s, e)')
+    to abbreviation names (e.g. '_stack_push'). These will be used in the output.
+
     Uses the helper functions (forall, eq, app, var, const, pred_app, implication,
     negation, iff, definedness, field_access, exists, conjunction, etc.)
     — the same vocabulary the LLM uses to construct axioms.
@@ -551,7 +559,7 @@ def render_axiom_to_python(axiom: Axiom, *, declarations: bool = True) -> str:
     vars_in_order = collect_variables(axiom)
     short_names: set[str] = {name for name, _sort in vars_in_order}
 
-    body = _render_formula(axiom.formula, short_names)
+    body = _render_formula(axiom.formula, short_names, abbreviations)
     axiom_line = f'Axiom("{axiom.label}", {body})'
 
     if not declarations:
@@ -563,36 +571,56 @@ def render_axiom_to_python(axiom: Axiom, *, declarations: bool = True) -> str:
     return axiom_line
 
 
-def _render_term(term: Term, short_names: set[str] | None = None) -> str:
+def _render_term(
+    term: Term,
+    short_names: set[str] | None = None,
+    abbreviations: dict[str, str] | None = None,
+) -> str:
     """Recursive renderer for Terms.
 
     If short_names is provided, Var nodes whose name is in that set are
     rendered as bare identifiers (e.g. `s`) rather than `var("s", "Sort")`.
+
+    If abbreviations is provided, it maps expression strings to abbreviation names.
     """
+    rendered = ""
     if isinstance(term, Var):
         if short_names is not None and term.name in short_names:
-            return term.name
-        return f'var("{term.name}", "{term.sort}")'
+            rendered = term.name
+        else:
+            rendered = f'var("{term.name}", "{term.sort}")'
     elif isinstance(term, FnApp):
         if not term.args:
-            return f'const("{term.fn_name}")'
-        args_code = ", ".join(_render_term(arg, short_names) for arg in term.args)
-        return f'app("{term.fn_name}", {args_code})'
+            rendered = f'const("{term.fn_name}")'
+        else:
+            args_code = ", ".join(
+                _render_term(arg, short_names, abbreviations) for arg in term.args
+            )
+            rendered = f'app("{term.fn_name}", {args_code})'
     elif isinstance(term, FieldAccess):
-        return f'field_access({_render_term(term.term, short_names)}, "{term.field_name}")'
+        rendered = f'field_access({_render_term(term.term, short_names, abbreviations)}, "{term.field_name}")'
     elif isinstance(term, Literal):
-        return f'Literal("{term.value}", SortRef("{term.sort}"))'
+        rendered = f'Literal("{term.value}", SortRef("{term.sort}"))'
     else:
         raise ValueError(f"Unknown Term type: {type(term)}")
 
+    if abbreviations and rendered in abbreviations:
+        return abbreviations[rendered]
+    return rendered
 
-def _render_formula(formula: Formula, short_names: set[str] | None = None) -> str:
+
+def _render_formula(
+    formula: Formula,
+    short_names: set[str] | None = None,
+    abbreviations: dict[str, str] | None = None,
+) -> str:
     """Recursive renderer for Formulas."""
+
     def rt(t: Term) -> str:
-        return _render_term(t, short_names)
+        return _render_term(t, short_names, abbreviations)
 
     def rf(f: Formula) -> str:
-        return _render_formula(f, short_names)
+        return _render_formula(f, short_names, abbreviations)
 
     if isinstance(formula, Equation):
         return f"eq({rt(formula.lhs)}, {rt(formula.rhs)})"
@@ -618,7 +646,9 @@ def _render_formula(formula: Formula, short_names: set[str] | None = None) -> st
                 for v in formula.variables
             )
         else:
-            vars_code = ", ".join(f'var("{v.name}", "{v.sort}")' for v in formula.variables)
+            vars_code = ", ".join(
+                f'var("{v.name}", "{v.sort}")' for v in formula.variables
+            )
         return f"forall([{vars_code}], {rf(formula.body)})"
     elif isinstance(formula, ExistentialQuant):
         if short_names is not None:
@@ -627,7 +657,9 @@ def _render_formula(formula: Formula, short_names: set[str] | None = None) -> st
                 for v in formula.variables
             )
         else:
-            vars_code = ", ".join(f'var("{v.name}", "{v.sort}")' for v in formula.variables)
+            vars_code = ", ".join(
+                f'var("{v.name}", "{v.sort}")' for v in formula.variables
+            )
         return f"exists([{vars_code}], {rf(formula.body)})"
     elif isinstance(formula, Definedness):
         return f"definedness({rt(formula.term)})"
