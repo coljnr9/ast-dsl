@@ -124,6 +124,8 @@ class SkeletonData:
     constructor_terms: tuple[tuple[str, str, str], ...]  # (sort_name, abbrev_name, expression)
     remaining_cells_description: str  # Markdown description of cells the LLM must fill
     spec_name: str
+    # Optional enrichment sections (toggleable for DoE)
+    observer_reference: str = ""  # Component B — observer DSL patterns table
 
 
 def generate_skeleton(
@@ -132,6 +134,9 @@ def generate_skeleton(
     table: ObligationTable,
     mechanical_report: MechanicalAxiomReport,
     spec_name: str,
+    *,
+    dsl_cell_hints: bool = True,
+    observer_reference: bool = True,
 ) -> SkeletonData:
     """Logic to generate the skeleton data."""
     # 1. Imports
@@ -142,6 +147,7 @@ def generate_skeleton(
     # 3. Constructor term abbreviations
     constructor_terms: list[tuple[str, str, str]] = []
     reverse_abbreviations: dict[str, str] = {}
+    ctor_name_to_abbrev: dict[str, str] = {}  # e.g. "register" -> "_library_register"
     for sort_name, info in sig.generated_sorts.items():
         for ctor_name in info.constructors:
             ctor = sig.functions[ctor_name]
@@ -153,6 +159,7 @@ def generate_skeleton(
                 expr = f'app("{ctor_name}", {params_str})'
             constructor_terms.append((sort_name, abbrev, expr))
             reverse_abbreviations[expr] = abbrev
+            ctor_name_to_abbrev[ctor_name] = abbrev
 
     logger.info(
         "Generated %d constructor term abbreviations for %d sorts",
@@ -256,9 +263,72 @@ def generate_skeleton(
                     hint = cell.tier.value
 
             remaining_parts.append(f"{item} -- {hint}")
+
+            if dsl_cell_hints:
+                # Build the renamed lookup parameter list (same logic as _structural_hint_parts)
+                is_pred = cell.observer_is_predicate
+                dsl_fn = "pred_app" if is_pred else "app"
+                if is_pred:
+                    obs_sym = sig.predicates[obs_name]
+                else:
+                    obs_sym = sig.functions[obs_name]
+                ctor_sym = sig.functions[cell.constructor_name]
+                ctor_param_name_set = {p.name for p in ctor_sym.params}
+                obs_lookup_params = list(obs_sym.params[1:])
+                renamed_lookup: list[str] = [
+                    p.name + "2" if p.name in ctor_param_name_set else p.name
+                    for p in obs_lookup_params
+                ]
+
+                # Find state variable: first ctor param whose sort equals generated sort
+                gen_sort = cell.generated_sort
+                state_var: str | None = None
+                for p in ctor_sym.params:
+                    if p.sort == gen_sort:
+                        state_var = p.name
+                        break
+
+                ctor_abbrev = ctor_name_to_abbrev.get(cell.constructor_name, cell.constructor_name)
+
+                dsl_obs_args = [ctor_abbrev] + renamed_lookup
+                dsl_obs_call = f'{dsl_fn}("{obs_name}", {', '.join(dsl_obs_args)})'
+
+                if state_var is not None:
+                    deleg_args = [state_var] + renamed_lookup
+                    deleg_call = f'{dsl_fn}("{obs_name}", {', '.join(deleg_args)})'
+                    remaining_parts.append(
+                        f"  DSL: `{dsl_obs_call}` | delegation: `{deleg_call}`"
+                    )
+                else:
+                    remaining_parts.append(f"  DSL: `{dsl_obs_call}`")
+
         remaining_parts.append("")
 
     remaining_cells_description = "\n".join(remaining_parts)
+
+    # 6. Observer quick reference table (Component B)
+    observer_reference_str = ""
+    if observer_reference and obs_remaining:
+        ref_lines = [
+            "### Observer DSL Patterns",
+            "",
+            "Use these patterns when constructing observer applications in your formulas.",
+            "",
+            "| Observer | Arity | DSL Pattern |",
+            "|----------|-------|-------------||",
+        ]
+        for obs_name in sorted(obs_remaining.keys()):
+            is_pred = obs_name in table.pred_roles
+            dsl_fn = "pred_app" if is_pred else "app"
+            if is_pred:
+                obs_sym = sig.predicates[obs_name]
+            else:
+                obs_sym = sig.functions[obs_name]
+            arity = len(obs_sym.params)
+            placeholders = [f"<{p.sort}_term>" for p in obs_sym.params]
+            pattern = f'{dsl_fn}("{obs_name}", {', '.join(placeholders)})'
+            ref_lines.append(f"| `{obs_name}` | {arity} | `{pattern}` |")
+        observer_reference_str = "\n".join(ref_lines)
 
     return SkeletonData(
         imports=imports,
@@ -268,6 +338,7 @@ def generate_skeleton(
         constructor_terms=tuple(constructor_terms),
         remaining_cells_description=remaining_cells_description,
         spec_name=spec_name,
+        observer_reference=observer_reference_str,
     )
 
 

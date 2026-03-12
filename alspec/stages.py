@@ -18,32 +18,34 @@ from .result import Err, Ok
 from .score import SpecScore, score_spec
 from .signature import GeneratedSortInfo, Signature
 from .spec import Spec
+from .compile_diagnostic import CompileDiagnostic
 
 logger = logging.getLogger(__name__)
 
 class StageError(Exception):
     """Base exception for pipeline stage failures."""
-    def __init__(self, stage: str, message: str, *, cause: Exception | None = None):
+    def __init__(self, stage: str, message: str, *, cause: Exception | None = None, diagnostic: CompileDiagnostic | None = None):
         self.stage = stage
         self.message = message
         self.cause = cause
+        self.diagnostic = diagnostic
         super().__init__(f"Stage '{stage}' failed: {message}")
 
 class AnalysisError(StageError):
-    def __init__(self, message: str, **kwargs):
-        super().__init__("analysis", message, **kwargs)
+    def __init__(self, message: str, *, cause: Exception | None = None, diagnostic: CompileDiagnostic | None = None):
+        super().__init__("analysis", message, cause=cause, diagnostic=diagnostic)
 
 class SignatureError(StageError):
-    def __init__(self, message: str, **kwargs):
-        super().__init__("signature", message, **kwargs)
+    def __init__(self, message: str, *, cause: Exception | None = None, diagnostic: CompileDiagnostic | None = None):
+        super().__init__("signature", message, cause=cause, diagnostic=diagnostic)
 
 class ObligationError(StageError):
-    def __init__(self, message: str, **kwargs):
-        super().__init__("obligation", message, **kwargs)
+    def __init__(self, message: str, *, cause: Exception | None = None, diagnostic: CompileDiagnostic | None = None):
+        super().__init__("obligation", message, cause=cause, diagnostic=diagnostic)
 
 class AxiomError(StageError):
-    def __init__(self, message: str, **kwargs):
-        super().__init__("axiom", message, **kwargs)
+    def __init__(self, message: str, *, cause: Exception | None = None, diagnostic: CompileDiagnostic | None = None):
+        super().__init__("axiom", message, cause=cause, diagnostic=diagnostic)
 
 @dataclass
 class StageContext:
@@ -279,7 +281,12 @@ class SignatureStage(PipelineStage):
         sig_or_err = _execute_signature_code(code)
         match sig_or_err:
             case str(err):
-                raise SignatureError(f"Code execution failed: {err}")
+                from .compile_diagnostic import diagnose_code
+                diag = diagnose_code(code, stage="signature")
+                raise SignatureError(
+                    f"Code execution failed: {err}",
+                    diagnostic=diag,
+                )
             case Signature() as sig:
                 return SignatureOutput(
                     signature=sig,
@@ -356,6 +363,7 @@ class AxiomStage(PipelineStage):
             constructor_terms="\n".join(
                 f"{abbrev} = {expr}" for _, abbrev, expr in skeleton.constructor_terms
             ),
+            observer_reference=skeleton.observer_reference,
         )
         system_prompt = build_default_prompt(Stage.AXIOMS)
         
@@ -383,7 +391,12 @@ class AxiomStage(PipelineStage):
         spec_or_err = _execute_spec_code(code4)
         match spec_or_err:
             case str(err):
-                raise AxiomError(f"Code execution failed: {err}")
+                from .compile_diagnostic import diagnose_code
+                diag = diagnose_code(code4, stage="axioms")
+                raise AxiomError(
+                    f"Code execution failed: {err}",
+                    diagnostic=diag,
+                )
             case Spec() as spec:
                 combined_axioms = list(spec.axioms)
                 spec = Spec(

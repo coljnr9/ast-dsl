@@ -78,6 +78,7 @@ def _build_axioms_user_prompt(
         constructor_terms="\n".join(
             f"{abbrev} = {expr}" for _, abbrev, expr in skeleton.constructor_terms
         ),
+        observer_reference=skeleton.observer_reference,
     )
 
 logger = logging.getLogger(__name__)
