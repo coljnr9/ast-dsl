@@ -48,6 +48,11 @@ class EvalResult:
     replicate: int = 1
     # Failure taxonomy classification
     failure_category: str = "pass"  # FailureCategory.value — stored as string for serialization
+    # Structured compile diagnostic summary
+    compile_diagnostic_class: str | None = None
+    compile_diagnostic_retryable: bool = False
+    compile_diagnostic_pass: str | None = None
+    compile_diagnostic_line: int | None = None
 
 
 @dataclass(frozen=True)
@@ -138,6 +143,10 @@ def _pipeline_to_eval(domain_id: str, model: str, pr: PipelineResult) -> EvalRes
         covered_cell_count=covered_cell_count,
         coverage_ratio=coverage_ratio,
         stage2_skip_reason=pr.axioms_skip_reason,
+        compile_diagnostic_class=pr.compile_diagnostic.error_class if pr.compile_diagnostic else None,
+        compile_diagnostic_retryable=pr.compile_diagnostic.retryable if pr.compile_diagnostic else False,
+        compile_diagnostic_pass=pr.compile_diagnostic.pass_name if pr.compile_diagnostic else None,
+        compile_diagnostic_line=pr.compile_diagnostic.line_number if pr.compile_diagnostic else None,
         **intrinsic
     )
 
@@ -236,6 +245,23 @@ def _emit_langfuse_scores(eval_result: EvalResult) -> None:
             comment=None,
             data_type="CATEGORICAL",
         )
+        if eval_result.compile_diagnostic_class:
+            langfuse.score_current_trace(
+                name="error_class",
+                value=eval_result.compile_diagnostic_class,
+                data_type="CATEGORICAL",
+            )
+        if eval_result.compile_diagnostic_pass:
+            langfuse.score_current_trace(
+                name="error_pass",
+                value=eval_result.compile_diagnostic_pass,
+                data_type="CATEGORICAL",
+            )
+        if eval_result.compile_diagnostic_line is not None:
+            langfuse.score_current_trace(
+                name="error_line",
+                value=float(eval_result.compile_diagnostic_line),
+            )
     else:
         error_msg = eval_result.parse_error or eval_result.checker_error or "unknown failure"
 
@@ -270,6 +296,23 @@ def _emit_langfuse_scores(eval_result: EvalResult) -> None:
             comment=error_msg,
             data_type="CATEGORICAL",
         )
+        if eval_result.compile_diagnostic_class:
+            langfuse.score_current_trace(
+                name="error_class",
+                value=eval_result.compile_diagnostic_class,
+                data_type="CATEGORICAL",
+            )
+        if eval_result.compile_diagnostic_pass:
+            langfuse.score_current_trace(
+                name="error_pass",
+                value=eval_result.compile_diagnostic_pass,
+                data_type="CATEGORICAL",
+            )
+        if eval_result.compile_diagnostic_line is not None:
+            langfuse.score_current_trace(
+                name="error_line",
+                value=float(eval_result.compile_diagnostic_line),
+            )
 
 
 def _emit_session_scores(

@@ -268,6 +268,13 @@ def export_csv(run: EvalRun, path: str) -> None:
                 "predicate_count",
                 "latency_ms",
                 "failure_category",
+                "compile_diagnostic_class",
+                "compile_diagnostic_retryable",
+                "compile_diagnostic_pass",
+                "compile_diagnostic_line",
+                "coverage_ratio",
+                "obligation_cell_count",
+                "covered_cell_count",
             ]
         )
 
@@ -300,6 +307,13 @@ def export_csv(run: EvalRun, path: str) -> None:
                         0,
                         result.latency_ms,
                         result.failure_category,
+                        result.compile_diagnostic_class,
+                        result.compile_diagnostic_retryable,
+                        result.compile_diagnostic_pass,
+                        result.compile_diagnostic_line,
+                        result.coverage_ratio,
+                        result.obligation_cell_count,
+                        result.covered_cell_count,
                     ]
                 )
             else:
@@ -323,6 +337,13 @@ def export_csv(run: EvalRun, path: str) -> None:
                         score.predicate_count,
                         result.latency_ms,
                         result.failure_category,
+                        result.compile_diagnostic_class,
+                        result.compile_diagnostic_retryable,
+                        result.compile_diagnostic_pass,
+                        result.compile_diagnostic_line,
+                        result.coverage_ratio,
+                        result.obligation_cell_count,
+                        result.covered_cell_count,
                     ]
                 )
 
@@ -450,6 +471,20 @@ def print_replicate_summary(
         out.write(f"    {cat:<35} {count:>3} ({pct:5.1f}%)\n")
     out.write("\n")
 
+    # WF error breakdown across all replicates.
+    wf_error_counts: Counter[str] = Counter()
+    for r in all_results:
+        if r.score is not None:
+            for diag in r.score.diagnostics:
+                if diag.severity == Severity.ERROR:
+                    wf_error_counts[diag.check] += 1
+
+    if wf_error_counts:
+        out.write("  WF error breakdown:\n")
+        for check, count in wf_error_counts.most_common():
+            out.write(f"    {check:<35} {count:>3}\n")
+        out.write("\n")
+
 
 def export_combined_csv(
     all_results: list[EvalResult],
@@ -480,6 +515,13 @@ def export_combined_csv(
                 "predicate_count",
                 "latency_ms",
                 "failure_category",
+                "compile_diagnostic_class",
+                "compile_diagnostic_retryable",
+                "compile_diagnostic_pass",
+                "compile_diagnostic_line",
+                "coverage_ratio",
+                "obligation_cell_count",
+                "covered_cell_count",
             ]
         )
 
@@ -513,6 +555,13 @@ def export_combined_csv(
                         0,
                         result.latency_ms,
                         result.failure_category,
+                        result.compile_diagnostic_class,
+                        result.compile_diagnostic_retryable,
+                        result.compile_diagnostic_pass,
+                        result.compile_diagnostic_line,
+                        result.coverage_ratio,
+                        result.obligation_cell_count,
+                        result.covered_cell_count,
                     ]
                 )
             else:
@@ -537,5 +586,12 @@ def export_combined_csv(
                         score.predicate_count,
                         result.latency_ms,
                         result.failure_category,
+                        result.compile_diagnostic_class,
+                        result.compile_diagnostic_retryable,
+                        result.compile_diagnostic_pass,
+                        result.compile_diagnostic_line,
+                        result.coverage_ratio,
+                        result.obligation_cell_count,
+                        result.covered_cell_count,
                     ]
                 )

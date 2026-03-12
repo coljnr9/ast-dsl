@@ -22,6 +22,7 @@ from .prompt_chunks import ChunkId
 from .score import SpecScore
 from .signature import Signature
 from .spec import Spec
+from .compile_diagnostic import CompileDiagnostic
 
 from .stages import (
     StageContext,
@@ -84,6 +85,9 @@ class PipelineResult:
     # Skip Reasons
     axioms_skip_reason: str | None = None
 
+    # Structured compilation diagnostic (populated on Stage 2/4 code failures)
+    compile_diagnostic: CompileDiagnostic | None = None
+
 # ---------------------------------------------------------------------------
 # Error result helper
 # ---------------------------------------------------------------------------
@@ -104,6 +108,7 @@ def _error_result(
     spec_code: str | None = None,
     spec_analysis: str | None = None,
     axioms_skip_reason: str | None = None,
+    compile_diagnostic: CompileDiagnostic | None = None,
 ) -> PipelineResult:
     """Build a failed PipelineResult with minimal boilerplate."""
     return PipelineResult(
@@ -120,9 +125,10 @@ def _error_result(
         score=None,
         error=error,
         error_stage=error_stage,
-        axioms_skip_reason=axioms_skip_reason,
         stage_usages=tuple(stage_usages),
         total_latency_ms=int((time.time() - start_time) * 1000),
+        axioms_skip_reason=axioms_skip_reason,
+        compile_diagnostic=compile_diagnostic,
     )
 
 # ---------------------------------------------------------------------------
@@ -187,6 +193,7 @@ async def run_pipeline_signature_only(
             stage_usages=stage_usages,
             start_time=start_time,
             domain_analysis=domain_analysis,
+            compile_diagnostic=e.diagnostic,
         )
 
 
@@ -271,4 +278,5 @@ async def run_pipeline(
             spec_code=ax_out.code if ax_out else None,
             spec_analysis=ax_out.analysis if ax_out else None,
             axioms_skip_reason="Stage failed" if not ax_out else None,
+            compile_diagnostic=e.diagnostic,
         )
