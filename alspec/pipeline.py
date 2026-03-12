@@ -563,7 +563,6 @@ async def run_pipeline(
         metadata={
             "constructor_term_count": str(len(skeleton.constructor_terms)),
             "constructor_term_sorts": ", ".join(sorted(set(sort for sort, _, _ in skeleton.constructor_terms))),
-            "constructor_terms": json.dumps({abbrev: expr for _, abbrev, expr in skeleton.constructor_terms}),
         }
     )
 
