@@ -14,7 +14,7 @@ from langfuse.openai import AsyncOpenAI  # type: ignore[attr-defined]
 
 from alspec.result import Err, Ok, Result
 
-_TOOL_CHOICE_AUTO_MODELS = ["inception/mercury-2"]
+_TOOL_CHOICE_AUTO_MODELS = ["inception/mercury-2", "openrouter/hunter-alpha"]
 # ---------------------------------------------------------------------------
 # Token usage metrics
 # ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ SUBMIT_AXIOM_FILLS_TOOL: dict[str, object] = {
                                     "Complete Python DSL expression for the axiom formula. "
                                     "This becomes the second argument to Axiom(label, formula). "
                                     "Use the exact helper functions from the import block. "
-                                    "Example: forall([s, cu], eq(app(\"get_cv\", app(\"init\")), const(\"zero\")))"
+                                    'Example: forall([s, cu], eq(app("get_cv", app("init")), const("zero")))'
                                 ),
                             },
                         },
@@ -451,13 +451,17 @@ class AsyncLLMClient:
                 return Err(
                     RuntimeError("submit_analysis arguments missing 'analysis' field")
                 )
+
     async def generate_with_fills_tool(
         self,
         messages: list[dict[str, str]],
         model: str = "meta-llama/llama-3.1-8b-instruct",
         name: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> Result[tuple[str, list[dict[str, str]], list[dict[str, str]], UsageInfo | None], Exception]:
+    ) -> Result[
+        tuple[str, list[dict[str, str]], list[dict[str, str]], UsageInfo | None],
+        Exception,
+    ]:
         """Call the model with submit_axiom_fills and return (analysis, fills, usage).
 
         fills is a list of dicts, each with 'label' and 'formula' string keys.
@@ -529,25 +533,39 @@ class AsyncLLMClient:
                 # Validate variables structure
                 validated_vars = []
                 for entry in v:
-                    if not isinstance(entry, dict) or "name" not in entry or "sort" not in entry:
+                    if (
+                        not isinstance(entry, dict)
+                        or "name" not in entry
+                        or "sort" not in entry
+                    ):
                         return Err(RuntimeError(f"Malformed variable entry: {entry}"))
-                    validated_vars.append({
-                        "name": str(entry["name"]),
-                        "sort": str(entry["sort"]),
-                    })
+                    validated_vars.append(
+                        {
+                            "name": str(entry["name"]),
+                            "sort": str(entry["sort"]),
+                        }
+                    )
                 # Validate fills structure
                 validated_fills = []
                 for entry in f:
-                    if not isinstance(entry, dict) or "label" not in entry or "formula" not in entry:
-                         return Err(RuntimeError(f"Malformed fill entry: {entry}"))
-                    validated_fills.append({
-                        "label": str(entry["label"]),
-                        "formula": str(entry["formula"]).strip('"\n ')
-                    })
+                    if (
+                        not isinstance(entry, dict)
+                        or "label" not in entry
+                        or "formula" not in entry
+                    ):
+                        return Err(RuntimeError(f"Malformed fill entry: {entry}"))
+                    validated_fills.append(
+                        {
+                            "label": str(entry["label"]),
+                            "formula": str(entry["formula"]).strip('"\n '),
+                        }
+                    )
                 return Ok((a, validated_vars, validated_fills, usage))
             case _:
                 return Err(
-                    RuntimeError("submit_axiom_fills arguments missing 'analysis', 'variables', or 'fills' fields")
+                    RuntimeError(
+                        "submit_axiom_fills arguments missing 'analysis', 'variables', or 'fills' fields"
+                    )
                 )
 
     async def generate_text(
