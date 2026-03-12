@@ -188,7 +188,7 @@ async def run_analysis(
             # Save to cache
             cache_file.parent.mkdir(parents=True, exist_ok=True)
             cache_file.write_text(analysis_text)
-            return analysis_text, StageUsage("analysis", usage)
+            return analysis_text, usage
         case Err(e):
             raise RuntimeError(
                 f"Stage 1 (Analysis) failed for {domain_id}/{lens_name}: {e}"

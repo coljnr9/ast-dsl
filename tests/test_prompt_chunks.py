@@ -299,7 +299,7 @@ class TestDomainAnalysisInPrompts:
     """Verify domain_analysis flows into the user prompts correctly."""
 
     def test_signature_user_prompt_includes_analysis(self):
-        from alspec.pipeline import _build_signature_user_prompt
+        from alspec.eval.doe_runner import _build_signature_user_prompt
         prompt = _build_signature_user_prompt(
             "A simple counter",
             domain_analysis="ENTITIES: Counter with value...",
@@ -308,13 +308,13 @@ class TestDomainAnalysisInPrompts:
         assert "Domain Analysis" in prompt
 
     def test_signature_user_prompt_omits_analysis_when_none(self):
-        from alspec.pipeline import _build_signature_user_prompt
+        from alspec.eval.doe_runner import _build_signature_user_prompt
         prompt = _build_signature_user_prompt("A simple counter")
         assert "Domain Analysis" not in prompt
 
     def test_axioms_user_prompt_excludes_domain_analysis(self):
         """Stage 4 template intentionally drops domain_analysis; confirm it is never rendered."""
-        from alspec.pipeline import _build_axioms_user_prompt
+        from alspec.eval.doe_runner import _build_axioms_user_prompt
         from alspec.skeleton import SkeletonData
         skeleton = SkeletonData(
             imports="...",
@@ -337,7 +337,7 @@ class TestDomainAnalysisInPrompts:
         assert "Domain Analysis" not in prompt
 
     def test_axioms_user_prompt_omits_analysis_when_none(self):
-        from alspec.pipeline import _build_axioms_user_prompt
+        from alspec.eval.doe_runner import _build_axioms_user_prompt
         from alspec.skeleton import SkeletonData
         skeleton = SkeletonData(
             imports="...",
@@ -358,7 +358,7 @@ class TestDomainAnalysisInPrompts:
 
     def test_signature_user_prompt_has_no_methodology(self):
         """Verify generic methodology was moved to system prompt."""
-        from alspec.pipeline import _build_signature_user_prompt
+        from alspec.eval.doe_runner import _build_signature_user_prompt
         prompt = _build_signature_user_prompt("A bank account system")
         # These should NOT be in the user prompt anymore
         assert "Classify functions" not in prompt
@@ -367,7 +367,7 @@ class TestDomainAnalysisInPrompts:
 
     def test_axioms_user_prompt_has_no_methodology(self):
         """Verify generic methodology was moved to system prompt."""
-        from alspec.pipeline import _build_axioms_user_prompt
+        from alspec.eval.doe_runner import _build_axioms_user_prompt
         from alspec.skeleton import SkeletonData
         skeleton = SkeletonData(
             imports="...",

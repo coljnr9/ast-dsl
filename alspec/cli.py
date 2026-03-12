@@ -207,6 +207,8 @@ async def handle_eval(
     lens: str | None = None,
     concurrency: int = 8,
     replicates: int = 1,
+    cache: str | None = None,
+    save_cache: str | None = None,
 ) -> int:
     from alspec.eval.domains import DOMAINS
     from alspec.eval.harness import EvalResult, EvalRun, run_domain_eval
@@ -240,6 +242,17 @@ async def handle_eval(
 
     ref_text = generate_reference()
     prompt_version = f"v3 (sha256: {hashlib.sha256(ref_text.encode()).hexdigest()[:8]})"
+
+    upstream_snapshots = {}
+    if cache:
+        from alspec.cache import load_cache
+        manifest, upstream_snapshots = load_cache(Path(cache))
+        print(f"  Cache: {cache} (hash={manifest.content_hash[:12]}, {len(manifest.domains)} domains)")
+    elif save_cache:
+        # Saving cache will occur at the end
+        pass
+    else:
+        print("  Cache: none (fresh generation)")
 
     # Build the canonical ordered list of (model, domain) pairs so that we can
     # sort gathered results back into a deterministic order after concurrent
@@ -284,13 +297,32 @@ async def handle_eval(
 
             task_start = _time.monotonic()
             try:
+                domain_id_str = getattr(domain, "id", str(domain))
+                from alspec.stages import AnalysisOutput, SignatureOutput
+                cached_analysis: AnalysisOutput | None = None
+                cached_signature: SignatureOutput | None = None
+                
+                if domain_id_str in upstream_snapshots:
+                    snap = upstream_snapshots[domain_id_str]
+                    from alspec.cache import analysis_output_from_snapshot, signature_output_from_snapshot
+                    cached_analysis = analysis_output_from_snapshot(snap)
+                    try:
+                        cached_signature = signature_output_from_snapshot(snap)
+                    except AssertionError:
+                        pass
+                
                 async with _semaphore:
-                    result = await run_domain_eval(
+                    result, pr = await run_domain_eval(
                         client, domain, model,  # type: ignore[arg-type]
                         session_id=_session_id,
                         lens=lens,
                         replicate=_rep,
+                        cached_analysis=cached_analysis,
+                        cached_signature=cached_signature,
                     )
+                if pr is not None:
+                    # MUST bypass frozen dataclass restriction
+                    object.__setattr__(result, "_pipeline_result", pr)
             except Exception as exc:
                 elapsed = _time.monotonic() - task_start
                 completed_count += 1
@@ -346,6 +378,8 @@ async def handle_eval(
             if isinstance(outcome, EvalResult):
                 # Stamp the replicate number on each result.
                 stamped = dataclasses.replace(outcome, replicate=rep)
+                if hasattr(outcome, "_pipeline_result"):
+                    object.__setattr__(stamped, "_pipeline_result", outcome._pipeline_result)
                 rep_results.append(stamped)
             else:
                 model_str, domain = pairs[i]
@@ -430,6 +464,44 @@ async def handle_eval(
         if csv_out:
             export_combined_csv(all_results, run_timestamp, prompt_version, csv_out)
             print(f"Exported combined results to {csv_out}")
+
+    if save_cache:
+        from alspec.cache import save_cache as do_save_cache, snapshot_from_pipeline_result
+        from alspec.prompt_chunks import Stage
+        
+        snapshots = {}
+        for res in all_results:
+            if res.domain_id in snapshots:
+                continue
+            pr = getattr(res, "_pipeline_result", None)
+            if not pr or pr.signature_code is None or pr.signature_analysis is None or pr.signature is None:
+                print(f"Debug skip {res.domain_id}. pr={pr is not None}, code={pr.signature_code is not None if pr else False}, ana={pr.signature_analysis is not None if pr else False}, sig={pr.signature is not None if pr else False}", file=sys.stderr)
+                continue
+            try:
+                snapshots[res.domain_id] = snapshot_from_pipeline_result(
+                    domain=res.domain_id,
+                    analysis_text=pr.domain_analysis,
+                    signature=pr.signature,
+                    signature_code=pr.signature_code,
+                    signature_analysis=pr.signature_analysis,
+                )
+            except ValueError as e:
+                print(f"Warning: could not snapshot {res.domain_id}: {e}", file=sys.stderr)
+                
+        if snapshots:
+            save_dir = Path(save_cache)
+            try:
+                do_save_cache(
+                    save_dir,
+                    snapshots,
+                    model=models[0],
+                    lens=lens,
+                    cache_through=Stage.SIGNATURE,
+                )
+            except Exception as e:
+                print(f"Warning: could not save cache: {e}", file=sys.stderr)
+        else:
+            print("Warning: no snapshots to save.", file=sys.stderr)
 
     return 0
 
@@ -703,6 +775,18 @@ async def async_main() -> int:
         help="Print detailed diagnostics and per-domain cache stats.",
     )
     eval_parser.add_argument(
+        "--cache",
+        type=str,
+        metavar="CACHE_DIR",
+        help="Load a saved pipeline cache (skip Stages 1-2).",
+    )
+    eval_parser.add_argument(
+        "--save-cache",
+        type=str,
+        metavar="CACHE_DIR",
+        help="After running Stages 1-2, save upstream outputs for reuse.",
+    )
+    eval_parser.add_argument(
         "--save-specs",
         type=str,
         metavar="DIR",
@@ -802,6 +886,8 @@ async def async_main() -> int:
                 lens=args.lens if args.lens != "none" else None,
                 concurrency=args.concurrency,
                 replicates=args.replicates,
+                cache=args.cache,
+                save_cache=args.save_cache,
             )
         case "doe":
             match args.doe_command:

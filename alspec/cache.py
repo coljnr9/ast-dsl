@@ -304,3 +304,23 @@ def restore_signature(snapshot: DomainSnapshot) -> Signature:
             f"snapshot has no Stage 2 data"
         )
     return signature_from_json(snapshot.stage2.signature_json)
+
+from alspec.stages import AnalysisOutput, SignatureOutput
+
+def analysis_output_from_snapshot(snapshot: DomainSnapshot) -> AnalysisOutput | None:
+    if snapshot.stage1 is None:
+        return None
+    return AnalysisOutput(
+        analysis_text=snapshot.stage1.analysis_text,
+        usage=None,
+    )
+
+def signature_output_from_snapshot(snapshot: DomainSnapshot) -> SignatureOutput | None:
+    if snapshot.stage2 is None:
+        return None
+    return SignatureOutput(
+        signature=restore_signature(snapshot),
+        code=snapshot.stage2.signature_code,
+        analysis=snapshot.stage2.signature_analysis,
+        usage=None,
+    )

@@ -40,16 +40,45 @@ from alspec.eval.domains import DOMAINS  # noqa: E402
 from alspec.llm import AsyncLLMClient  # noqa: E402
 from alspec.obligation import build_obligation_table, ObligationTable  # noqa: E402
 
-from alspec.pipeline import (
-    _build_signature_user_prompt,
-    _build_axioms_user_prompt,
-    run_pipeline_signature_only,
-)
 from alspec.axiom_gen import generate_mechanical_axioms
 from alspec.obligation_render import render_obligation_prompt
 from alspec.prompt_chunks import Stage, assemble_prompt  # noqa: E402
 from alspec.result import Err, Ok  # noqa: E402
 from alspec.signature import Signature  # noqa: E402
+from alspec.prompt import render
+
+def _build_signature_user_prompt(domain_description: str, domain_analysis: str | None = None) -> str:
+    return render(
+        "generate_signature.md.j2",
+        domain_description=domain_description,
+        domain_analysis=domain_analysis,
+    )
+
+def _build_axioms_user_prompt(
+    domain_description: str,
+    spec_name: str,
+    skeleton: object,
+    signature_analysis: str | None = None,
+    domain_analysis: str | None = None,
+) -> str:
+    from alspec.skeleton import SkeletonData
+    assert isinstance(skeleton, SkeletonData)
+    return render(
+        "generate_axiom_fills.md.j2",
+        domain_description=domain_description,
+        domain_analysis=domain_analysis,
+        spec_name=spec_name,
+        skeleton_imports=skeleton.imports,
+        skeleton_signature_code=skeleton.signature_code,
+        mechanical_axioms="\n".join(
+            f"    {line}," for line in skeleton.mechanical_axiom_lines
+        ),
+        remaining_cells=skeleton.remaining_cells_description,
+        signature_analysis=signature_analysis,
+        constructor_terms="\n".join(
+            f"{abbrev} = {expr}" for _, abbrev, expr in skeleton.constructor_terms
+        ),
+    )
 
 logger = logging.getLogger(__name__)
 langfuse = get_client()
@@ -59,17 +88,16 @@ langfuse = get_client()
 # ---------------------------------------------------------------------------
 
 
+from alspec.stages import AnalysisOutput, SignatureOutput, ObligationOutput, StageContext, AnalysisStage, SignatureStage, ObligationStage, StageError
+
 @dataclass(frozen=True)
 class UpstreamCache:
     """Cached output from stages 1-2-3 for a single domain."""
 
     domain: str
-    signature: Signature
-    obligation_table: ObligationTable
-    signature_code: str  # raw code string to include in Stage 4 user prompt
-    signature_analysis: str
-    obligation_prompt_md: str
-    analysis_text: str | None  # Stage 1 output (if lens used)
+    analysis: AnalysisOutput
+    signature: SignatureOutput
+    obligation: ObligationOutput
     spec_name: str  # domain ID formatted as spec name
     upstream_trace_name: str  # for Langfuse cross-referencing
 
@@ -170,48 +198,33 @@ async def _build_upstream_cache(
                     ],
                 ):
                     langfuse.update_current_trace(input=desc)
-
-                    result = await run_pipeline_signature_only(
+                    ctx = StageContext(
                         client=client,
+                        model=config.upstream_model,
                         domain_id=domain,
                         domain_description=desc,
-                        model=config.upstream_model,
+                        session_id=session_id,
                         lens=config.upstream_lens,
                     )
 
-                    if not result.success:
-                        logger.warning(
-                            "Upstream failed for domain %s: %s", domain, result.error
-                        )
+                    try:
+                        an_out = await AnalysisStage().run(ctx)
+                        sig_out = await SignatureStage().run(ctx, analysis=an_out)
+                        ob_out = await ObligationStage().run(ctx, signature=sig_out)
+                    except StageError as e:
+                        logger.warning("Upstream failed for domain %s: %s", domain, e)
                         langfuse.score_current_trace(name="upstream_parse", value=0.0)
                         return None
-
-                    sig = result.signature
-                    assert sig is not None
-
-                    try:
-                        table = build_obligation_table(sig)
-                        mech_report = generate_mechanical_axioms(sig, table)
-                        prompt_md = render_obligation_prompt(sig, table, mech_report)
-                    except Exception as e:
-                        logger.warning(
-                            "Upstream obligation table failed for domain %s: %s", domain, e
-                        )
-                        langfuse.score_current_trace(name="upstream_well_formed", value=0.0)
-                        return None
-
-                    langfuse.update_current_trace(output=result.signature_code)
+                        
+                    langfuse.update_current_trace(output=sig_out.code)
                     langfuse.score_current_trace(name="upstream_parse", value=1.0)
                     langfuse.score_current_trace(name="upstream_well_formed", value=1.0)
 
                     return UpstreamCache(
                         domain=domain,
-                        signature=sig,
-                        obligation_table=table,
-                        signature_code=result.signature_code or "",
-                        signature_analysis=result.signature_analysis or "",
-                        obligation_prompt_md=prompt_md,
-                        analysis_text=result.domain_analysis,
+                        analysis=an_out,
+                        signature=sig_out,
+                        obligation=ob_out,
                         spec_name=domain.replace("-", " ").title().replace(" ", ""),
                         upstream_trace_name=upstream_trace_name,
                     )
@@ -401,10 +414,9 @@ async def execute_stage4_trial(
     user_prompt = _build_axioms_user_prompt(
         domain_description=desc,
         spec_name=upstream.spec_name,
-        signature_code=upstream.signature_code,
-        signature_analysis=upstream.signature_analysis,
-        obligation_prompt_md=upstream.obligation_prompt_md,
-        domain_analysis=upstream.analysis_text,
+        skeleton=upstream.obligation.skeleton,
+        signature_analysis=upstream.signature.analysis,
+        domain_analysis=upstream.analysis.analysis_text,
     )
 
     messages = [
@@ -448,8 +460,8 @@ async def execute_stage4_trial(
             langfuse.update_current_trace(
                 input={
                     "domain": domain,
-                    "signature_code": upstream.signature_code,
-                    "obligation_prompt": upstream.obligation_prompt_md,
+                    "signature_code": upstream.signature.code,
+                    "obligation_prompt": upstream.obligation.rendered_prompt,
                     "system_prompt_chunks": [c.name for c in trial.chunk_ids],
                 }
             )
@@ -484,7 +496,7 @@ async def execute_stage4_trial(
             score = await score_stage4_output(
                 code=code,
                 domain=domain,
-                sig=upstream.signature,
+                sig=upstream.signature.signature,
                 trial_id=trial.trial_id,
                 replicate=trial.replicate,
                 model=config.model,
@@ -505,11 +517,12 @@ async def execute_stage4_trial(
                 name="intrinsic_health",
                 value=score.intrinsic_health,
             )
-            langfuse.score_current_trace(
-                name="coverage",
-                value=score.coverage_ratio,
-                comment=f"{score.covered_cells}/{score.total_cells}",
-            )
+            if score.coverage_ratio is not None:
+                langfuse.score_current_trace(
+                    name="coverage",
+                    value=score.coverage_ratio,
+                    comment=f"{score.covered_cells}/{score.total_cells}",
+                )
             langfuse.score_current_trace(
                 name="unmatched_count",
                 value=float(score.unmatched_axiom_count),

@@ -24,7 +24,7 @@ from typing import Any
 from rapidfuzz import fuzz, process
 
 from alspec.obligation import build_obligation_table
-from alspec.pipeline import _execute_signature_code
+from alspec.stages import _execute_signature_code
 from alspec.signature import GeneratedSortInfo, Signature
 
 logger = logging.getLogger(__name__)

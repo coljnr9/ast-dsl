@@ -332,8 +332,10 @@ async def run_domain_eval(
     session_id: str | None = None,
     lens: str | None = None,
     replicate: int = 1,
-) -> EvalResult:
-    """Run the two-stage pipeline for a single domain and model.
+    cached_analysis: "AnalysisOutput | None" = None,
+    cached_signature: "SignatureOutput | None" = None,
+) -> tuple[EvalResult, PipelineResult | None]:
+    """Run the pipeline for a single domain and model.
 
     Langfuse trace structure:
       Trace: eval/{domain.id}/{model_short}
@@ -370,10 +372,12 @@ async def run_domain_eval(
             domain_description=domain.description,
             model=model,
             lens=lens,
+            cached_analysis=cached_analysis,
+            cached_signature=cached_signature,
         )
 
         eval_result = _pipeline_to_eval(domain.id, model, result)
 
         _emit_langfuse_scores(eval_result)
-
-    return eval_result
+        
+        return eval_result, result

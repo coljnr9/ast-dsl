@@ -92,9 +92,9 @@ from alspec.eval.domains import DOMAINS, DomainPrompt  # noqa: E402
 from alspec.llm import AsyncLLMClient  # noqa: E402
 from alspec.obligation import ObligationTable, build_obligation_table  # noqa: E402
 from alspec.pipeline import (  # noqa: E402
-    _build_axioms_user_prompt,
     run_pipeline_signature_only,
 )
+from alspec.eval.doe_runner import _build_axioms_user_prompt, _build_signature_user_prompt
 from alspec.obligation_render import render_obligation_prompt
 from alspec.prompt_chunks import ChunkId, Stage, assemble_prompt  # noqa: E402
 from alspec.result import Err, Ok  # noqa: E402
@@ -150,58 +150,49 @@ def _get_domain_description(domain: str) -> str:
 from dataclasses import dataclass  # noqa: E402
 
 
+from alspec.stages import AnalysisOutput, SignatureOutput, ObligationOutput, StageContext, AnalysisStage, SignatureStage, ObligationStage, AxiomStage, AxiomOutput
+
 @dataclass(frozen=True)
 class UpstreamCache:
     domain: str
-    signature: Signature
-    obligation_table: ObligationTable
-    mech_report: MechanicalAxiomReport
-    signature_code: str
-    signature_analysis: str
-    obligation_prompt_md: str
-    analysis_text: str | None
-    spec_name: str
+    analysis: AnalysisOutput
+    signature: SignatureOutput
+    obligation: ObligationOutput
 
 
-def _upstream_cache_from_snapshot(
-    snapshot: DomainSnapshot,
-) -> UpstreamCache:
-    """Convert a loaded DomainSnapshot into the runtime UpstreamCache.
-
-    Regenerates deterministic stages (obligation table, rendered markdown)
-    from the frozen signature.
-    """
-    sig = restore_signature(snapshot)
-
-    table = build_obligation_table(sig)
-    mech_report = generate_mechanical_axioms(sig, table)
-    prompt_md = render_obligation_prompt(sig, table, mech_report)
-
-    assert snapshot.stage2 is not None  # guaranteed by load validation
-
+async def _upstream_cache_from_snapshot(client: AsyncLLMClient, snapshot: DomainSnapshot) -> UpstreamCache:
+    """Rebuild the UpstreamCache from a loaded snapshot."""
+    from alspec.cache import analysis_output_from_snapshot, signature_output_from_snapshot
+    from alspec.stages import ObligationStage, StageContext
+    
+    an_out = analysis_output_from_snapshot(snapshot)
+    sig_out = signature_output_from_snapshot(snapshot)
+    
+    # Rebuild obligation table
+    ctx = StageContext(
+        client=client,
+        model=UPSTREAM_MODEL,
+        domain_id=snapshot.domain,
+        domain_description=snapshot.domain.replace("-", " ")
+    )
+    ob_out = await ObligationStage().run(ctx, signature=sig_out)
     return UpstreamCache(
         domain=snapshot.domain,
-        signature=sig,
-        obligation_table=table,
-        mech_report=mech_report,
-        signature_code=snapshot.stage2.signature_code,
-        signature_analysis=snapshot.stage2.signature_analysis,
-        obligation_prompt_md=prompt_md,
-        analysis_text=snapshot.stage1.analysis_text if snapshot.stage1 else None,
-        spec_name=snapshot.domain.replace("-", " ").title().replace(" ", ""),
+        analysis=an_out,
+        signature=sig_out,
+        obligation=ob_out
     )
-
 
 def _snapshot_from_upstream_cache(uc: UpstreamCache) -> DomainSnapshot:
     """Convert a runtime UpstreamCache to a DomainSnapshot for saving."""
+    from alspec.cache import snapshot_from_pipeline_result
     return snapshot_from_pipeline_result(
         domain=uc.domain,
-        analysis_text=uc.analysis_text,
-        signature=uc.signature,
-        signature_code=uc.signature_code,
-        signature_analysis=uc.signature_analysis,
+        analysis_text=uc.analysis.analysis_text,
+        signature=uc.signature.signature,
+        signature_code=uc.signature.code,
+        signature_analysis=uc.signature.analysis,
     )
-
 
 async def _build_upstream_cache(
     client: AsyncLLMClient,
@@ -210,6 +201,7 @@ async def _build_upstream_cache(
     session_id: str,
 ) -> dict[str, UpstreamCache]:
     """Run Stages 1-2-3 for each domain and cache results."""
+    from alspec.stages import StageContext, AnalysisStage, SignatureStage, ObligationStage, StageError
     logger.info("Building upstream cache (Stages 1-3) for %d domains...", len(domains))
     cache: dict[str, UpstreamCache] = {}
     lock = asyncio.Lock()
@@ -217,66 +209,27 @@ async def _build_upstream_cache(
     async def run_one(domain: str) -> None:
         async with semaphore:
             desc = _get_domain_description(domain)
-
-            with langfuse.start_as_current_observation(
-                as_type="span",
-                name=f"characterize/upstream/{domain}",
-            ):
-                with propagate_attributes(
-                    trace_name=f"characterize/upstream/{domain}",
-                    session_id=session_id,
-                    metadata={
-                        "domain": domain,
-                        "model": UPSTREAM_MODEL,
-                        "lens": UPSTREAM_LENS,
-                        "session_id": session_id,
-                    },
-                    tags=[
-                        f"domain:{domain}",
-                        "phase:upstream",
-                        f"session:{session_id}",
-                    ],
-                ):
-                    result = await run_pipeline_signature_only(
-                        client=client,
-                        domain_id=domain,
-                        domain_description=desc,
-                        model=UPSTREAM_MODEL,
-                        lens=UPSTREAM_LENS,
-                    )
-
-            if not result.success:
-                logger.warning(
-                    "Upstream failed for domain %s: %s", domain, result.error
-                )
-                return
-
-            sig = result.signature
-            if sig is None:
-                logger.warning("Upstream returned no signature for domain %s", domain)
-                return
-
-            try:
-                table = build_obligation_table(sig)
-                mech_report = generate_mechanical_axioms(sig, table)
-                prompt_md = render_obligation_prompt(sig, table, mech_report)
-            except Exception as e:
-                logger.warning("Obligation table failed for domain %s: %s", domain, e)
-                return
-
-            entry = UpstreamCache(
-                domain=domain,
-                signature=sig,
-                obligation_table=table,
-                mech_report=mech_report,
-                signature_code=result.signature_code or "",
-                signature_analysis=result.signature_analysis or "",
-                obligation_prompt_md=prompt_md,
-                analysis_text=result.domain_analysis,
-                spec_name=domain.replace("-", " ").title().replace(" ", ""),
+            ctx = StageContext(
+                client=client,
+                model=UPSTREAM_MODEL,
+                domain_id=domain,
+                domain_description=desc,
+                session_id=session_id,
+                lens=UPSTREAM_LENS
             )
-            async with lock:
-                cache[domain] = entry
+            
+            try:
+                # Upstream runs: 1, 2, 3
+                an_out = await AnalysisStage().run(ctx)
+                sig_out = await SignatureStage().run(ctx, analysis=an_out)
+                ob_out = await ObligationStage().run(ctx, signature=sig_out)
+                
+                entry = UpstreamCache(domain, an_out, sig_out, ob_out)
+                async with lock:
+                    cache[domain] = entry
+            except StageError as e:
+                logger.warning("Upstream failed for domain %s: %s", domain, e)
+                return
 
     await asyncio.gather(*[run_one(d) for d in domains])
     logger.info("Upstream cache: %d/%d succeeded", len(cache), len(domains))
@@ -317,35 +270,17 @@ async def _run_trial(
     session_id: str,
     cache_id: str,
 ) -> TrialResult:
-    """Run one (domain, replicate) trial. Returns a TrialResult.
-
-    Inlines scoring logic from score_stage4_output so we can capture the
-    MatchReport and extract per-cell detail without a double exec.
-    Never raises — all errors surface as failed TrialResult.
-    """
+    """Run one (domain, replicate) trial. Returns a TrialResult."""
+    from alspec.stages import StageContext, AxiomStage, StageError
     desc = _get_domain_description(domain)
-
-    # Generate skeleton for this trial
-    skeleton = generate_skeleton(
-        sig=upstream.signature,
-        signature_code=upstream.signature_code,
-        table=upstream.obligation_table,
-        mechanical_report=upstream.mech_report,
-        spec_name=upstream.spec_name,
-    )
-
-    user_prompt = _build_axioms_user_prompt(
+    ctx = StageContext(
+        client=client,
+        model=MODEL,
+        domain_id=domain,
         domain_description=desc,
-        spec_name=upstream.spec_name,
-        skeleton=skeleton,
-        signature_analysis=upstream.signature_analysis,
-        domain_analysis=upstream.analysis_text,
+        session_id=session_id,
+        lens=None,
     )
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
 
     trace_name = f"characterize/trial/{domain}/rep{replicate}"
     with langfuse.start_as_current_observation(
@@ -359,7 +294,6 @@ async def _run_trial(
                 "cache_id": cache_id,
                 "domain": domain,
                 "replicate": str(replicate),
-                "session_id": session_id,
             },
             tags=[
                 f"domain:{domain}",
@@ -367,83 +301,27 @@ async def _run_trial(
                 f"cache:{cache_id}",
             ],
         ):
-            result = await client.generate_with_fills_tool(
-                messages, model=MODEL, name=f"characterize/{domain}/rep{replicate}"
-            )
-
-    match result:
-        case Err(exc):
-            return TrialResult(
-                domain=domain,
-                replicate=replicate,
-                parse_success=False,
-                well_formed=False,
-                coverage_ratio=None,
-                covered_cells=0,
-                total_cells=0,
-                error=f"LLM error: {exc}",
-                spec_code=None,
-            )
-        case Ok((_, vars_list, fills, _)):
-            code = splice_fills(skeleton, vars_list, fills)
-
-    # ---- Inline scoring (Option B) ----
-
-    # 1. Parse
-    namespace: dict[str, Any] = {}
-    try:
-        exec("from alspec import *", namespace)
-        exec("from alspec.helpers import *", namespace)
-        exec(code, namespace)
-    except Exception as e:
-        return TrialResult(
-            domain=domain,
-            replicate=replicate,
-            parse_success=False,
-            well_formed=False,
-            coverage_ratio=0.0,
-            covered_cells=0,
-            total_cells=0,
-            error=f"Exec failed: {e}",
-            spec_code=code,
-        )
-
-    spec = namespace.get("spec")
-    if not isinstance(spec, Spec):
-        got = type(spec).__name__ if spec is not None else "nothing"
-        return TrialResult(
-            domain=domain,
-            replicate=replicate,
-            parse_success=False,
-            well_formed=False,
-            coverage_ratio=0.0,
-            covered_cells=0,
-            total_cells=0,
-            error=f"No `spec` variable of type Spec (got {got})",
-            spec_code=code,
-        )
-
-    # 2. Merge mechanical axioms (Stage 3.5)
-    mech_report = upstream.mech_report
-    mech_labels = {a.label for a in mech_report.axioms}
-    # Keep LLM axioms that don't collide with mechanical labels
-    combined_axioms = list(mech_report.axioms) + [
-        a for a in spec.axioms if a.label not in mech_labels
-    ]
-    spec = Spec(
-        name=spec.name,
-        signature=upstream.signature,
-        axioms=tuple(combined_axioms),
-    )
-    n_mech = len(mech_report.axioms)
-    n_merged = len(combined_axioms)
-    logger.debug(
-        "domain=%s rep=%d: merged %d mechanical axioms (%d total)",
-        domain,
-        replicate,
-        n_mech,
-        n_merged,
-    )
+            try:
+                ax_out = await AxiomStage().run(
+                    ctx,
+                    analysis=upstream.analysis,
+                    signature=upstream.signature,
+                    obligation=upstream.obligation,
+                )
+                spec = ax_out.spec
+                code = ax_out.code
+            except StageError as e:
+                return TrialResult(
+                    domain=domain,
+                    replicate=replicate,
+                    parse_success=False,
+                    well_formed=False,
+                    coverage_ratio=0.0,
+                    covered_cells=0,
+                    total_cells=0,
+                    error=e.message,
+                    spec_code=None,
+                )
 
     # 3. Well-formedness
     try:
@@ -454,8 +332,8 @@ async def _run_trial(
 
     # 4. Match — uses upstream sig NOT spec.signature (consistent with doe_runner)
     try:
-        table = build_obligation_table(upstream.signature)
-        match_report = await match_spec(spec, table, upstream.signature)
+        table = build_obligation_table(upstream.signature.signature)
+        match_report = await match_spec(spec, table, upstream.signature.signature)
     except Exception as e:
         return TrialResult(
             domain=domain,
@@ -656,7 +534,7 @@ async def main() -> None:
                                 "cache_id": cache_id,
                             },
                         ):
-                            uc = _upstream_cache_from_snapshot(snap)
+                            uc = await _upstream_cache_from_snapshot(client, snap)
                             upstream_cache[domain] = uc
                             # Tags are added via propagate_attributes if supported,
                             # but we can't easily add tags to nested observations

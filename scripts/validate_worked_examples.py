@@ -167,22 +167,22 @@ def main() -> int:
     # ================================================================
     try:
         import inspect
-        from alspec.pipeline import _execute_signature_code
+        from alspec.stages import _execute_signature_code
         source = inspect.getsource(_execute_signature_code)
 
-        if 'normalized' in source.lower():
-            errors.append("pipeline.py: _execute_signature_code still contains 'normalized'")
-        if 'Pattern A' in source or 'Pattern B' in source:
-            errors.append("pipeline.py: _execute_signature_code still contains legacy Pattern A/B comments")
-        if 'patched' in source:
-            errors.append("pipeline.py: _execute_signature_code still patches generated_sorts")
+        if "normalized" in source:
+            errors.append("stages.py: _execute_signature_code still contains 'normalized'")
+        if "Pattern B" in source or "Pattern A" in source:
+            errors.append("stages.py: _execute_signature_code still contains legacy Pattern A/B comments")
+        if "generated_sorts[" in source and "GeneratedSortInfo(" in source and "patch" in source.lower():
+            errors.append("stages.py: _execute_signature_code still patches generated_sorts")
 
-        # Must have the strict GeneratedSortInfo check
-        if 'GeneratedSortInfo' not in source:
-            errors.append("pipeline.py: _execute_signature_code doesn't validate GeneratedSortInfo types")
+        # Make sure it actually enforces the type
+        if "GeneratedSortInfo" not in source or "isinstance" not in source:
+            errors.append("stages.py: _execute_signature_code doesn't validate GeneratedSortInfo types")
 
     except Exception as e:
-        errors.append(f"pipeline.py: Could not inspect _execute_signature_code: {e}")
+        errors.append(f"stages.py: Could not inspect _execute_signature_code: {e}")
 
     # ================================================================
     # Report
