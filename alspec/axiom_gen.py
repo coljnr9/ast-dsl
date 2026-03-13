@@ -4,15 +4,22 @@ Generates axioms for obligation cells whose content is fully determined
 by the signature structure, requiring no domain knowledge.
 
 Covers two mechanical patterns:
-  - SELECTOR_EXTRACT: sel(ctor(x₁,...,xₙ)) = xᵢ
+  - SELECTOR_EXTRACT (PLAIN or HIT dispatch):
+      PLAIN: sel(ctor(x₁,...,xₙ)) = xᵢ
+      HIT:   eq_k(k, k2) → sel(ctor(...,k,...), k2) = xᵢ
   - Any MISS dispatch: ¬eq(k,k2) → obs(ctor(s,k,...),k2,...) = obs(s,k2,...)
 
-The MISS pattern applies regardless of cell tier. Tier classifies the
-observer↔constructor relationship (selector, domain, etc.); dispatch
-classifies key guard structure (PLAIN, HIT, MISS). These are independent
-axes. The MISS delegation axiom — the locality/frame axiom from the
-McCarthy store schema (1962) — is a structural consequence of the key
-dispatch decomposition, not of the obs↔ctor relationship.
+Dispatch is checked BEFORE tier. A SELECTOR_EXTRACT cell with MISS dispatch
+routes to _generate_miss (the locality/frame axiom), not _generate_selector_extract.
+This is correct: MISS dispatch is a structural consequence of key dispatch
+decomposition, independent of the obs↔ctor tier classification.
+
+For a keyed selector (SELECTOR_EXTRACT + HIT), the axiom is:
+    ∀ ctor_vars, obs_vars . eq_k(ctor_key, obs_key) →
+        sel(ctor(ctor_vars...), obs_vars...) = extracted_param
+
+For an unkeyed selector (SELECTOR_EXTRACT + PLAIN), no guard or obs vars:
+    ∀ ctor_vars . sel(ctor(ctor_vars...)) = extracted_param
 
 Formal basis: CASL Reference Manual §2.3.4 (selector axioms from free type
 declarations), §5.2.2 (conditional axioms), and the McCarthy store axiom
@@ -176,73 +183,69 @@ def _generate_selector_extract(
     cell: ObligationCell,
     sig: Signature,
 ) -> Axiom:
-    """Generate sel(ctor(x₁,...,xₙ)) = xᵢ for a SELECTOR_EXTRACT cell.
+    """Generate the extraction axiom for a SELECTOR_EXTRACT cell.
 
-    Finds which constructor parameter the selector extracts by matching
-    the selector's result sort against the constructor's parameter sorts.
-    Uses the declared selector info from generated_sorts to resolve
-    ambiguity when multiple parameters share the same sort.
+    For PLAIN dispatch (no shared key sort), the unguarded form:
+        ∀ ctor_vars . sel(ctor(ctor_vars...)) = extracted_param
+
+    For HIT dispatch (selector shares a key sort with its home constructor),
+    the guarded form with the observer's key lookup parameter:
+        ∀ ctor_vars, obs_vars . eq_k(ctor_key, obs_key) →
+            sel(ctor(ctor_vars...), obs_vars...) = extracted_param
+
+    Uses _build_cell_variables for consistent variable naming (observer lookup
+    params whose names collide with constructor params get '2' appended).
+
+    Note: MISS dispatch cells are never passed here — _select_generator checks
+    MISS BEFORE SELECTOR_EXTRACT, routing them to _generate_miss instead.
     """
-    sel = sig.functions[cell.observer_name]
     ctor = sig.functions[cell.constructor_name]
-    gen_sort = cell.generated_sort
 
-    # The extracts_sort from the cell tells us which sort this selector extracts.
-    # The selector declaration in generated_sorts maps sel_name -> result_sort.
-    extracts_sort = cell.extracts_sort
-    if extracts_sort is None:
-        # Fall back to the selector's result sort
-        extracts_sort = sel.result
+    # The selector map gives us the param name directly.
+    param_name = cell.extracts_param
+    if param_name is None:
+        raise ValueError(
+            f"Selector '{cell.observer_name}' has no param mapping for "
+            f"constructor '{cell.constructor_name}' (extracts_param is None)"
+        )
 
-    # Build variables for all constructor parameters
-    ctor_vars: list[Var] = [var(p.name, p.sort) for p in ctor.params]
-    ctor_var_terms = ctor_vars  # Var is a Term
+    # Use _build_cell_variables for consistent naming (handles collision renaming)
+    all_vars, ctor_vars, obs_vars, _state_var, ctor_key_var, obs_key_var = (
+        _build_cell_variables(cell, sig)
+    )
 
-    # Find the constructor parameter that this selector extracts.
-    # Use the selector map from generated_sorts for precise identification.\n    # Look up the generated sort info to determine which param the selector extracts.
-
-    # The selector map tells us the result sort; we need to find WHICH param.
-    # The extracts_sort should match one ctor param's sort.
-    # When multiple params have the same sort, the selector declaration
-    # in generated_sorts disambiguates by result sort. But if the extracts_sort
-    # matches multiple params, we pick the right one by convention:
-    # - if extracts_sort == gen_sort, the selector extracts the state param
-    # - otherwise, the first non-state param matching extracts_sort
-
+    # Find the extracted variable by param name in ctor_vars
     extracted_var: Var | None = None
-
-    if extracts_sort == gen_sort:
-        # Selector extracts the state component (like pop extracting Stack from push)
-        for v in ctor_vars:
-            if v.sort == gen_sort:
-                extracted_var = v
-                break
-    else:
-        # Selector extracts a non-state component
-        # Find first ctor param whose sort matches extracts_sort AND is NOT the gen sort
-        for v in ctor_vars:
-            if v.sort == extracts_sort and v.sort != gen_sort:
-                extracted_var = v
-                break
+    for v in ctor_vars:
+        if v.name == param_name:
+            extracted_var = v
+            break
 
     if extracted_var is None:
         raise ValueError(
-            f"Cannot determine which parameter selector '{sel.name}' extracts "
-            f"from constructor '{ctor.name}'. Expected a param of sort '{extracts_sort}' "
-            f"but found params: {[(p.name, p.sort) for p in ctor.params]}"
+            f"Selector '{cell.observer_name}' maps to param '{param_name}' "
+            f"but constructor '{cell.constructor_name}' has no such param. "
+            f"Params: {[(p.name, p.sort) for p in ctor.params]}"
         )
 
-    # Build the axiom: forall(vars, eq(sel(ctor(vars)), extracted_var))
-    ctor_app = app(ctor.name, *ctor_var_terms)
-    sel_app = app(sel.name, ctor_app)
+    # Build: sel(ctor(ctor_vars...), obs_vars...) = extracted_var
+    ctor_app = app(ctor.name, *ctor_vars)
+    sel_app = app(cell.observer_name, ctor_app, *obs_vars)
+    body: Formula = eq(sel_app, extracted_var)
 
-    formula: Formula = eq(sel_app, extracted_var)
+    # For HIT dispatch, wrap in the equality guard
+    if cell.dispatch == CellDispatch.HIT and ctor_key_var is not None and obs_key_var is not None:
+        if cell.eq_pred is None:
+            raise ValueError(
+                f"SELECTOR_EXTRACT HIT cell ({cell.observer_name}, {cell.constructor_name}) "
+                f"has no eq_pred set"
+            )
+        guard = pred_app(cell.eq_pred, ctor_key_var, obs_key_var)
+        body = implication(guard, body)
 
-    # Only wrap in forall if there are variables to bind
-    if ctor_vars:
-        formula = forall(ctor_vars, formula)
+    formula: Formula = forall(all_vars, body) if all_vars else body
 
-    label = f"{sel.name}_{ctor.name}_extract"
+    label = f"{cell.observer_name}_{ctor.name}_extract"
     return Axiom(label=label, formula=formula)
 
 
@@ -441,21 +444,29 @@ def _select_generator(
 
     Returns the generator function or None if the cell is not mechanical.
 
-    Two mechanical patterns:
-      1. SELECTOR_EXTRACT — tier-based, always PLAIN dispatch.
-      2. Any MISS dispatch — dispatch-based, regardless of tier.
-         The MISS delegation (locality/frame axiom) is a structural
-         consequence of the key dispatch decomposition, independent
-         of the obs↔ctor tier classification.
-    """
-    # SELECTOR_EXTRACT: any dispatch (always PLAIN for selectors)
-    if cell.tier == CellTier.SELECTOR_EXTRACT:
-        return _generate_selector_extract  # type: ignore[return-value]
+    Dispatch is checked BEFORE tier — MISS is always a frame/locality axiom
+    regardless of tier. Checking tier first would incorrectly route a
+    SELECTOR_EXTRACT + MISS cell to _generate_selector_extract, producing
+    a duplicate extraction axiom instead of the delegation axiom.
 
-    # MISS dispatch: locality/frame axiom — tier-independent.
-    # The McCarthy store axiom's negative branch: ¬eq(k,k2) → delegate.
+    Three mechanical cases by priority:
+      1. MISS dispatch — frame axiom, tier-independent. The McCarthy store
+         axiom's negative branch: ¬eq(k,k2) → delegate. Applies to any
+         observer (selector, domain, predicate) against any constructor.
+      2. SELECTOR_EXTRACT + PLAIN — unguarded extraction: sel(ctor(...)) = xᵢ
+      3. SELECTOR_EXTRACT + HIT — guarded extraction: eq_k(k,k2) → sel(ctor(...),k2) = xᵢ
+    """
+    # MISS dispatch FIRST — locality/frame axiom, tier-independent.
+    # A SELECTOR_EXTRACT MISS cell must generate the delegation axiom, not
+    # the extraction axiom. Only after ruling out MISS do we check for
+    # SELECTOR_EXTRACT (which covers PLAIN and HIT dispatch).
     if cell.dispatch == CellDispatch.MISS:
         return _generate_miss  # type: ignore[return-value]
+
+    # SELECTOR_EXTRACT: PLAIN (unguarded) or HIT (guarded) dispatch.
+    # MISS cells for SELECTOR_EXTRACT observers are handled above.
+    if cell.tier == CellTier.SELECTOR_EXTRACT:
+        return _generate_selector_extract  # type: ignore[return-value]
 
     return None  # type: ignore[return-value]
 

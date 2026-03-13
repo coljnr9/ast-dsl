@@ -339,7 +339,7 @@ def test_selector_foreign_miss_generates_mechanical():
         generated_sorts={
             "TodoList": GeneratedSortInfo(
                 constructors=("empty", "add_item", "edit"),
-                selectors={"add_item": {"get_title": "Title"}},
+                selectors={"add_item": {"get_title": "t"}},
             )
         },
     )
@@ -433,7 +433,12 @@ def test_all_miss_cells_covered():
 
 
 def test_hit_cells_not_mechanical():
-    """HIT cells should NOT be generated mechanically regardless of tier."""
+    """SELECTOR_FOREIGN HIT cells should NOT be generated mechanically.
+
+    SELECTOR_EXTRACT HIT cells (keyed selectors) ARE mechanical — they produce
+    guarded extraction axioms. But SELECTOR_FOREIGN HIT cells require domain
+    reasoning and must not be generated.
+    """
     sig = Signature(
         sorts={
             "TodoList": atomic("TodoList"),
@@ -465,7 +470,7 @@ def test_hit_cells_not_mechanical():
         generated_sorts={
             "TodoList": GeneratedSortInfo(
                 constructors=("empty", "add_item", "edit"),
-                selectors={"add_item": {"get_title": "Title"}},
+                selectors={"add_item": {"get_title": "t"}},
             )
         },
     )
@@ -478,10 +483,175 @@ def test_hit_cells_not_mechanical():
         for c in report.cells_covered
     }
 
-    # HIT for get_title × edit should NOT be covered (requires domain reasoning)
+    # SELECTOR_FOREIGN HIT (get_title × edit) should NOT be covered
+    # (edit is not the home constructor for get_title — requires domain reasoning)
     assert ("get_title", "edit", CellDispatch.HIT) not in covered_keys, (
-        "HIT cell should not be mechanically generated"
+        "SELECTOR_FOREIGN HIT cell should not be mechanically generated"
     )
+
+    # SELECTOR_EXTRACT HIT (get_title × add_item) SHOULD be covered:
+    # add_item is the home constructor, so the guarded extraction is mechanical.
+    assert ("get_title", "add_item", CellDispatch.HIT) in covered_keys, (
+        "SELECTOR_EXTRACT HIT cell should be mechanically generated with guard"
+    )
+
+
+def test_selector_extract_hit_generates_guarded_extraction():
+    """SELECTOR_EXTRACT + HIT produces: eq_k(k, k2) → sel(ctor(...k...), k2) = param."""
+    sig = Signature(
+        sorts={
+            "Sys": atomic("Sys"),
+            "Id": atomic("Id"),
+            "Text": atomic("Text"),
+        },
+        functions={
+            "empty": FnSymbol("empty", params=(), result="Sys"),
+            "report": FnSymbol(
+                "report",
+                params=(param("sys", "Sys"), param("id", "Id"), param("title", "Text")),
+                result="Sys",
+            ),
+            "get_title": FnSymbol(
+                "get_title",
+                params=(param("sys", "Sys"), param("id", "Id")),
+                result="Text",
+            ),
+        },
+        predicates={
+            "eq_id": PredSymbol("eq_id", params=(param("k1", "Id"), param("k2", "Id"))),
+        },
+        generated_sorts={
+            "Sys": GeneratedSortInfo(
+                constructors=("empty", "report"),
+                selectors={"report": {"get_title": "title"}},
+            )
+        },
+    )
+
+    table = build_obligation_table(sig)
+    report = generate_mechanical_axioms(sig, table)
+
+    covered_keys = {
+        (c.observer_name, c.constructor_name, c.dispatch)
+        for c in report.cells_covered
+    }
+
+    # SELECTOR_EXTRACT + HIT: get_title × report should be covered
+    assert ("get_title", "report", CellDispatch.HIT) in covered_keys, (
+        f"SELECTOR_EXTRACT HIT cell not covered. Covered: {covered_keys}"
+    )
+
+    # SELECTOR_EXTRACT + MISS: delegates (not extraction)
+    assert ("get_title", "report", CellDispatch.MISS) in covered_keys
+
+    # Find the HIT axiom and verify structure
+    hit_axiom = None
+    for ax, cell in zip(report.axioms, report.cells_covered):
+        if (cell.observer_name == "get_title"
+                and cell.constructor_name == "report"
+                and cell.dispatch == CellDispatch.HIT):
+            hit_axiom = ax
+            break
+
+    assert hit_axiom is not None, "HIT extraction axiom not found"
+    assert hit_axiom.label == "get_title_report_extract"
+
+    # Verify structure: forall([sys, id, id2], implication(eq_id(id, id2), eq(get_title(report(sys, id, title), id2), title)))
+    sys_v = var("sys", "Sys")
+    id_v = var("id", "Id")
+    title_v = var("title", "Text")
+    id2_v = var("id2", "Id")  # renamed: collides with ctor param "id"
+
+    expected = forall(
+        [sys_v, id_v, title_v, id2_v],
+        implication(
+            pred_app("eq_id", id_v, id2_v),
+            eq(
+                app("get_title", app("report", sys_v, id_v, title_v), id2_v),
+                title_v,
+            ),
+        ),
+    )
+    assert hit_axiom.formula == expected, (
+        f"HIT extraction formula mismatch.\nGot: {hit_axiom.formula}\nExpected: {expected}"
+    )
+
+
+def test_selector_extract_miss_generates_delegation():
+    """SELECTOR_EXTRACT + MISS routes to delegation, NOT a second extraction axiom."""
+    sig = Signature(
+        sorts={
+            "Sys": atomic("Sys"),
+            "Id": atomic("Id"),
+            "Text": atomic("Text"),
+        },
+        functions={
+            "empty": FnSymbol("empty", params=(), result="Sys"),
+            "report": FnSymbol(
+                "report",
+                params=(param("sys", "Sys"), param("id", "Id"), param("title", "Text")),
+                result="Sys",
+            ),
+            "get_title": FnSymbol(
+                "get_title",
+                params=(param("sys", "Sys"), param("id", "Id")),
+                result="Text",
+            ),
+        },
+        predicates={
+            "eq_id": PredSymbol("eq_id", params=(param("k1", "Id"), param("k2", "Id"))),
+        },
+        generated_sorts={
+            "Sys": GeneratedSortInfo(
+                constructors=("empty", "report"),
+                selectors={"report": {"get_title": "title"}},
+            )
+        },
+    )
+
+    table = build_obligation_table(sig)
+    report = generate_mechanical_axioms(sig, table)
+
+    # Find the MISS axiom for get_title × report
+    miss_axiom = None
+    for ax, cell in zip(report.axioms, report.cells_covered):
+        if (cell.observer_name == "get_title"
+                and cell.constructor_name == "report"
+                and cell.dispatch == CellDispatch.MISS):
+            miss_axiom = ax
+            break
+
+    assert miss_axiom is not None, "MISS delegation axiom not found for SELECTOR_EXTRACT"
+    assert "miss" in miss_axiom.label, f"Expected 'miss' in label, got: {miss_axiom.label}"
+
+    # Must be a frame axiom: forall(..., implication(negation(eq_id(...)), eq(...)))
+    assert isinstance(miss_axiom.formula, UniversalQuant)
+    assert isinstance(miss_axiom.formula.body, Implication)
+    assert isinstance(miss_axiom.formula.body.antecedent, Negation)
+
+    # Verify the delegation structure: get_title(report(sys,id,title), id2) = get_title(sys, id2)
+    sys_v = var("sys", "Sys")
+    id_v = var("id", "Id")
+    title_v = var("title", "Text")
+    id2_v = var("id2", "Id")
+
+    expected = forall(
+        [sys_v, id_v, title_v, id2_v],
+        implication(
+            negation(pred_app("eq_id", id_v, id2_v)),
+            eq(
+                app("get_title", app("report", sys_v, id_v, title_v), id2_v),
+                app("get_title", sys_v, id2_v),
+            ),
+        ),
+    )
+    assert miss_axiom.formula == expected, (
+        f"MISS delegation formula mismatch.\nGot: {miss_axiom.formula}\nExpected: {expected}"
+    )
+
+    # Crucially: no duplicate labels (the old bug produced two identical extraction axioms)
+    labels = [ax.label for ax in report.axioms]
+    assert len(labels) == len(set(labels)), f"Duplicate axiom labels: {labels}"
 
 
 # ---------------------------------------------------------------------------
