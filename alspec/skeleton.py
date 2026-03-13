@@ -315,7 +315,7 @@ def generate_skeleton(
             "Use these patterns when constructing observer applications in your formulas.",
             "",
             "| Observer | Arity | DSL Pattern |",
-            "|----------|-------|-------------||",
+            "|----------|-------|-------------|",
         ]
         for obs_name in sorted(obs_remaining.keys()):
             is_pred = obs_name in table.pred_roles
