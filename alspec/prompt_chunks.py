@@ -329,6 +329,7 @@ _DEFAULT_CONFIGS: dict[Stage, list[ChunkId]] = {
         ChunkId.PARTIAL_FN_PATTERNS,
         ChunkId.GUARD_POLARITY,
         ChunkId.PRESERVATION_COLLAPSE,
+        ChunkId.DOMAIN_SUBCASES,
         ChunkId.EQ_PRED_BASIS,
         ChunkId.AXIOMS_METHODOLOGY,
         ChunkId.EXAMPLE_SESSION_STORE_SPEC,
