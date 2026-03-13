@@ -155,3 +155,59 @@ class TestGenerationConstraint:
 
 
 
+class TestNamespaceInvariant:
+    """Namespace invariant (CASL RM §2.3.4): constructors and selectors must be functions."""
+
+    def test_constructor_as_predicate_raises(self):
+        import pytest
+        from alspec import Signature, GeneratedSortInfo, atomic, fn, pred
+        from alspec.obligation import build_obligation_table, ObligationTableError
+
+        sig = Signature(
+            sorts={"S": atomic("S")},
+            functions={"init": fn("init", [], "S")},
+            predicates={"is_valid": pred("is_valid", [("s", "S")])},
+            generated_sorts={
+                "S": GeneratedSortInfo(constructors=("init", "is_valid"), selectors={}),
+            },
+        )
+        with pytest.raises(ObligationTableError, match="is_valid.*predicate.*function"):
+            build_obligation_table(sig)
+
+    def test_selector_as_predicate_raises(self):
+        import pytest
+        from alspec import Signature, GeneratedSortInfo, atomic, fn, pred
+        from alspec.obligation import build_obligation_table, ObligationTableError
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "Bool": atomic("Bool")},
+            functions={"init": fn("init", [("b", "Bool")], "S")},
+            predicates={"sel": pred("sel", [("s", "S")])},
+            generated_sorts={
+                "S": GeneratedSortInfo(
+                    constructors=("init",),
+                    selectors={"init": {"sel": "b"}}
+                ),
+            },
+        )
+        with pytest.raises(ObligationTableError, match="sel.*predicate.*function"):
+            build_obligation_table(sig)
+
+    def test_nonexistent_selector_raises(self):
+        import pytest
+        from alspec import Signature, GeneratedSortInfo, atomic, fn
+        from alspec.obligation import build_obligation_table, ObligationTableError
+
+        sig = Signature(
+            sorts={"S": atomic("S"), "Bool": atomic("Bool")},
+            functions={"init": fn("init", [("b", "Bool")], "S")},
+            predicates={},
+            generated_sorts={
+                "S": GeneratedSortInfo(
+                    constructors=("init",),
+                    selectors={"init": {"missing": "b"}}
+                ),
+            },
+        )
+        with pytest.raises(ObligationTableError, match="missing.*not found in signature"):
+            build_obligation_table(sig)

@@ -354,6 +354,12 @@ def build_obligation_table(sig: Signature) -> ObligationTable:
         has_base = False
         for ctor_name in info.constructors:
             if ctor_name not in sig.functions:
+                # Check B1 enhancement: Namespace invariant (CASL RM §2.3.4)
+                if ctor_name in sig.predicates:
+                    raise ObligationTableError(
+                        f"Constructor '{ctor_name}' is a predicate, not a function. "
+                        "Constructors must be function symbols per CASL RM §2.3.4."
+                    )
                 raise ObligationTableError(
                     f"Constructor '{ctor_name}' listed for sort '{gen_sort}' not found in signature."
                 )
@@ -364,6 +370,19 @@ def build_obligation_table(sig: Signature) -> ObligationTable:
             ctor_fn = sig.functions[ctor_name]
             if all(p.sort != gen_sort for p in ctor_fn.params):
                 has_base = True
+
+        # Check B2: Selector namespace validation (CASL RM §2.3.4)
+        for ctor_name, sel_map in info.selectors.items():
+            for sel_name in sel_map:
+                if sel_name not in sig.functions:
+                    if sel_name in sig.predicates:
+                        raise ObligationTableError(
+                            f"Selector '{sel_name}' is a predicate, not a function. "
+                            "Selectors must be function symbols per CASL RM §2.3.4."
+                        )
+                    raise ObligationTableError(
+                        f"Selector '{sel_name}' for constructor '{ctor_name}' not found in signature."
+                    )
 
         if not has_base:
             raise ObligationTableError(
