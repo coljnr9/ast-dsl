@@ -114,7 +114,7 @@ def door_lock_spec() -> Spec:
         generated_sorts={
             "Lock": GeneratedSortInfo(
                 constructors=("new", "lock", "unlock", "open_door", "close_door"),
-                selectors={"new": {"get_code": "Code"}},
+                selectors={"new": {"get_code": "c"}},
             )
         },
     )

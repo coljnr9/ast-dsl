@@ -17,10 +17,15 @@ A **generated sort** declares which constructors build all its values. In the si
 generated_sorts={
     "Stack": GeneratedSortInfo(
         constructors=("new", "push"),
-        selectors={"push": {"top": "Elem", "pop": "Stack"}},
+        selectors={"push": {"top": "e", "pop": "s"}},
     )
 }
 ```
+
+The selector map value is the **parameter name** from the constructor's param list
+(here `push(s: Stack, e: Elem) → Stack`), not the result sort. This identifies
+precisely which parameter the selector extracts — essential when multiple params
+share the same sort.
 
 Every function is classified by its role relative to the generated sort:
 
@@ -33,7 +38,7 @@ Every function is classified by its role relative to the generated sort:
 | **Uninterpreted** | Appears in axioms but not defined by them (e.g., `classify`). |
 
 **Selectors** are declared per-constructor. `get_target` is a selector of `set_target`
-(extracts `Temp`) but a regular observer of `read_temp` (preservation, not extraction).
+(extracts param `t`) but a regular observer of `read_temp` (preservation, not extraction).
 A function is a selector when its axiom is unconditional component extraction:
 `get_target(set_target(th, t)) = t`."""
 

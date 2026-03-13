@@ -244,7 +244,7 @@ class ObligationCell:
     key_sort: SortRef | None = None  # set when dispatch is HIT or MISS
     eq_pred: str | None = None  # the equality predicate name
     home_constructor: str | None = None  # if SELECTOR, which ctor owns it
-    extracts_sort: str | None = None  # if SELECTOR_EXTRACT, the result sort
+    extracts_param: str | None = None  # if SELECTOR_EXTRACT, the constructor param name
 
 
 @dataclass(frozen=True)
@@ -277,7 +277,7 @@ def _compute_tier(
     sig: Signature,
     equality_preds: dict[SortRef, str],
 ) -> tuple[CellTier, str | None, str | None]:
-    """Compute the tier for a cell. Returns (tier, home_ctor, extracts_sort)."""
+    """Compute the tier for a cell. Returns (tier, home_ctor, extracts_param)."""
     # 1. Selectors take precedence
     if not isinstance(obs, PredSymbol):
         role = fn_roles.get(obs.name)
@@ -289,7 +289,7 @@ def _compute_tier(
                         return (
                             CellTier.SELECTOR_EXTRACT,
                             ctor_name,
-                            sel_map[obs.name],
+                            sel_map[obs.name],  # param_name
                         )
                     else:
                         return CellTier.SELECTOR_FOREIGN, ctor_name, None
@@ -458,7 +458,7 @@ def build_obligation_table(sig: Signature) -> ObligationTable:
                         )
 
                 dispatch = _detect_key_dispatch(obs, ctor, equality_preds, gen_sort)
-                tier, home_ctor, extracts_sort = _compute_tier(
+                tier, home_ctor, extracts_param = _compute_tier(
                     obs, ctor, gen_sort, fn_roles, sig, equality_preds
                 )
                 is_pred = isinstance(obs, PredSymbol)
@@ -476,7 +476,7 @@ def build_obligation_table(sig: Signature) -> ObligationTable:
                             key_sort=key_sort,
                             eq_pred=eq_pred,
                             home_constructor=home_ctor,
-                            extracts_sort=extracts_sort,
+                            extracts_param=extracts_param,
                         )
                     )
                     cells.append(
@@ -490,7 +490,7 @@ def build_obligation_table(sig: Signature) -> ObligationTable:
                             key_sort=key_sort,
                             eq_pred=eq_pred,
                             home_constructor=home_ctor,
-                            extracts_sort=extracts_sort,
+                            extracts_param=extracts_param,
                         )
                     )
                 else:
@@ -503,7 +503,7 @@ def build_obligation_table(sig: Signature) -> ObligationTable:
                             dispatch=CellDispatch.PLAIN,
                             tier=tier,
                             home_constructor=home_ctor,
-                            extracts_sort=extracts_sort,
+                            extracts_param=extracts_param,
                         )
                     )
 

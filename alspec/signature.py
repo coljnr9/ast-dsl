@@ -109,12 +109,16 @@ class GeneratedSortInfo:
     - constructors: the operations that build values of this sort
     - selectors: for each constructor, which observers extract its components
 
-    Example (Stack):
+    The selector map value is the **parameter name** from the constructor's
+    param list, NOT the result sort. This allows precise disambiguation when
+    a constructor has multiple parameters of the same sort.
+
+    Example (Stack): push(s: Stack, e: Elem) → Stack
         GeneratedSortInfo(
             constructors=("new", "push"),
-            selectors={"push": {"top": "Elem", "pop": "Stack"}}
+            selectors={"push": {"top": "e", "pop": "s"}}
         )
-    Meaning: push has two components — top extracts the Elem, pop extracts the Stack.
+    Meaning: top extracts param 'e' (the Elem), pop extracts param 's' (the Stack).
     new has no selectors (it's a nullary base constructor).
 
     Example (FiniteMap):
@@ -126,7 +130,7 @@ class GeneratedSortInfo:
     """
 
     constructors: tuple[str, ...]
-    selectors: Mapping[str, Mapping[str, str]] = field(default_factory=dict)  # ctor_name → {selector_name: result_sort}
+    selectors: Mapping[str, Mapping[str, str]] = field(default_factory=dict)  # ctor_name → {selector_name: param_name}
 
 
 # ---------------------------------------------------------------------------
@@ -145,12 +149,33 @@ class Signature:
     P: predicate symbols, keyed by name
 
     Invariant: every SortRef in F and P must reference a sort in S.
+    Invariant: every selector param name in generated_sorts must exist
+               in the corresponding constructor's param list.
     """
 
     sorts: Mapping[str, SortDecl]
     functions: Mapping[str, FnSymbol]
     predicates: Mapping[str, PredSymbol]
     generated_sorts: Mapping[str, GeneratedSortInfo] = _EMPTY_GENERATED_SORTS
+
+    def __post_init__(self) -> None:
+        """Validate selector param names against constructor param lists."""
+        for sort_name, info in self.generated_sorts.items():
+            for ctor_name, sel_map in info.selectors.items():
+                if ctor_name not in self.functions:
+                    raise ValueError(
+                        f"Selector map references unknown constructor '{ctor_name}' "
+                        f"for generated sort '{sort_name}'"
+                    )
+                ctor = self.functions[ctor_name]
+                ctor_param_names = {p.name for p in ctor.params}
+                for sel_name, param_name in sel_map.items():
+                    if param_name not in ctor_param_names:
+                        raise ValueError(
+                            f"Selector '{sel_name}' maps to param '{param_name}' "
+                            f"but constructor '{ctor_name}' has params: "
+                            f"{sorted(ctor_param_names)}"
+                        )
 
     def get_sort(self, name: str) -> SortDecl | None:
         return self.sorts.get(name)

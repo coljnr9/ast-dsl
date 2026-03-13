@@ -77,7 +77,7 @@ def temperature_sensor_spec() -> Spec:
         generated_sorts={
             "Sensor": GeneratedSortInfo(
                 constructors=("init", "record"),
-                selectors={"record": {"read": "Temp"}},
+                selectors={"record": {"read": "t"}},
             )
         },
     )

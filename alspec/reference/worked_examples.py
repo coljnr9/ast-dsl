@@ -958,7 +958,7 @@ def temperature_sensor_spec() -> Spec:
         generated_sorts={
             "Sensor": GeneratedSortInfo(
                 constructors=("init", "record"),
-                selectors={"record": {"read": "Temp"}},
+                selectors={"record": {"read": "t"}},
             )
         },
     )
@@ -1086,8 +1086,8 @@ def thermostat_spec() -> Spec:
             "Thermostat": GeneratedSortInfo(
                 constructors=("new", "set_target", "read_temp"),
                 selectors={
-                    "set_target": {"get_target": "Temp"},
-                    "read_temp": {"get_current": "Temp"},
+                    "set_target": {"get_target": "t"},
+                    "read_temp": {"get_current": "r"},
                 },
             )
         },
@@ -1425,7 +1425,7 @@ def door_lock_spec() -> Spec:
         generated_sorts={
             "Lock": GeneratedSortInfo(
                 constructors=("new", "lock", "unlock", "open_door", "close_door"),
-                selectors={"new": {"get_code": "Code"}},
+                selectors={"new": {"get_code": "c"}},
             )
         },
     )
@@ -4898,7 +4898,7 @@ def stack_spec() -> Spec:
         generated_sorts={
             "Stack": GeneratedSortInfo(
                 constructors=("new", "push"),
-                selectors={"push": {"top": "Elem", "pop": "Stack"}},
+                selectors={"push": {"top": "e", "pop": "s"}},
             )
         },
     )
@@ -5800,8 +5800,8 @@ def session_store_spec() -> Spec:
             "Session": GeneratedSortInfo(
                 constructors=("create", "verify", "expire", "refresh"),
                 selectors={
-                    "create": {"get_token": "Token"},
-                    "verify": {"last_input": "Token"},
+                    "create": {"get_token": "t"},
+                    "verify": {"last_input": "t"},
                 },
             ),
             "Status": GeneratedSortInfo(
@@ -6385,8 +6385,8 @@ def rate_limiter_spec() -> Spec:
             "Limiter": GeneratedSortInfo(
                 constructors=("create", "record", "reset", "set_max"),
                 selectors={
-                    "create": {"get_max": "Nat"},
-                    "set_max": {"get_max": "Nat"},
+                    "create": {"get_max": "m"},
+                    "set_max": {"get_max": "n"},
                 },
             ),
             "Status": GeneratedSortInfo(
@@ -7627,7 +7627,7 @@ def connection_spec() -> Spec:
             "Conn": GeneratedSortInfo(
                 constructors=("create", "connect", "disconnect", "fail", "retry"),
                 selectors={
-                    "fail": {"get_error": "ErrorCode"},
+                    "fail": {"get_error": "e"},
                 },
             ),
             "State": GeneratedSortInfo(

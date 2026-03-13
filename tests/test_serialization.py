@@ -54,7 +54,7 @@ class TestGeneratedSortsRoundTrip:
             generated_sorts={
                 "Stack": GeneratedSortInfo(
                     constructors=("new", "push"),
-                    selectors={"push": {"top": "Elem"}},
+                    selectors={"push": {"top": "e"}},
                 )
             },
         )

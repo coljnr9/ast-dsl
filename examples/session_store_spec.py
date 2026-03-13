@@ -81,8 +81,8 @@ def session_store_spec() -> Spec:
             "Session": GeneratedSortInfo(
                 constructors=("create", "verify", "expire", "refresh"),
                 selectors={
-                    "create": {"get_token": "Token"},
-                    "verify": {"last_input": "Token"},
+                    "create": {"get_token": "t"},
+                    "verify": {"last_input": "t"},
                 },
             ),
             "Status": GeneratedSortInfo(

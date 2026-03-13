@@ -63,7 +63,9 @@ sig = Signature(
 - `sorts`: all sort declarations using `atomic(name)`
 - `functions`: all function symbols using `fn(name, params, result, total=True/False)`
 - `predicates`: all predicate symbols using `pred(name, params)`
-- `generated_sorts`: for each generated sort, use `GeneratedSortInfo(constructors=(...), selectors={...})`
+- `generated_sorts`: for each generated sort, use `GeneratedSortInfo(constructors=(...), selectors={...})`.
+  - In `selectors`, the value for each selector is the **parameter name** it extracts from that constructor, not the sort name.
+  - Example: `push(s: Stack, e: Elem)` with selectors `pop` and `top` → `selectors={"push": {"pop": "s", "top": "e"}}`
 
 Do NOT wrap the code in a function definition.
 Do NOT write any axioms — a later stage will handle axiom generation.

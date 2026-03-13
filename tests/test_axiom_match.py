@@ -2390,8 +2390,8 @@ class TestImplicationFormDefinitions:
             generated_sorts={
                 "Thermostat": GeneratedSortInfo(
                     constructors=("create", "set_target"),
-                    selectors={"create": {"get_target": "Temp", "get_current": "Temp"},
-                               "set_target": {"get_target": "Temp"}},
+                    selectors={"create": {"get_target": "t", "get_current": "t"},
+                               "set_target": {"get_target": "t"}},
                 ),
                 "Status": GeneratedSortInfo(constructors=("on", "off"), selectors={}),
             },

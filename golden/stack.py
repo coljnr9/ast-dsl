@@ -83,7 +83,7 @@ def stack_spec() -> Spec:
         generated_sorts={
             "Stack": GeneratedSortInfo(
                 constructors=("new", "push"),
-                selectors={"push": {"top": "Elem", "pop": "Stack"}},
+                selectors={"push": {"top": "e", "pop": "s"}},
             )
         },
     )

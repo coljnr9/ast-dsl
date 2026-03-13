@@ -80,8 +80,8 @@ def rate_limiter_spec() -> Spec:
             "Limiter": GeneratedSortInfo(
                 constructors=("create", "record", "reset", "set_max"),
                 selectors={
-                    "create": {"get_max": "Nat"},
-                    "set_max": {"get_max": "Nat"},
+                    "create": {"get_max": "m"},
+                    "set_max": {"get_max": "n"},
                 },
             ),
             "Status": GeneratedSortInfo(

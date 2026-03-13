@@ -137,8 +137,8 @@ def thermostat_spec() -> Spec:
             "Thermostat": GeneratedSortInfo(
                 constructors=("new", "set_target", "read_temp"),
                 selectors={
-                    "set_target": {"get_target": "Temp"},
-                    "read_temp": {"get_current": "Temp"},
+                    "set_target": {"get_target": "t"},
+                    "read_temp": {"get_current": "r"},
                 },
             )
         },
