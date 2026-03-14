@@ -370,7 +370,7 @@ class TestPartialOrderSpec:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# nat_spec — leq_suc_suc
+# nat_spec — leq_succ_succ
 # Guard predicate and constrained predicate are the same symbol
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -380,23 +380,23 @@ class TestNatSpecLeqSucSuc:
     def _index(self) -> None:
         self.index = AxiomIndex.from_spec(nat_spec())
 
-    def test_leq_suc_suc(self) -> None:
-        rec = _record_by_label(self.index, "leq_suc_suc")
+    def test_leq_succ_succ(self) -> None:
+        rec = _record_by_label(self.index, "leq_succ_succ")
 
         # variables: (x:Nat, y:Nat)
         assert len(rec.variables) == 2
         assert rec.variables[0].name == "x"
         assert rec.variables[1].name == "y"
 
-        # guards: (Guard("leq", "+", (suc(x), suc(y))),)
+        # guards: (Guard("leq", "+", (succ(x), suc(y))),)
         assert len(rec.guards) == 1
         g = rec.guards[0]
         assert g.pred_name == "leq"
         assert g.polarity == "+"
         assert len(g.args) == 2
-        # args are FnApp("suc", (Var("x", Nat),)) and FnApp("suc", (Var("y", Nat),))
-        assert isinstance(g.args[0], FnApp) and g.args[0].fn_name == "suc"
-        assert isinstance(g.args[1], FnApp) and g.args[1].fn_name == "suc"
+        # args are FnApp("succ", (Var("x", Nat),)) and FnApp("succ", (Var("y", Nat),))
+        assert isinstance(g.args[0], FnApp) and g.args[0].fn_name == "succ"
+        assert isinstance(g.args[1], FnApp) and g.args[1].fn_name == "succ"
 
         # body: pred_app("leq", x, y) — the consequent after guard extraction
         assert isinstance(rec.body, PredApp)
@@ -407,11 +407,11 @@ class TestNatSpecLeqSucSuc:
         assert rec.equation_rhs is None
 
         assert rec.referenced_preds == {"leq"}
-        assert "suc" in rec.referenced_fns
+        assert "succ" in rec.referenced_fns
 
-    def test_lt_suc(self) -> None:
-        """lt_suc: PredApp guard → constrained = lt predicate."""
-        rec = _record_by_label(self.index, "lt_suc")
+    def test_lt_succc(self) -> None:
+        """lt_succ: PredApp guard → constrained = lt predicate."""
+        rec = _record_by_label(self.index, "lt_succ")
         assert len(rec.guards) == 1
         assert rec.guards[0].pred_name == "lt"
         assert rec.guards[0].polarity == "+"
@@ -436,13 +436,13 @@ class TestNatSpecLeqSucSuc:
         assert rec.constrained == ConstrainedSymbol("add", "function")
         assert isinstance(rec.equation_rhs, Var)
 
-    def test_add_suc(self) -> None:
-        """add_suc: simple equation, constrained = add function."""
-        rec = _record_by_label(self.index, "add_suc")
+    def test_add_succc(self) -> None:
+        """add_succ: simple equation, constrained = add function."""
+        rec = _record_by_label(self.index, "add_succ")
         assert rec.guards == ()
         assert rec.constrained == ConstrainedSymbol("add", "function")
         assert isinstance(rec.equation_rhs, FnApp)
-        assert rec.equation_rhs.fn_name == "suc"
+        assert rec.equation_rhs.fn_name == "succ"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -719,7 +719,7 @@ class TestAuditSpecUnconstrainedFunction:
             sorts={"Nat": atomic("Nat")},
             functions={
                 "zero": fn("zero", [], "Nat"),
-                "suc": fn("suc", [("n", "Nat")], "Nat"),
+                "succ": fn("succ", [("n", "Nat")], "Nat"),
                 "unused_fn": fn("unused_fn", [("n", "Nat")], "Nat"),  # never referenced
             },
             predicates={},
@@ -729,7 +729,7 @@ class TestAuditSpecUnconstrainedFunction:
             name="TestUnconstrained",
             signature=sig,
             axioms=(
-                Axiom("trivial", forall([x], eq(app("suc", x), app("suc", x)))),
+                Axiom("trivial", forall([x], eq(app("succ", x), app("succ", x)))),
             ),
         )
         diagnostics = audit_spec(spec)
@@ -891,7 +891,7 @@ class TestAuditFlagInScoreSpec:
             sorts={"Nat": atomic("Nat")},
             functions={
                 "zero": fn("zero", [], "Nat"),
-                "suc": fn("suc", [("n", "Nat")], "Nat"),
+                "succ": fn("succ", [("n", "Nat")], "Nat"),
                 "unused_fn": fn("unused_fn", [("n", "Nat")], "Nat"),
             },
             predicates={},
@@ -901,7 +901,7 @@ class TestAuditFlagInScoreSpec:
             name="TestUnconstrained",
             signature=sig,
             axioms=(
-                Axiom("trivial", forall([x], eq(app("suc", x), app("suc", x)))),
+                Axiom("trivial", forall([x], eq(app("succ", x), app("succ", x)))),
             ),
         )
 

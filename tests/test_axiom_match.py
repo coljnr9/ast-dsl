@@ -1246,7 +1246,7 @@ GOLDEN_STEMS = [
 # Specs NOT in this set have known exceptional axiom patterns:
 #   - access-control: distinctness axioms (negation(Equation(const, const)))
 #                     and can_access_def (derived pred with Var first arg).
-#   - email-inbox: pred_zero/pred_suc (Nat helper axioms for uninterpreted fns).
+#   - email-inbox: pred_zero/pred_succ (Nat helper axioms for uninterpreted fns).
 # These are legitimately UNMATCHED — they don't follow the obs(ctor(...)) pattern.
 ZERO_UNMATCHED_SPECS = set(GOLDEN_STEMS) - {"email-inbox"}
 

@@ -21,6 +21,7 @@ Usage:
 
 from alspec import (
     Axiom,
+    Biconditional,
     Conjunction,
     Disjunction,
     Implication,
@@ -112,16 +113,19 @@ def nat_spec() -> Spec:
 
     sorts:  Nat
     ops:    zero : → Nat
-            suc : Nat → Nat
+            succ : Nat → Nat
             add, mul : Nat × Nat → Nat
-    preds:  leq, lt : Nat × Nat
+    preds:  leq, lt, geq : Nat × Nat
     axioms: add(zero, y) = y
-            add(suc(x), y) = suc(add(x, y))
+            add(succ(x), y) = succ(add(x, y))
             mul(zero, y) = zero
-            mul(suc(x), y) = add(y, mul(x, y))
+            mul(succ(x), y) = add(y, mul(x, y))
             leq(zero, y)
             ¬ lt(y, zero)
-            leq(suc(x), suc(y)) ⟺ leq(x, y)
+            leq(succ(x), succ(y)) ⟺ leq(x, y)
+            geq(n, zero)
+            ¬ geq(zero, succ(n))
+            geq(succ(x), succ(y)) ⟺ geq(x, y)
     """
     x = var("x", "Nat")
     y = var("y", "Nat")
@@ -130,37 +134,38 @@ def nat_spec() -> Spec:
         sorts={"Nat": atomic("Nat")},
         functions={
             "zero": fn("zero", [], "Nat"),
-            "suc": fn("suc", [("n", "Nat")], "Nat"),
+            "succ": fn("succ", [("n", "Nat")], "Nat"),
             "add": fn("add", [("x", "Nat"), ("y", "Nat")], "Nat"),
             "mul": fn("mul", [("x", "Nat"), ("y", "Nat")], "Nat"),
         },
         predicates={
             "leq": pred("leq", [("x", "Nat"), ("y", "Nat")]),
             "lt": pred("lt", [("x", "Nat"), ("y", "Nat")]),
+            "geq": pred("geq", [("x", "Nat"), ("y", "Nat")]),
         },
     )
 
     axioms = (
-        # add: 2 constructors (zero, suc) on first arg → 2 axioms
+        # add: 2 constructors (zero, succ) on first arg → 2 axioms
         Axiom("add_zero", forall([y], eq(app("add", const("zero"), y), y))),
         Axiom(
-            "add_suc",
+            "add_succ",
             forall(
                 [x, y],
                 eq(
-                    app("add", app("suc", x), y),
-                    app("suc", app("add", x, y)),
+                    app("add", app("succ", x), y),
+                    app("succ", app("add", x, y)),
                 ),
             ),
         ),
         # mul: 2 constructors on first arg → 2 axioms
         Axiom("mul_zero", forall([y], eq(app("mul", const("zero"), y), const("zero")))),
         Axiom(
-            "mul_suc",
+            "mul_succ",
             forall(
                 [x, y],
                 eq(
-                    app("mul", app("suc", x), y),
+                    app("mul", app("succ", x), y),
                     app("add", y, app("mul", x, y)),
                 ),
             ),
@@ -168,11 +173,11 @@ def nat_spec() -> Spec:
         # leq: 2 constructors on first arg → 2 axioms
         Axiom("leq_zero", forall([y], PredApp("leq", (const("zero"), y)))),
         Axiom(
-            "leq_suc_suc",
+            "leq_succ_succ",
             forall(
                 [x, y],
                 Implication(
-                    PredApp("leq", (app("suc", x), app("suc", y))),
+                    PredApp("leq", (app("succ", x), app("succ", y))),
                     PredApp("leq", (x, y)),
                 ),
             ),
@@ -180,12 +185,25 @@ def nat_spec() -> Spec:
         # lt: 2 constructors on second arg → 2 axioms
         Axiom("lt_zero", forall([y], Negation(PredApp("lt", (y, const("zero")))))),
         Axiom(
-            "lt_suc",
+            "lt_succ",
             forall(
                 [x, y],
                 Implication(
-                    PredApp("lt", (app("suc", x), app("suc", y))),
+                    PredApp("lt", (app("succ", x), app("succ", y))),
                     PredApp("lt", (x, y)),
+                ),
+            ),
+        ),
+        # geq: inductive definition (3 axioms)
+        Axiom("geq_zero_base", forall([y], PredApp("geq", (y, const("zero"))))),
+        Axiom("geq_zero_succ", forall([y], Negation(PredApp("geq", (const("zero"), app("succ", y)))))),
+        Axiom(
+            "geq_succ_succ",
+            forall(
+                [x, y],
+                Biconditional(
+                    PredApp("geq", (app("succ", x), app("succ", y))),
+                    PredApp("geq", (x, y)),
                 ),
             ),
         ),
@@ -346,13 +364,13 @@ def list_spec() -> Spec:
             append : List × List → List
             length : List → Nat
             zero : → Nat
-            suc : Nat → Nat
+            succ : Nat → Nat
     axioms: hd(cons(x, L)) = x
             tl(cons(x, L)) = L
             append(nil, M) = M
             append(cons(x, L), M) = cons(x, append(L, M))
             length(nil) = zero
-            length(cons(x, L)) = suc(length(L))
+            length(cons(x, L)) = succ(length(L))
     """
     x = var("x", "Elem")
     L = var("L", "List")
@@ -370,7 +388,7 @@ def list_spec() -> Spec:
             "cons": fn("cons", [("x", "Elem"), ("L", "List")], "List"),
             # Nat constructors (needed for length)
             "zero": fn("zero", [], "Nat"),
-            "suc": fn("suc", [("n", "Nat")], "Nat"),
+            "succ": fn("succ", [("n", "Nat")], "Nat"),
             # Observers (partial — undefined on nil)
             "hd": fn("hd", [("L", "List")], "Elem", total=False),
             "tl": fn("tl", [("L", "List")], "List", total=False),
@@ -414,7 +432,7 @@ def list_spec() -> Spec:
                 [x, L],
                 eq(
                     app("length", app("cons", x, L)),
-                    app("suc", app("length", L)),
+                    app("succ", app("length", L)),
                 ),
             ),
         ),

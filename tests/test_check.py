@@ -20,7 +20,7 @@ def get_base_sig() -> Signature:
         sorts={"Nat": AtomicSort(SortRef("Nat")), "Bool": AtomicSort(SortRef("Bool"))},
         functions={
             "zero": FnSymbol("zero", (), SortRef("Nat")),
-            "suc": FnSymbol("suc", (FnParam("n", SortRef("Nat")),), SortRef("Nat")),
+            "succ": FnSymbol("succ", (FnParam("n", SortRef("Nat")),), SortRef("Nat")),
             "add": FnSymbol(
                 "add",
                 (FnParam("a", SortRef("Nat")), FnParam("b", SortRef("Nat"))),
@@ -104,7 +104,7 @@ def test_fn_arity() -> None:
     ax = Axiom(
         label="bad_arity",
         formula=Equation(
-            FnApp("suc", (FnApp("zero", ()), FnApp("zero", ()))), FnApp("zero", ())
+            FnApp("succ", (FnApp("zero", ()), FnApp("zero", ()))), FnApp("zero", ())
         ),
     )
     spec = Spec("Test", sig, (ax,))
@@ -117,7 +117,7 @@ def test_fn_arg_sorts() -> None:
     ax = Axiom(
         label="bad_sort",
         formula=Equation(
-            FnApp("suc", (FnApp("is_zero", (FnApp("zero", ()),)),)), FnApp("zero", ())
+            FnApp("succ", (FnApp("is_zero", (FnApp("zero", ()),)),)), FnApp("zero", ())
         ),  # bool passed to nat
     )
     spec = Spec("Test", sig, (ax,))
