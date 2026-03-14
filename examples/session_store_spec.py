@@ -24,7 +24,11 @@ def session_store_spec() -> Spec:
     """Session Store specification.
 
     Models a single authentication session lifecycle with token-based
-    verification, expiry, and refresh. Demonstrates:
+    verification, expiry, and refresh. This domain does not use any
+    basis library sorts — Token is opaque (no arithmetic or comparison
+    needed beyond eq_token), and Status is a domain-specific enumeration.
+    The basis library's FiniteMap pattern does not apply here because
+    this models a single session, not a keyed collection. Demonstrates:
 
     - Selector extraction + foreign (get_token, last_input)
     - Equality predicate basis axioms (eq_token)

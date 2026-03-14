@@ -523,7 +523,7 @@ BOUNDED_COUNTER = WorkedExample(
     ),
     functions=(
         FunctionInfo("zero", "-> Nat", FunctionRole.CONSTANT, "Zero constant for natural numbers"),
-        FunctionInfo("suc", "Nat -> Nat", FunctionRole.CONSTRUCTOR, "Successor function for natural numbers"),
+        FunctionInfo("succ", "Nat -> Nat", FunctionRole.CONSTRUCTOR, "Successor function for natural numbers"),
         FunctionInfo("new", "Nat -> Counter", FunctionRole.CONSTRUCTOR, "Creates new counter with given maximum capacity"),
         FunctionInfo("inc", "Counter ->? Counter", FunctionRole.CONSTRUCTOR, "Increments counter, undefined at max"),
         FunctionInfo("val", "Counter -> Nat", FunctionRole.OBSERVER, "Returns current count value"),
@@ -579,7 +579,7 @@ def bounded_counter_spec() -> Spec:
         functions={
             # Nat helpers
             "zero": fn("zero", [], "Nat"),
-            "suc": fn("suc", [("n", "Nat")], "Nat"),
+            "succ": fn("succ", [("n", "Nat")], "Nat"),
             # Counter constructors
             "new": fn("new", [("m", "Nat")], "Counter"),
             "inc": fn("inc", [("c", "Counter")], "Counter", total=False),
@@ -630,7 +630,7 @@ def bounded_counter_spec() -> Spec:
                     negation(pred_app("is_at_max", c)),
                     eq(
                         app("val", app("inc", c)),
-                        app("suc", app("val", c)),
+                        app("succ", app("val", c)),
                     ),
                 ),
             ),
@@ -679,7 +679,7 @@ def bounded_counter_spec() -> Spec:
                     negation(pred_app("is_at_max", c)),
                     iff(
                         pred_app("is_at_max", app("inc", c)),
-                        eq(app("suc", app("val", c)), app("max_val", c)),
+                        eq(app("succ", app("val", c)), app("max_val", c)),
                     ),
                 ),
             ),
@@ -3326,7 +3326,7 @@ EMAIL_INBOX = WorkedExample(
         FunctionInfo("delete", "Inbox × MsgId → Inbox", FunctionRole.CONSTRUCTOR, "Removes a message"),
         FunctionInfo("star", "Inbox × MsgId → Inbox", FunctionRole.CONSTRUCTOR, "Stars/unstars a message"),
         FunctionInfo("zero", "→ Nat", FunctionRole.HELPER, "Natural number zero"),
-        FunctionInfo("suc", "Nat → Nat", FunctionRole.HELPER, "Natural number successor"),
+        FunctionInfo("succ", "Nat → Nat", FunctionRole.HELPER, "Natural number successor"),
         FunctionInfo("pred", "Nat → Nat", FunctionRole.HELPER, "Natural number predecessor"),
         FunctionInfo("unread_count", "Inbox → Nat", FunctionRole.OBSERVER, "Gets total unread messages"),
         FunctionInfo("eq_id", "MsgId × MsgId", FunctionRole.PREDICATE, "Message ID equality test"),
@@ -3396,7 +3396,7 @@ def email_inbox_spec() -> Spec:
             "star": fn("star", [("i", "Inbox"), ("m", "MsgId")], "Inbox"),
             # Nat helpers
             "zero": fn("zero", [], "Nat"),
-            "suc": fn("suc", [("n", "Nat")], "Nat"),
+            "succ": fn("succ", [("n", "Nat")], "Nat"),
             "pred": fn("pred", [("n", "Nat")], "Nat"),
             # Observer
             "unread_count": fn("unread_count", [("i", "Inbox")], "Nat"),
@@ -3448,7 +3448,7 @@ def email_inbox_spec() -> Spec:
         # pred x zero: BASIS — pred(zero) = zero
         Axiom(label="pred_zero", formula=eq(app("pred", const("zero")), const("zero"))),
         # pred x suc: BASIS — pred(suc(n)) = n
-        Axiom(label="pred_suc", formula=forall([n], eq(app("pred", app("suc", n)), n))),
+        Axiom(label="pred_succ", formula=forall([n], eq(app("pred", app("succ", n)), n))),
         # == has_msg axioms ==
         # has_msg x empty: BASIS — Empty inbox has no messages
         Axiom(
@@ -3799,7 +3799,7 @@ def email_inbox_spec() -> Spec:
                     negation(pred_app("has_msg", i, m)),
                     eq(
                         app("unread_count", app("receive", i, m)),
-                        app("suc", app("unread_count", i)),
+                        app("succ", app("unread_count", i)),
                     ),
                 ),
             ),
@@ -3844,7 +3844,7 @@ def email_inbox_spec() -> Spec:
                     conjunction(pred_app("has_msg", i, m), pred_app("is_read", i, m)),
                     eq(
                         app("unread_count", app("mark_unread", i, m)),
-                        app("suc", app("unread_count", i)),
+                        app("succ", app("unread_count", i)),
                     ),
                 ),
             ),
@@ -5743,7 +5743,11 @@ def session_store_spec() -> Spec:
     """Session Store specification.
 
     Models a single authentication session lifecycle with token-based
-    verification, expiry, and refresh. Demonstrates:
+    verification, expiry, and refresh. This domain does not use any
+    basis library sorts — Token is opaque (no arithmetic or comparison
+    needed beyond eq_token), and Status is a domain-specific enumeration.
+    The basis library's FiniteMap pattern does not apply here because
+    this models a single session, not a keyed collection. Demonstrates:
 
     - Selector extraction + foreign (get_token, last_input)
     - Equality predicate basis axioms (eq_token)
@@ -6167,6 +6171,10 @@ def session_store_spec() -> Spec:
         "The domain is a single authentication session — not a session store with "
         "multiple sessions, just one session that goes through a lifecycle of creation, "
         "verification, expiry, and refresh. The generated sort is Session.\n\n"
+        "This domain does not use any basis library sorts — Token is opaque (no arithmetic "
+        "or comparison needed beyond eq_token), and Status is a domain-specific enumeration. "
+        "The basis library's FiniteMap pattern does not apply here because this models a "
+        "single session, not a keyed collection.\n\n"
         "Sessions have a two-phase lifecycle: active and expired. That gives me an "
         "enumeration sort Status with constructors active and expired. These must be "
         "explicitly distinct — under loose semantics, a model where active = expired "
@@ -6229,7 +6237,7 @@ def session_store_spec() -> Spec:
 
 RATE_LIMITER = WorkedExample(
     domain_name="Rate Limiter",
-    summary="Models a rate limiter tracking request counts against a configured maximum per window. Demonstrates multi-constructor selector extraction, cross-sort helpers (Nat with zero/succ), helper composition in accumulator axioms, comparison-driven predicate via inductive Peano geq, preservation collapse, function-valued derived observer with guard-split per-constructor axioms, and linked predicate/function derived observers.",
+    summary="Models a rate limiter tracking request counts against a configured maximum per window. Demonstrates basis library usage (Nat with zero/succ/geq as utility sort), unary predicate design avoiding false key dispatch, multi-constructor selector extraction, helper composition in accumulator axioms, preservation collapse, function-valued derived observer with guard-split per-constructor axioms, and linked predicate/function derived observers.",
     patterns=frozenset({
         Pattern.SEL_EXTRACT,
         Pattern.PRESERVATION,
@@ -6242,7 +6250,7 @@ RATE_LIMITER = WorkedExample(
     }),
     sorts=(
         SortInfo("Limiter", "GENERATED", "Central domain object representing rate limiter state"),
-        SortInfo("Nat", "ATOMIC", "Cross-sort Peano naturals for counting (zero/succ)"),
+        SortInfo("Nat", "ATOMIC", "Basis library Nat — utility sort for counting, NOT a domain sort (no generated_sorts entry)"),
         SortInfo("Status", "ENUMERATION", "Rate limit status with explicit distinctness (ok/exceeded)"),
     ),
     functions=(
@@ -6302,6 +6310,20 @@ RATE_LIMITER = WorkedExample(
             "structural predicates like is_empty or is_active, which need no "
             "such infrastructure."
         ),
+        DesignDecision(
+            "Basis library Nat",
+            "Nat operations (zero, succ, geq) come from the basis library. Include them in "
+            "the signature because axioms reference them, but do NOT add Nat to generated_sorts "
+            "or declare selectors for succ. Nat is a utility sort — its structure is defined by "
+            "the basis library, not by this domain."
+        ),
+        DesignDecision(
+            "Unary predicate design",
+            "over_limit takes only Limiter, not a threshold parameter. A binary predicate like "
+            "over_limit(l, n) would share sort Nat with constructor parameters (e.g., set_max(l, n)), "
+            "triggering false key dispatch. The correct pattern: derive comparisons from observers "
+            "inside a unary predicate, keeping the profile free of shared parameter sorts."
+        ),
     ),
     code='''from alspec import (
     Axiom,
@@ -6327,16 +6349,17 @@ def rate_limiter_spec() -> Spec:
     """Rate Limiter specification.
 
     Models a rate limiter tracking request counts against a configured
-    maximum per window. Demonstrates:
+    maximum per window. Demonstrates basis library usage (Nat with
+    zero/succ/geq as utility sort) and:
 
+    - Basis library Nat: include zero, succ, geq in signature because
+      axioms reference them, but do NOT add Nat to generated_sorts
+    - Unary predicate design: over_limit(l) avoids false key dispatch
     - Selector extraction including multi-constructor selector (get_max
       is a selector of both create and set_max)
-    - Selector foreign with preservation (total selectors on non-home ctors)
-    - Cross-sort helpers (Nat with zero/succ)
     - Helper composition: succ(get_count(l)) in accumulator axiom
     - Accumulator pattern (get_count across constructors)
     - Comparison-driven predicate (over_limit via geq)
-    - Inductive helper axioms (Peano definition of geq)
     - Preservation collapse across unrelated constructors
     - Function-valued derived observer (get_status via geq comparison)
     - Enumeration sort with explicit distinctness (Status: ok/exceeded)
@@ -6360,7 +6383,7 @@ def rate_limiter_spec() -> Spec:
             "Status": atomic("Status"),
         },
         functions={
-            # Nat helpers (cross-sort, pattern 10)
+            # Nat basis library (include only operations your axioms reference)
             "zero": fn("zero", [], "Nat"),
             "succ": fn("succ", [("n", "Nat")], "Nat"),
             # Status enumeration
@@ -6378,6 +6401,7 @@ def rate_limiter_spec() -> Spec:
             "get_status": fn("get_status", [("l", "Limiter")], "Status"),
         },
         predicates={
+            # Nat basis predicate (comparison for threshold checking)
             "geq": pred("geq", [("a", "Nat"), ("b", "Nat")]),
             "over_limit": pred("over_limit", [("l", "Limiter")]),
         },
@@ -6685,11 +6709,9 @@ def rate_limiter_spec() -> Spec:
             ),
         ),
         # ==================================================================
-        # HELPER AXIOMS — geq (inductive definition on Nat)
-        # Without these axioms, loose semantics permits models where geq
-        # is unconditionally false (or true), making over_limit vacuous.
-        # These three axioms provide the minimal Peano characterization
-        # of ≥ on natural numbers built from zero/succ.
+        # BASIS AXIOMS — geq (from Nat basis library)
+        # These Peano axioms characterize ≥ on natural numbers.
+        # Without them, loose semantics permits vacuous models.
         # ==================================================================
         # Every natural number is ≥ zero
         Axiom(
@@ -6725,16 +6747,14 @@ def rate_limiter_spec() -> Spec:
     analysis_text=(
         "The domain is a rate limiter that tracks request counts against a configured "
         "maximum per time window. The generated sort is Limiter.\n\n"
-        "I need Peano naturals for counting — a separate sort Nat with zero and succ. "
-        "Nat needs constructors here because get_count computes values: "
-        "get_count(create(m)) must equal zero (an initial value, not a stored parameter), "
-        "and get_count(record(l)) must equal succ(get_count(l)) (a derived value). "
-        "Because the axioms need to name specific Nat values (zero as an initial count, "
-        "succ as the increment), Nat cannot stay opaque — it needs constructors zero and succ. "
-        "I also need a comparison predicate geq (greater-or-equal) with inductive "
-        "Peano axioms: geq(n, zero) holds for all n, ¬geq(zero, succ(n)), and "
-        "geq(succ(a), succ(b)) ↔ geq(a, b). These three axioms fully characterize geq "
-        "and prevent vacuous models under loose semantics.\n\n"
+        "I need natural number arithmetic for counting requests. The basis library provides "
+        "Peano Nat with zero, succ, add, mul, and comparison predicates leq, lt, geq. For "
+        "this domain I need zero (initial count), succ (increment by one), and geq "
+        "(threshold comparison). I include these in my signature as helper functions and "
+        "predicates — they are basis operations, not domain-specific declarations. "
+        "Nat is a utility sort: it stays out of generated_sorts, gets no selectors, and "
+        "no generated sort metadata. Only Limiter (my domain sort) and Status (my "
+        "enumeration) go in generated_sorts.\n\n"
         "Four constructors: create(m) initializes the limiter with maximum m and count "
         "zero. record(l) increments the count by one. reset(l) sets the count back to "
         "zero for window rollover. set_max(l, n) updates the maximum threshold.\n\n"
@@ -6750,6 +6770,16 @@ def rate_limiter_spec() -> Spec:
         "and get_max into the geq condition. For record, get_count becomes "
         "succ(get_count(l)) and get_max is preserved, giving "
         "geq(succ(get_count(l)), get_max(l)).\n\n"
+        "Critically, over_limit is a UNARY predicate — it takes only a Limiter, not a "
+        "threshold parameter. If I made it binary like over_limit(l, n), then n would "
+        "share sort Nat with constructor parameters like set_max(l, n), triggering "
+        "false key dispatch and requiring eq_nat. The correct pattern: derive the "
+        "comparison from observers (geq(get_count(l), get_max(l))) inside a unary "
+        "predicate, keeping the predicate's profile free of shared parameter sorts. "
+        "Similarly, for domains with partial constructors guarded by a comparison "
+        "(like withdraw failing on insufficient funds), use a definedness biconditional "
+        "(def(withdraw(a, amt)) ↔ leq(amt, balance(a))) rather than a separate binary "
+        "predicate like has_funds(a, amt).\n\n"
         "Second, get_status as a function observer returning a Status enumeration "
         "(ok/exceeded). get_status is derived from the same geq condition as "
         "over_limit: get_status(l) = exceeded ↔ over_limit(l). The per-constructor "
@@ -6873,7 +6903,10 @@ def dns_zone_spec() -> Spec:
     """DNS Zone specification.
 
     Models a DNS zone storing resource records indexed by (DomainName,
-    RecordType). Demonstrates:
+    RecordType). This domain follows the FiniteMap basis pattern —
+    empty/add_record/get_rdata maps directly to the basis library's
+    empty/update/lookup with key equality dispatch. The extension is
+    dual-key dispatch: two key sorts instead of one. Demonstrates:
 
     - Dual-key dispatch: obligation table splits on eq_name (first key),
       then second-level key dispatch on eq_type (RecordType) within HIT
@@ -6884,6 +6917,10 @@ def dns_zone_spec() -> Spec:
     - Guard polarity at both key levels
     - Delegation via strong equality (preserves/propagates undefinedness)
     - Existence predicate linked to observer definedness (has_record_def)
+    - Opaque Nat: TTL values are only stored and retrieved, never computed
+      or compared — although the basis library provides structured Nat with
+      zero, succ, add, and comparison predicates, none are needed here;
+      do not import basis operations for purely opaque sorts
 
     Obligation table: 3 observers × 3 constructors = 9 base cells.
     empty cells are PLAIN (3). Keyed constructor cells split into HIT/MISS
@@ -7394,6 +7431,9 @@ def dns_zone_spec() -> Spec:
         "The domain is a DNS zone that stores resource records indexed by a composite "
         "key of (DomainName, RecordType). This is a keyed collection — the generated "
         "sort is Zone.\n\n"
+        "This domain follows the FiniteMap basis pattern — empty/add_record/get_rdata maps "
+        "directly to the basis library's empty/update/lookup with key equality dispatch. The "
+        "extension is dual-key dispatch: two key sorts instead of one.\n\n"
         "The key structure has two levels: DomainName is the primary key, and "
         "RecordType is a secondary key within each name. Both need equality predicates "
         "(eq_name and eq_type) with full basis axioms (reflexivity, symmetry, "
@@ -7412,7 +7452,11 @@ def dns_zone_spec() -> Spec:
         "(MISS cases). No axiom needs to name a specific DomainName, RecordType, RData, "
         "or Nat value that isn't already bound by the universal quantifier from the "
         "constructor's parameter list. This is the hallmark of opaque sorts: they flow "
-        "through the specification as abstract values, never constructed or decomposed.\n\n"
+        "through the specification as abstract values, never constructed or decomposed. "
+        "Although the basis library provides structured Nat with zero, succ, add, and "
+        "comparison predicates, none of those operations are needed here — TTL values are "
+        "only stored and retrieved, never computed or compared. When a sort is purely opaque "
+        "like this, do not import basis operations for it.\n\n"
         "The observers are both partial: get_rdata(z, n, t) returns the resource data "
         "and get_ttl(z, n, t) returns the TTL, but both are undefined when no record "
         "exists at (n, t). On the empty zone, both are unconditionally undefined for "
@@ -7583,6 +7627,11 @@ def connection_spec() -> Spec:
     - Preservation collapse (get_timeout across all state-transition constructors)
     - Selector extraction + foreign undefinedness (get_error)
     - Enumeration sort with explicit distinctness (State: idle/active/failed)
+    - Opaque Nat: timeout is stored by create and retrieved by get_timeout
+      unchanged — the basis library provides structured Nat with arithmetic
+      and comparison, but none of that is needed here; when no axiom computes
+      or compares values of a sort, leave it unstructured and do not import
+      basis operations
 
     Obligation table: 4 observers × 5 constructors = 20 cells, all PLAIN.
     No key dispatch. get_error is partial; all other functions are total.
@@ -7879,6 +7928,10 @@ def connection_spec() -> Spec:
         "opaque — fail(c, e) stores an error code and get_error retrieves it, but no "
         "axiom computes or initializes an ErrorCode value. Nat is similarly opaque: "
         "create(n) stores a timeout value and get_timeout retrieves it unchanged. "
+        "The basis library provides structured Nat with arithmetic and comparison, but "
+        "none of that is needed here — timeout is stored by create and retrieved by "
+        "get_timeout unchanged. This is the opaque pattern: when no axiom computes or "
+        "compares values of a sort, leave it unstructured and do not import basis operations. "
         "Neither sort appears on the right side of an equation except as a variable "
         "from the constructor's parameter list. Contrast this with State: State cannot "
         "be opaque because observers return named State constants (idle_st, active_st, "

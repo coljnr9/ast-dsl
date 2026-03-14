@@ -14,6 +14,20 @@ def render() -> str:
             Pre-built, verified specifications covering fundamental algebraic patterns.
             Use these to recognize when your domain matches an existing pattern.
             Sources: CASL Basic Libraries (CoFI), Sannella & Tarlecki (2012).
+
+            **How to use basis operations in your signature:**
+            - **Include only what you need.** If your axioms reference `zero`, `succ`, and `geq`,
+              include those in your signature's `functions` and `predicates` dicts. Do not include
+              operations you don't use (e.g., don't add `mul` if you only need counting).
+            - **Do NOT add basis sorts to `generated_sorts`.** Basis sorts like Nat and Bool are
+              utility sorts, not domain sorts. Do not declare constructors, selectors, or
+              generated sort metadata for them. Only your domain's own generated sort (and its
+              enumerations) belong in `generated_sorts`.
+            - **Basis operations are helpers, not observers.** They operate on parameter sorts,
+              never on the domain's generated sort. They create no obligation table rows.
+            - **Recognize basis patterns.** If your domain is a keyed collection (store/add/lookup
+              by key), it follows the FiniteMap pattern. If it counts things, it uses Nat. Naming
+              the pattern helps you select the right operations.
             """
         )
     )

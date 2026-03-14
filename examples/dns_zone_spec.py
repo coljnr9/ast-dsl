@@ -24,7 +24,10 @@ def dns_zone_spec() -> Spec:
     """DNS Zone specification.
 
     Models a DNS zone storing resource records indexed by (DomainName,
-    RecordType). Demonstrates:
+    RecordType). This domain follows the FiniteMap basis pattern —
+    empty/add_record/get_rdata maps directly to the basis library's
+    empty/update/lookup with key equality dispatch. The extension is
+    dual-key dispatch: two key sorts instead of one. Demonstrates:
 
     - Dual-key dispatch: obligation table splits on eq_name (first key),
       then second-level key dispatch on eq_type (RecordType) within HIT
@@ -35,6 +38,10 @@ def dns_zone_spec() -> Spec:
     - Guard polarity at both key levels
     - Delegation via strong equality (preserves/propagates undefinedness)
     - Existence predicate linked to observer definedness (has_record_def)
+    - Opaque Nat: TTL values are only stored and retrieved, never computed
+      or compared — although the basis library provides structured Nat with
+      zero, succ, add, and comparison predicates, none are needed here;
+      do not import basis operations for purely opaque sorts
 
     Obligation table: 3 observers × 3 constructors = 9 base cells.
     empty cells are PLAIN (3). Keyed constructor cells split into HIT/MISS

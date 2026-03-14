@@ -22,16 +22,17 @@ def rate_limiter_spec() -> Spec:
     """Rate Limiter specification.
 
     Models a rate limiter tracking request counts against a configured
-    maximum per window. Demonstrates:
+    maximum per window. Demonstrates basis library usage (Nat with
+    zero/succ/geq as utility sort) and:
 
+    - Basis library Nat: include zero, succ, geq in signature because
+      axioms reference them, but do NOT add Nat to generated_sorts
+    - Unary predicate design: over_limit(l) avoids false key dispatch
     - Selector extraction including multi-constructor selector (get_max
       is a selector of both create and set_max)
-    - Selector foreign with preservation (total selectors on non-home ctors)
-    - Cross-sort helpers (Nat with zero/succ)
     - Helper composition: succ(get_count(l)) in accumulator axiom
     - Accumulator pattern (get_count across constructors)
     - Comparison-driven predicate (over_limit via geq)
-    - Inductive helper axioms (Peano definition of geq)
     - Preservation collapse across unrelated constructors
     - Function-valued derived observer (get_status via geq comparison)
     - Enumeration sort with explicit distinctness (Status: ok/exceeded)
@@ -55,7 +56,7 @@ def rate_limiter_spec() -> Spec:
             "Status": atomic("Status"),
         },
         functions={
-            # Nat helpers (cross-sort, pattern 10)
+            # Nat basis library (include only operations your axioms reference)
             "zero": fn("zero", [], "Nat"),
             "succ": fn("succ", [("n", "Nat")], "Nat"),
             # Status enumeration
@@ -73,6 +74,7 @@ def rate_limiter_spec() -> Spec:
             "get_status": fn("get_status", [("l", "Limiter")], "Status"),
         },
         predicates={
+            # Nat basis predicate (comparison for threshold checking)
             "geq": pred("geq", [("a", "Nat"), ("b", "Nat")]),
             "over_limit": pred("over_limit", [("l", "Limiter")]),
         },
@@ -380,11 +382,9 @@ def rate_limiter_spec() -> Spec:
             ),
         ),
         # ==================================================================
-        # HELPER AXIOMS — geq (inductive definition on Nat)
-        # Without these axioms, loose semantics permits models where geq
-        # is unconditionally false (or true), making over_limit vacuous.
-        # These three axioms provide the minimal Peano characterization
-        # of ≥ on natural numbers built from zero/succ.
+        # BASIS AXIOMS — geq (from Nat basis library)
+        # These Peano axioms characterize ≥ on natural numbers.
+        # Without them, loose semantics permits vacuous models.
         # ==================================================================
         # Every natural number is ≥ zero
         Axiom(
