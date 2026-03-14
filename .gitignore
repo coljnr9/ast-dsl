@@ -18,6 +18,8 @@ algebraic-specification-references/
 
 # Experiment Results
 results/
+result
+.direnv/
 data/analysis/
 
 # Pipeline cache directories
